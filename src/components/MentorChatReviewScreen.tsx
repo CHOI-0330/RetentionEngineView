@@ -28,6 +28,7 @@ interface MentorChatReviewScreenProps {
 export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewScreenProps) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState('');
+  const [comment, setComment] = useState('');
 
   // Mock data based on studentId
   const getStudentData = (id: string) => {
@@ -67,7 +68,7 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
         },
         {
           id: '2',
-          content: "もちろんです！二次方程式は多くの実生活の問題で使用されます。例えば、物体の放物線運動を計算する際や、利益を最大化する価格を見つける場合などです。具体的な例を使って説明しましょう。\n\nボールを投げた時の軌道は h = -4.9t² + v₀t + h₀ という二次方程式で表せます。ここで h は高さ、t は時間、v₀ は初速度、h₀ は初期の高さです。",
+          content: "もちろんです！二次方程式は多くの実生活の問題で使用されます。例えば、物体の放物線運動を計算する際や、利益を最大化する価格を見つける場合などです。具体的な例を使って説明しましょう.\n\nボールを投げた時の軌道は h = -4.9t² + v₀t + h₀ という二次方程式で表せます。ここで h は高さ、t は時間、v₀ は初速度、h₀ は初期の高さです。",
           sender: 'ai' as const,
           timestamp: new Date(Date.now() - 1740000),
           canEdit: true
@@ -80,7 +81,7 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
         },
         {
           id: '4',
-          content: "二次方程式を解く方法は主に3つあります：\n\n1. 因数分解\n2. 平方完成\n3. 二次方程式の公式\n\n最も一般的なのは二次方程式の公式です：x = (-b ± √(b² - 4ac)) / 2a\n\n先ほどのボールの例で、ボールが地面に落ちる時間を求めてみましょう。",
+          content: "二次方程式を解く方法は主に3つあります：\n\n1. 因数分解\n2. 平方完成\n3. 二次方程式の公式\n\n最も一般的なのは二次方程式の公式です：x = (-b ± \u221a(b² - 4ac)) / 2a\n\n先ほどのボールの例で、ボールが地面に落ちる時間を求めてみましょう。",
           sender: 'ai' as const,
           timestamp: new Date(Date.now() - 1620000),
           canEdit: true
@@ -95,14 +96,14 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
         },
         {
           id: '6',
-          content: "光合成の光反応は、葉緑体のチラコイド膜で起こります。光エネルギーを化学エネルギーに変換する重要なプロセスです。\n\n主なステップ：\n1. 光の吸収：クロロフィルが光エネルギーを吸収\n2. 水の分解：H₂O → 2H⁺ + ½O₂ + 2e⁻\n3. ATPとNADPHの生成",
+          content: "光合成の光反応は、葉緑体のチラコイド膜で起こります。光エネルギーを化学エネルギーに変換する重要なプロセスです。\n\n主なステップ：\n1. 光の吸収：クロロフィルが光エネルギーを吸収\n2. 水の分解：H\u2082O \u2192 2H\u207a + \u00bdO\u2082 + 2e\u207b\n3. ATPとNADPHの生成",
           sender: 'ai' as const,
           timestamp: new Date(Date.now() - 1140000),
           canEdit: true
         }
       ]
     };
-    return messageSets[id as keyof typeof messageSets] || messageSets['1'];
+    return messageSets[id as keyof typeof students] || messageSets['1'];
   };
 
   const student = getStudentData(studentId);
@@ -111,10 +112,16 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
   const handleEditMessage = (messageId: string, currentContent: string) => {
     setEditingMessageId(messageId);
     setEditedContent(currentContent);
+    setComment(''); // Clear previous comment
   };
 
   const handleSaveEdit = () => {
     if (editingMessageId) {
+      console.log('Saving correction and comment:', {
+        messageId: editingMessageId,
+        correction: editedContent,
+        comment: comment,
+      });
       setMessages(prev => prev.map(msg => 
         msg.id === editingMessageId 
           ? { ...msg, content: editedContent }
@@ -122,12 +129,14 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
       ));
       setEditingMessageId(null);
       setEditedContent('');
+      setComment('');
     }
   };
 
   const handleCancelEdit = () => {
     setEditingMessageId(null);
     setEditedContent('');
+    setComment('');
   };
 
   const handleFeedback = (messageId: string, isGood: boolean) => {
@@ -191,11 +200,19 @@ export function MentorChatReviewScreen({ studentId, onBack }: MentorChatReviewSc
                   <CardContent className="p-3">
                     {editingMessageId === message.id ? (
                       <div className="space-y-3">
+                        <label className="text-xs font-medium text-muted-foreground">AIの回答を添削</label>
                         <Textarea
                           value={editedContent}
                           onChange={(e) => setEditedContent(e.target.value)}
                           className="min-h-20 text-sm"
                           placeholder="AIの回答を添削してください..."
+                        />
+                        <label className="text-xs font-medium text-muted-foreground">コメント (学生に表示されます)</label>
+                        <Textarea
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          className="min-h-16 text-sm"
+                          placeholder="なぜこのように添削したか、補足情報などを入力します..."
                         />
                         <div className="flex gap-2">
                           <Button size="sm" onClick={handleSaveEdit}>

@@ -157,7 +157,7 @@ export function StudentChatHistoryScreen() {
       </div>
 
       {/* Chat Sessions */}
-      <div className="p-4 space-y-3">
+      <div className="space-y-3">
         {filteredSessions.map((session) => (
           <Card key={session.id} className="overflow-hidden">
             <Collapsible>

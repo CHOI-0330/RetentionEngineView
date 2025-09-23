@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { StudentChatScreen } from './StudentChatScreen';
 import { StudentChatHistoryScreen } from './StudentChatHistoryScreen';
+import { StudentFeedbackScreen } from './StudentFeedbackScreen';
 import { FeedbackNotificationCenter } from './FeedbackNotificationCenter';
 import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { MessageSquare, History, LogOut, User } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
+import { AppSidebar } from './AppSidebar';
+import { SidebarProvider, SidebarTrigger } from './ui/sidebar';
 
 interface MentorFeedback {
   id: string;
@@ -23,9 +25,8 @@ interface StudentInterfaceProps {
 }
 
 export function StudentInterface({ onLogout }: StudentInterfaceProps) {
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeView, setActiveView] = useState('chat');
 
-  // Mock mentor feedback data - in a real app, this would come from an API
   const [mentorFeedbacks, setMentorFeedbacks] = useState<MentorFeedback[]>([
     {
       id: 'feedback-2',
@@ -59,71 +60,66 @@ export function StudentInterface({ onLogout }: StudentInterfaceProps) {
     );
   };
 
+  const renderContent = () => {
+    switch (activeView) {
+      case 'chat':
+        return <StudentChatScreen mentorFeedbacks={mentorFeedbacks} onUpdateFeedback={setMentorFeedbacks} />;
+      case 'history':
+        return <StudentChatHistoryScreen />;
+      case 'feedback':
+        return <StudentFeedbackScreen mentorFeedbacks={mentorFeedbacks} />;
+      default:
+        return <StudentChatScreen mentorFeedbacks={mentorFeedbacks} onUpdateFeedback={setMentorFeedbacks} />;
+    }
+  };
+
+  const getTitleForView = (view: string) => {
+    switch (view) {
+      case 'chat': return 'AI学習アシスタント';
+      case 'history': return 'チャット履歴';
+      case 'feedback': return 'メンターからの添削一覧';
+      default: return 'チャット';
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* Header */}
-        <div className="border-b bg-white">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between py-3">
-              {/* User Info */}
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>
-                    <User className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium text-sm">学生モード</p>
-                  <p className="text-xs text-muted-foreground">AI学習アシスタント</p>
-                </div>
-              </div>
+    <SidebarProvider>
+      <div className="flex h-screen bg-background">
+        <AppSidebar 
+          userRole="student"
+          selectedView={activeView}
+          onSelectView={setActiveView}
+          className="border-r"
+        />
 
-              {/* Navigation Tabs */}
-              <TabsList className="grid w-fit grid-cols-2 bg-transparent p-1 h-auto">
-                <TabsTrigger 
-                  value="chat" 
-                  className="flex items-center gap-2 py-2 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="text-sm">チャット</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="history" 
-                  className="flex items-center gap-2 py-2 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-                >
-                  <History className="h-4 w-4" />
-                  <span className="text-sm">履歴</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Feedback Notifications and Logout */}
-              <div className="flex items-center gap-2">
-                <FeedbackNotificationCenter 
-                  feedbacks={mentorFeedbacks}
-                  onMarkAsReviewed={handleMarkAsReviewed}
-                />
-                <Button variant="ghost" size="sm" onClick={onLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  ログアウト
-                </Button>
-              </div>
+        <div className="flex-1 flex flex-col">
+          {/* Top Bar */}
+          <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger className="md:hidden" />
+              <h1 className="font-medium">{getTitleForView(activeView)}</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <FeedbackNotificationCenter 
+                feedbacks={mentorFeedbacks}
+                onMarkAsReviewed={handleMarkAsReviewed}
+              />
+              <Avatar className="h-8 w-8">
+                <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+              </Avatar>
+              <Button variant="ghost" size="sm" onClick={onLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                ログアウト
+              </Button>
             </div>
           </div>
-        </div>
 
-        {/* Content */}
-        <TabsContent value="chat" className="m-0">
-          <StudentChatScreen 
-            mentorFeedbacks={mentorFeedbacks}
-            onUpdateFeedback={setMentorFeedbacks}
-          />
-        </TabsContent>
-        
-        <TabsContent value="history" className="m-0">
-          <StudentChatHistoryScreen />
-        </TabsContent>
-      </Tabs>
-    </div>
+          {/* Main Content */}
+          <main className="flex-1 overflow-y-auto">
+            {renderContent()}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }
