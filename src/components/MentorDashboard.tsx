@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ThumbsUp, ThumbsDown, Search } from 'lucide-react';
-import { Input } from './ui/input';
+import React, { useState } from "react";
+import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ThumbsUp, ThumbsDown, Search } from "lucide-react";
+import { Input } from "./ui/input";
 
 interface Student {
   id: string;
   name: string;
   avatar?: string;
   lastActivity: Date;
-  status: 'active' | 'idle' | 'offline';
+  status: "active" | "idle" | "offline";
   recentChat: {
     summary: string;
     aiResponse: string;
@@ -27,41 +27,51 @@ interface MentorDashboardProps {
 }
 
 export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   const students: Student[] = [
     {
-      id: '1',
-      name: '田中 愛美',
+      id: "1",
+      name: "田中 愛美",
       lastActivity: new Date(Date.now() - 300000), // 5 minutes ago
-      status: 'active',
+      status: "active",
       recentChat: {
-        summary: '実生活における二次方程式の公式の応用について質問',
-        aiResponse: '二次方程式の公式は弾道運動、利益最適化、面積計算などの問題解決に使用できます。',
-        subject: '数学',
+        summary: "実生活における二次方程式の公式の応用について質問",
+        aiResponse:
+          "二次方程式の公式は弾道運動、利益最適化、面積計算などの問題解決に使用できます。",
+        subject: "数学",
         timestamp: new Date(Date.now() - 300000),
-        needsReview: true
+        needsReview: true,
       },
-      totalChats: 15
+      totalChats: 15,
     },
     // ... (other student data remains the same)
   ];
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.recentChat.subject.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.recentChat.subject
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
   );
 
   const handleFeedback = (studentId: string, isGood: boolean) => {
-    console.log(`Feedback for student ${studentId}: ${isGood ? 'Good' : 'Bad'}`);
+    console.log(
+      `Feedback for student ${studentId}: ${isGood ? "Good" : "Bad"}`
+    );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'idle': return 'bg-yellow-500';
-      case 'offline': return 'bg-gray-400';
-      default: return 'bg-gray-400';
+      case "active":
+        return "bg-green-500";
+      case "idle":
+        return "bg-yellow-500";
+      case "offline":
+        return "bg-gray-400";
+      default:
+        return "bg-gray-400";
     }
   };
 
@@ -69,8 +79,8 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'たった今';
+
+    if (diffMins < 1) return "たった今";
     if (diffMins < 60) return `${diffMins}分前`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}時間前`;
@@ -84,7 +94,7 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="学生を検索..."
+            placeholder="若手社員を検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-input-background border-0"
@@ -101,10 +111,17 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={student.avatar} />
                     <AvatarFallback>
-                      {student.name.split(' ').map(n => n[0]).join('')}
+                      {student.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <div className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${getStatusColor(student.status)}`} />
+                  <div
+                    className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${getStatusColor(
+                      student.status
+                    )}`}
+                  />
                 </div>
 
                 <div className="flex-1 space-y-3">
@@ -112,7 +129,9 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
                     <div>
                       <h3 className="font-medium">{student.name}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>最終活動: {formatLastActivity(student.lastActivity)}</span>
+                        <span>
+                          最終活動: {formatLastActivity(student.lastActivity)}
+                        </span>
                         <span>•</span>
                         <span>総チャット数: {student.totalChats}</span>
                       </div>
@@ -133,16 +152,22 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
                         {formatLastActivity(student.recentChat.timestamp)}
                       </span>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">学生の質問:</p>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          若手社員の質問:
+                        </p>
                         <p className="text-sm">{student.recentChat.summary}</p>
                       </div>
-                      
+
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">AIの回答:</p>
-                        <p className="text-sm text-muted-foreground">{student.recentChat.aiResponse}</p>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          AIの回答:
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {student.recentChat.aiResponse}
+                        </p>
                       </div>
                     </div>
 

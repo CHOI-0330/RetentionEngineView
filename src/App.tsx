@@ -18,14 +18,26 @@ export default function App() {
 
   // Role selection screen
   if (!userRole) {
-    return <UserRoleSelector onRoleSelect={handleRoleSelect} />;
+    return (
+      <div key="role-selector">
+        <UserRoleSelector onRoleSelect={handleRoleSelect} />
+      </div>
+    );
   }
 
   // Student interface
   if (userRole === 'student') {
-    return <StudentInterface onLogout={handleLogout} />;
+    return (
+      <div key="student-interface">
+        <StudentInterface onLogout={handleLogout} />
+      </div>
+    );
   }
 
   // Mentor interface
-  return <MentorInterface onLogout={handleLogout} />;
+  return (
+    <div key="mentor-interface">
+      <MentorInterface onLogout={handleLogout} />
+    </div>
+  );
 }

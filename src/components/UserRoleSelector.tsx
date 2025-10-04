@@ -1,11 +1,17 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { MessageSquare, Users, BookOpen, GraduationCap } from 'lucide-react';
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { MessageSquare, Users, BookOpen, GraduationCap } from "lucide-react";
 
 interface UserRoleSelectorProps {
-  onRoleSelect: (role: 'student' | 'mentor') => void;
+  onRoleSelect: (role: "student" | "mentor") => void;
 }
 
 export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
@@ -18,7 +24,7 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
             <div className="h-12 w-12 bg-primary rounded-lg flex items-center justify-center">
               <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold">EduChat AI</h1>
+            <h1 className="text-3xl font-bold">Retention Engine</h1>
           </div>
           <p className="text-lg text-muted-foreground">
             あなたの役割を選択してください
@@ -33,7 +39,7 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
               <div className="w-20 h-20 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <MessageSquare className="h-10 w-10 text-blue-600" />
               </div>
-              <CardTitle className="text-2xl">学生</CardTitle>
+              <CardTitle className="text-2xl">若手社員</CardTitle>
               <CardDescription className="text-base">
                 AIと対話して学習を進めましょう
               </CardDescription>
@@ -53,12 +59,12 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
                   <span>質問とフィードバック</span>
                 </div>
               </div>
-              <Button 
-                className="w-full mt-6" 
+              <Button
+                className="w-full mt-6"
                 size="lg"
-                onClick={() => onRoleSelect('student')}
+                onClick={() => onRoleSelect("student")}
               >
-                学生として開始
+                若手社員として開始
               </Button>
             </CardContent>
           </Card>
@@ -71,14 +77,14 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
               </div>
               <CardTitle className="text-2xl">メンター</CardTitle>
               <CardDescription className="text-base">
-                学生の学習を指導し、AIの品質を向上させましょう
+                若手社員の学習を指導し、AIの品質を向上させましょう
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span>学生活動の監督</span>
+                  <span>若手社員活動の監督</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -89,10 +95,10 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
                   <span>知識ベースの管理</span>
                 </div>
               </div>
-              <Button 
-                className="w-full mt-6" 
+              <Button
+                className="w-full mt-6"
                 size="lg"
-                onClick={() => onRoleSelect('mentor')}
+                onClick={() => onRoleSelect("mentor")}
               >
                 メンターとして開始
               </Button>
@@ -110,7 +116,7 @@ export function UserRoleSelector({ onRoleSelect }: UserRoleSelectorProps) {
               <Avatar className="h-6 w-6">
                 <AvatarFallback className="text-xs">学</AvatarFallback>
               </Avatar>
-              <span>体験学生</span>
+              <span>体験若手社員</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Avatar className="h-6 w-6">
