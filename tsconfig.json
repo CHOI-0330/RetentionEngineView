@@ -28,11 +28,17 @@
     "next-env.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "src/type/**/*.ts",
+    "src/application/**/*.ts",
     "src/views/**/*.ts",
     "src/views/**/*.tsx",
     "src/components/ui/**/*.ts",
     "src/components/ui/**/*.tsx",
     "src/components/MentorFeedbackPreview.tsx",
+    "src/interfaceAdapters/**/*.ts",
+    "src/interfaceAdapters/**/*.tsx",
+    "Presenter/**/*.ts",
+    "Presenter/**/*.tsx",
     ".next/types/**/*.ts"
   ],
   "exclude": [
