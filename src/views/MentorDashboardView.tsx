@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { Card, CardContent } from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import React from "react";
+import { Card, CardContent } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { ThumbsUp, ThumbsDown, Search } from "lucide-react";
-import { Input } from "./ui/input";
+import { Input } from "../components/ui/input";
 
-interface Student {
+export interface StudentItem {
   id: string;
   name: string;
   avatar?: string;
@@ -22,45 +22,26 @@ interface Student {
   totalChats: number;
 }
 
-interface MentorDashboardProps {
+interface MentorDashboardViewProps {
+  students: StudentItem[];
+  searchQuery: string;
+  onChangeSearch: (value: string) => void;
   onViewStudentChat: (studentId: string) => void;
+  onFeedback: (studentId: string, isGood: boolean) => void;
 }
 
-export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const students: Student[] = [
-    {
-      id: "1",
-      name: "田中 愛美",
-      lastActivity: new Date(Date.now() - 300000), // 5 minutes ago
-      status: "active",
-      recentChat: {
-        summary: "実生活における二次方程式の公式の応用について質問",
-        aiResponse:
-          "二次方程式の公式は弾道運動、利益最適化、面積計算などの問題解決に使用できます。",
-        subject: "数学",
-        timestamp: new Date(Date.now() - 300000),
-        needsReview: true,
-      },
-      totalChats: 15,
-    },
-    // ... (other student data remains the same)
-  ];
-
+export function MentorDashboardView({
+  students,
+  searchQuery,
+  onChangeSearch,
+  onViewStudentChat,
+  onFeedback,
+}: MentorDashboardViewProps) {
   const filteredStudents = students.filter(
     (student) =>
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.recentChat.subject
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
+      student.recentChat.subject.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleFeedback = (studentId: string, isGood: boolean) => {
-    console.log(
-      `Feedback for student ${studentId}: ${isGood ? "Good" : "Bad"}`
-    );
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -96,25 +77,22 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
           <Input
             placeholder="若手社員を検索..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => onChangeSearch(e.target.value)}
             className="pl-10 bg-input-background border-0"
           />
         </div>
       </div>
 
       <div className="grid gap-4">
-        {students.map((student) => (
+        {filteredStudents.map((student) => (
           <Card key={student.id}>
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
                 <div className="relative">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={student.avatar} />
+                    {student.avatar ? <AvatarImage src={student.avatar} /> : null}
                     <AvatarFallback>
-                      {student.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {student.name.split(" ").map((n) => n[0]).join("")}
                     </AvatarFallback>
                   </Avatar>
                   <div
@@ -129,17 +107,13 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
                     <div>
                       <h3 className="font-medium">{student.name}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>
-                          最終活動: {formatLastActivity(student.lastActivity)}
-                        </span>
+                        <span>最終活動: {formatLastActivity(student.lastActivity)}</span>
                         <span>•</span>
                         <span>総チャット数: {student.totalChats}</span>
                       </div>
                     </div>
                     {student.recentChat.needsReview && (
-                      <Badge variant="destructive" className="text-xs">
-                        レビュー必要
-                      </Badge>
+                      <Badge variant="destructive" className="text-xs">レビュー必要</Badge>
                     )}
                   </div>
 
@@ -155,48 +129,25 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
 
                     <div className="space-y-2">
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          若手社員の質問:
-                        </p>
+                        <p className="text-xs font-medium text-muted-foreground">若手社員の質問:</p>
                         <p className="text-sm">{student.recentChat.summary}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          AIの回答:
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {student.recentChat.aiResponse}
-                        </p>
+                        <p className="text-xs font-medium text-muted-foreground">AIの回答:</p>
+                        <p className="text-sm text-muted-foreground">{student.recentChat.aiResponse}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 pt-2">
                       <span className="text-xs font-medium">AIの回答品質:</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleFeedback(student.id, true)}
-                        className="h-7 px-2"
-                      >
-                        <ThumbsUp className="h-3 w-3 mr-1" />
-                        良い
+                      <Button size="sm" variant="outline" onClick={() => onFeedback(student.id, true)} className="h-7 px-2">
+                        <ThumbsUp className="h-3 w-3 mr-1" />良い
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleFeedback(student.id, false)}
-                        className="h-7 px-2"
-                      >
-                        <ThumbsDown className="h-3 w-3 mr-1" />
-                        悪い
+                      <Button size="sm" variant="outline" onClick={() => onFeedback(student.id, false)} className="h-7 px-2">
+                        <ThumbsDown className="h-3 w-3 mr-1" />悪い
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 px-2 ml-auto"
-                        onClick={() => onViewStudentChat(student.id)}
-                      >
+                      <Button size="sm" variant="secondary" className="h-7 px-2 ml-auto" onClick={() => onViewStudentChat(student.id)}>
                         チャット表示
                       </Button>
                     </div>
@@ -210,3 +161,4 @@ export function MentorDashboard({ onViewStudentChat }: MentorDashboardProps) {
     </div>
   );
 }
+
