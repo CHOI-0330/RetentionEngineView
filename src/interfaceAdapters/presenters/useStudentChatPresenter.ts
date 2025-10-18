@@ -52,7 +52,6 @@ export interface StudentChatPresenterInteractions {
   requestFeedbackForMessage: (msgId: string) => void;
   applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
   requestCreateFeedback: (content: string, message: Message) => void;
-  toggleFeedbackEditing: (msgId: string, isEditing: boolean) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
   cancelAssistantStream: () => void;
@@ -64,7 +63,6 @@ export interface StudentChatPresenterOutput {
   status: StudentChatPresenterStatus;
   meta: StudentChatPresenterMeta;
   interactions: StudentChatPresenterInteractions;
-  editingFlags: Record<string, boolean>;
 }
 
 const toMessageView = (message: Message): StudentChatMessageView => ({
@@ -152,7 +150,6 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       requestFeedbackForMessage: actions.requestFeedbackForMessage,
       applyFeedbackForMessage: actions.applyFeedbackForMessage,
       requestCreateFeedback: actions.requestCreateFeedback,
-      toggleFeedbackEditing: actions.toggleFeedbackEditing,
       clearError: actions.clearError,
       reportExternalFailure: actions.reportExternalFailure,
       cancelAssistantStream: actions.notifyAssistantStreamCancelled,
@@ -166,7 +163,6 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       actions.requestFeedbackForMessage,
       actions.requestOlderMessages,
       actions.notifyAssistantStreamCancelled,
-      actions.toggleFeedbackEditing,
     ]
   );
 
@@ -176,6 +172,5 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
     status,
     meta,
     interactions,
-    editingFlags: state.editingMessageIds,
   };
 };

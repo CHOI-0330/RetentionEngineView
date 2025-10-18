@@ -81,7 +81,6 @@ export interface StudentChatControllerState {
   activeAssistantMessageId?: string | null;
   pendingUserMessage?: { convId: string; authorId: string; content: string } | null;
   assistantSeqByMessageId: Record<string, number>;
-  editingMessageIds: Record<string, boolean>;
 }
 
 export interface StudentChatControllerActions {
@@ -95,10 +94,10 @@ export interface StudentChatControllerActions {
   notifyAssistantDelta: (delta: MessageDelta) => void;
   notifyAssistantStreamCompleted: (finalText: string) => void;
   notifyAssistantStreamCancelled: () => void;
+  syncAssistantMessage: (message: Message) => void;
   requestFeedbackForMessage: (msgId: string) => void;
   applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
   requestCreateFeedback: (content: string, targetMessage: Message) => void;
-  toggleFeedbackEditing: (msgId: string, isEditing: boolean) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
 }
@@ -159,7 +158,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     activeAssistantMessageId: null,
     pendingUserMessage: null,
     assistantSeqByMessageId: {},
-    editingMessageIds: {},
   }));
 
   const mutateState = useCallback((updater: (previous: StudentChatControllerState) => StudentChatControllerState) => {
@@ -382,11 +380,11 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         }
         const updated = [...previous.messages];
         updated[index] = appendResult.value.message;
-        return {
-          ...previous,
-          messages: updated,
-          isStreaming: true,
-          assistantSeqByMessageId: {
+      return {
+        ...previous,
+        messages: updated,
+        isStreaming: true,
+        assistantSeqByMessageId: {
             ...previous.assistantSeqByMessageId,
             [target.msgId]: delta.seqNo,
           },
@@ -457,6 +455,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         messages: updatedMessages,
         isStreaming: false,
         isAwaitingAssistant: false,
+        activeAssistantMessageId: null,
         pendingEffects: [
           ...previous.pendingEffects,
           createEffect({ kind: "REQUEST_CANCEL_ASSISTANT_MESSAGE", payload: { msgId: cancelResult.value.msgId } }),
@@ -464,6 +463,24 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       };
     });
   }, [createEffect]);
+
+  const syncAssistantMessage = useCallback(
+    (message: Message) => {
+      mutateState((previous) => {
+        const index = previous.messages.findIndex((item) => item.msgId === message.msgId);
+        if (index < 0) {
+          return previous;
+        }
+        const updatedMessages = [...previous.messages];
+        updatedMessages[index] = message;
+        return {
+          ...previous,
+          messages: updatedMessages,
+        };
+      });
+    },
+    [mutateState]
+  );
 
   const requestFeedbackForMessage = useCallback(
     (msgId: string) => {
@@ -503,10 +520,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           [msgId]: normalized,
         },
         authorNames: authorNames ? { ...previous.authorNames, ...authorNames } : previous.authorNames,
-        editingMessageIds: {
-          ...previous.editingMessageIds,
-          [msgId]: false,
-        },
       }));
     },
     [mutateState]
@@ -542,19 +555,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     [conversation, createEffect, currentUser, mentorAssignments, mutateState, state.feedbackByMessageId]
   );
 
-  const toggleFeedbackEditing = useCallback(
-    (msgId: string, isEditing: boolean) => {
-      mutateState((previous) => ({
-        ...previous,
-        editingMessageIds: {
-          ...previous.editingMessageIds,
-          [msgId]: isEditing,
-        },
-      }));
-    },
-    [mutateState]
-  );
-
   const clearError = useCallback(() => {
     mutateState((previous) => ({
       ...previous,
@@ -584,10 +584,10 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       notifyAssistantDelta,
       notifyAssistantStreamCompleted,
       notifyAssistantStreamCancelled,
+      syncAssistantMessage,
       requestFeedbackForMessage,
       applyFeedbackForMessage,
       requestCreateFeedback,
-      toggleFeedbackEditing,
       clearError,
       reportExternalFailure,
     }),

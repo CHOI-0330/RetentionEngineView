@@ -94,6 +94,7 @@ export interface LLMPort {
     runtime: LLMRuntime;
   }): AsyncIterable<string>;
 }
+// 実装例：GeminiLLMPort（NEXT_PUBLIC_ENABLE_GEMINI=1 で有効化、GEMINI_MODEL_ID でモデル指定可）
 export interface PolicyPort {
   isOwner(userId: string, convId: string): Promise<boolean>;
   isMentorMapped(mentorId: string, newhireId: string): Promise<boolean>;

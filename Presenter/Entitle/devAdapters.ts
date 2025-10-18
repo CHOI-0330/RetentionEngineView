@@ -8,6 +8,7 @@ import type {
   MessagePort,
   StudentSummary,
 } from "../../src/application/entitle/ports";
+import { GeminiLLMPort } from "../../src/interfaceAdapters/gateways/llm/geminiClientPort";
 import type {
   Conversation,
   Feedback,
@@ -351,7 +352,13 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackPort = new InMemoryFeedbackPort(store);
   const mentorAssignmentPort = new StaticMentorAssignmentPort(store);
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
-  const llmPort = new InMemoryLLMPort();
+  const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
+  if (shouldUseGemini) {
+    console.info("[LLM] Gemini gateway enabled. Streaming responses will be proxied via /api/llm/gemini.");
+  } else {
+    console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable Gemini gateway.");
+  }
+  const llmPort: LLMPort = shouldUseGemini ? new GeminiLLMPort() : new InMemoryLLMPort();
   const dashboardPort = new InMemoryMentorDashboardPort(store);
 
   const runtimes: LLMRuntime[] = [

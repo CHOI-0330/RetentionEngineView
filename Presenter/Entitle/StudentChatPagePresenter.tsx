@@ -147,13 +147,13 @@ const StudentChatRuntime = ({
         }
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
           const message = (await callStudentChatAction("finalizeAssistantMessage", effect.payload)) as Message;
-          controller.actions.notifyAssistantStreamCompleted(message.content);
+          controller.actions.syncAssistantMessage(message);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_CANCEL_ASSISTANT_MESSAGE": {
-          await callStudentChatAction("cancelAssistantMessage", effect.payload);
-          controller.actions.notifyAssistantStreamCancelled();
+          const message = (await callStudentChatAction("cancelAssistantMessage", effect.payload)) as Message;
+          controller.actions.syncAssistantMessage(message);
           activeAssistantIdRef.current = null;
           break;
         }
@@ -231,13 +231,13 @@ const StudentChatRuntime = ({
         }
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
           const finalized = await devAdapters.messagePort.finalizeAssistantMessage(effect.payload);
-          controller.actions.notifyAssistantStreamCompleted(finalized.content);
+          controller.actions.syncAssistantMessage(finalized);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_CANCEL_ASSISTANT_MESSAGE": {
-          await devAdapters.messagePort.cancelAssistantMessage(effect.payload.msgId);
-          controller.actions.notifyAssistantStreamCancelled();
+          const cancelled = await devAdapters.messagePort.cancelAssistantMessage(effect.payload.msgId);
+          controller.actions.syncAssistantMessage(cancelled);
           activeAssistantIdRef.current = null;
           break;
         }
