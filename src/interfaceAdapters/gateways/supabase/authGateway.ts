@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { createServerSupabaseClient } from "../../../lib/supabaseClient";
 import type { AuthPort } from "../../../application/entitle/ports";
@@ -9,15 +9,31 @@ interface SupabaseRegisterResult {
 }
 
 export class SupabaseAuthGateway implements AuthPort {
-  private readonly serviceClient = createServerSupabaseClient();
-  private readonly anonClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  private serviceClient: SupabaseClient | null = null;
+  private anonClient: SupabaseClient | null = null;
+
+  private getServiceClient(): SupabaseClient {
+    if (!this.serviceClient) {
+      this.serviceClient = createServerSupabaseClient();
+    }
+    return this.serviceClient;
+  }
+
+  private getAnonClient(): SupabaseClient {
+    if (!this.anonClient) {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !anonKey) {
+        throw new Error("Supabase anon client is not configured.");
+      }
+      this.anonClient = createClient(url, anonKey);
+    }
+    return this.anonClient;
+  }
 
   // Grabs the user's role using the service client so other methods can stay small.
   private async fetchUserRole(userId: string): Promise<User["role"]> {
-    const { data, error } = await this.serviceClient
+    const { data, error } = await this.getServiceClient()
       .from("user")
       .select("role")
       .eq("user_id", userId)
@@ -34,7 +50,7 @@ export class SupabaseAuthGateway implements AuthPort {
     displayName: string;
     role: User["role"];
   }): Promise<SupabaseRegisterResult> {
-    const adminClient = this.serviceClient;
+    const adminClient = this.getServiceClient();
     const { data, error } = await adminClient.auth.admin.createUser({
       email: input.email,
       password: input.password,
@@ -66,7 +82,8 @@ export class SupabaseAuthGateway implements AuthPort {
     userId: string;
     role: User["role"];
   }> {
-    const { data, error } = await this.anonClient.auth.signInWithPassword({
+    const anonClient = this.getAnonClient();
+    const { data, error } = await anonClient.auth.signInWithPassword({
       email: input.email,
       password: input.password,
     });
@@ -91,7 +108,8 @@ export class SupabaseAuthGateway implements AuthPort {
     role: User["role"];
   }> {
     // The anon client is enough to refresh a session as long as we provide the refresh token.
-    const { data, error } = await this.anonClient.auth.refreshSession({
+    const anonClient = this.getAnonClient();
+    const { data, error } = await anonClient.auth.refreshSession({
       refresh_token: input.refreshToken,
     });
     if (error || !data.session || !data.user) {
@@ -109,14 +127,14 @@ export class SupabaseAuthGateway implements AuthPort {
   }
 
   async logoutUser(input: { accessToken: string }): Promise<void> {
-    const { error } = await this.serviceClient.auth.admin.signOut(input.accessToken, "global");
+    const { error } = await this.getServiceClient().auth.admin.signOut(input.accessToken, "global");
     if (error) {
       throw error;
     }
   }
 
   async getUserFromAccessToken(accessToken: string): Promise<{ userId: string; role: User["role"] }> {
-    const { data, error } = await this.serviceClient.auth.getUser(accessToken);
+    const { data, error } = await this.getServiceClient().auth.getUser(accessToken);
     if (error || !data.user) {
       throw error ?? new Error("Invalid access token.");
     }
