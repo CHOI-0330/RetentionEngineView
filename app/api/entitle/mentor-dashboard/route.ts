@@ -8,7 +8,7 @@ type MentorDashboardAction = "listStudentSummaries" | "submitFeedbackQuality";
 export async function POST(request: NextRequest) {
   const { action, payload } = (await request.json()) as {
     action: MentorDashboardAction;
-    payload: unknown;
+    payload?: unknown;
   };
 
   const gateway = new SupabaseMentorDashboardGateway();
@@ -33,17 +33,18 @@ export async function POST(request: NextRequest) {
         if (authUser.role !== "MENTOR") {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-        const summaries = await gateway.listStudentSummaries(payload as { mentorId: string });
+        const summaries = await gateway.listStudentSummaries({ mentorId: authUser.userId });
         return NextResponse.json({ data: summaries });
       }
       case "submitFeedbackQuality": {
         if (authUser.role !== "MENTOR") {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-        await gateway.submitFeedbackQuality(payload as {
-          mentorId: string;
-          studentId: string;
-          isPositive: boolean;
+        const body = payload as { studentId: string; isPositive: boolean };
+        await gateway.submitFeedbackQuality({
+          mentorId: authUser.userId,
+          studentId: body.studentId,
+          isPositive: body.isPositive,
         });
         return NextResponse.json({ data: { ok: true } });
       }
