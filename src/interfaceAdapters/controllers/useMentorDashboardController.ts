@@ -64,14 +64,6 @@ export const useMentorDashboardController = (
   const [state, setState] = useState<MentorDashboardControllerState>(createInitialState);
   const effectIdRef = useRef(0);
 
-  const createEffect = useCallback(
-    (effect: Omit<MentorDashboardControllerEffect, "id">): MentorDashboardControllerEffect => ({
-      id: `mentor-dashboard-effect-${effectIdRef.current++}`,
-      ...effect,
-    }),
-    []
-  );
-
   const setSearchQuery = useCallback((value: string) => {
     setState((previous) => ({
       ...previous,
@@ -89,14 +81,15 @@ export const useMentorDashboardController = (
         isRefreshing: true,
         pendingEffects: [
           ...previous.pendingEffects,
-          createEffect({
+          {
+            id: `mentor-dashboard-effect-${effectIdRef.current++}`,
             kind: "REQUEST_REFRESH_SUMMARIES",
             payload: { mentorId },
-          }),
+          },
         ],
       };
     });
-  }, [createEffect, mentorId]);
+  }, [mentorId]);
 
   const applySummaries = useCallback((summaries: StudentSummary[]) => {
     setState((previous) => ({
@@ -119,14 +112,15 @@ export const useMentorDashboardController = (
         qualitySubmitting: { ...previous.qualitySubmitting, [studentId]: true },
         pendingEffects: [
           ...previous.pendingEffects,
-          createEffect({
+          {
+            id: `mentor-dashboard-effect-${effectIdRef.current++}`,
             kind: "REQUEST_SUBMIT_FEEDBACK_QUALITY",
             payload: { mentorId, studentId, isPositive },
-          }),
+          },
         ],
       }));
     },
-    [createEffect, mentorId]
+    [mentorId]
   );
 
   const finalizeSubmitFeedbackQuality = useCallback((studentId: string) => {

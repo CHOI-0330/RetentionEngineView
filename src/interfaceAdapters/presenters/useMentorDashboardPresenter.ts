@@ -6,9 +6,9 @@ import type {
   MentorDashboardController,
   MentorDashboardControllerEffect,
 } from "../controllers/useMentorDashboardController";
-import type { StudentItem } from "../../views/MentorDashboardView";
+import type { MentorDashboardStudentItem } from "../../views/MentorDashboardView";
 
-const deriveStatus = (summary: StudentSummary): StudentItem["status"] => {
+const deriveStatus = (summary: StudentSummary): MentorDashboardStudentItem["status"] => {
   const last = new Date(summary.lastActivityAt).getTime();
   const diffMinutes = (Date.now() - last) / 60000;
   if (!Number.isFinite(diffMinutes) || diffMinutes < 0) {
@@ -24,7 +24,7 @@ const deriveStatus = (summary: StudentSummary): StudentItem["status"] => {
 };
 
 export interface MentorDashboardPresenterViewModel {
-  students: StudentItem[];
+  students: MentorDashboardStudentItem[];
   searchQuery: string;
   onChangeSearch: (value: string) => void;
   onViewStudentChat: (studentId: string) => void;
@@ -73,7 +73,7 @@ export const useMentorDashboardPresenter = (
     });
   }, [state.searchQuery, state.summaries]);
 
-  const students = useMemo<StudentItem[]>(() => {
+  const students = useMemo<MentorDashboardStudentItem[]>(() => {
     return filteredSummaries.map((summary) => {
       const { newhire, conversation, recentMessage, needsReview, totalChats, lastActivityAt } = summary;
       const studentMessage = recentMessage?.role === "NEW_HIRE" ? recentMessage.content : "";

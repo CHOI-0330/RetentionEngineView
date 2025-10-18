@@ -54,7 +54,7 @@ export type StudentChatControllerEffect =
   | {
       id: string;
       kind: "REQUEST_LIST_MESSAGES";
-      payload: { cursor?: string };
+      payload: { convId: string; cursor?: string };
     }
   | {
       id: string;
@@ -135,10 +135,11 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
 
   const effectIdRef = useRef(0);
   const createEffect = useCallback(
-    (effect: Omit<StudentChatControllerEffect, "id">): StudentChatControllerEffect => ({
-      id: `student-chat-effect-${effectIdRef.current++}`,
-      ...effect,
-    }),
+    (effect: Omit<StudentChatControllerEffect, "id">): StudentChatControllerEffect =>
+      ({
+        id: `student-chat-effect-${effectIdRef.current++}`,
+        ...effect,
+      } as StudentChatControllerEffect),
     []
   );
 
@@ -182,9 +183,13 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       if (result.kind === "failure") {
         return { ...previous, error: result.error };
       }
-      const nextEffect: StudentChatControllerEffect = createEffect({
+      const nextEffect = createEffect({
         kind: "REQUEST_PERSIST_USER_MESSAGE",
-        payload: result.value,
+        payload: {
+          convId: result.value.convId,
+          authorId: result.value.authorId,
+          content: result.value.content,
+        },
       });
       return {
         ...previous,
@@ -220,7 +225,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       }
       const effect = createEffect({
         kind: "REQUEST_LIST_MESSAGES",
-        payload: { cursor: previous.nextCursor },
+        payload: { convId: conversation.convId, cursor: previous.nextCursor },
       });
       return {
         ...previous,
@@ -282,10 +287,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         isAwaitingAssistant: true,
         pendingEffects: [
           ...previous.pendingEffects,
-          createEffect({
-            kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE",
-            payload: { convId: conversation.convId },
-          }),
+          createEffect({ kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE", payload: { convId: conversation.convId } }),
           createEffect({
             kind: "REQUEST_STREAM_ASSISTANT_RESPONSE",
             payload: {
@@ -454,10 +456,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         isAwaitingAssistant: false,
         pendingEffects: [
           ...previous.pendingEffects,
-          createEffect({
-            kind: "REQUEST_CANCEL_ASSISTANT_MESSAGE",
-            payload: { msgId: cancelResult.value.msgId },
-          }),
+          createEffect({ kind: "REQUEST_CANCEL_ASSISTANT_MESSAGE", payload: { msgId: cancelResult.value.msgId } }),
         ],
       };
     });
@@ -483,10 +482,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           ...previous,
           pendingEffects: [
             ...previous.pendingEffects,
-            createEffect({
-              kind: "REQUEST_LIST_FEEDBACKS",
-              payload: { msgId },
-            }),
+            createEffect({ kind: "REQUEST_LIST_FEEDBACKS", payload: { msgId } }),
           ],
         };
       });
@@ -529,10 +525,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         ...previous,
         pendingEffects: [
           ...previous.pendingEffects,
-          createEffect({
-            kind: "REQUEST_CREATE_FEEDBACK",
-            payload: createResult.payload,
-          }),
+          createEffect({ kind: "REQUEST_CREATE_FEEDBACK", payload: createResult.payload }),
         ],
       }));
     },
