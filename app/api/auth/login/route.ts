@@ -28,7 +28,15 @@ export async function POST(request: NextRequest) {
     setAuthCookies(response, data);
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected error";
+    let message = "Unexpected error";
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (error && typeof error === "object" && "message" in error) {
+      const extracted = (error as { message?: unknown }).message;
+      if (typeof extracted === "string" && extracted.length > 0) {
+        message = extracted;
+      }
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

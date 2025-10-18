@@ -8,6 +8,19 @@ interface SupabaseRegisterResult {
   userId: string;
 }
 
+const toError = (value: unknown, fallbackMessage: string): Error => {
+  if (value instanceof Error) {
+    return value;
+  }
+  if (value && typeof value === "object" && "message" in value) {
+    const message = (value as { message?: unknown }).message;
+    if (typeof message === "string" && message.length > 0) {
+      return new Error(message);
+    }
+  }
+  return new Error(fallbackMessage);
+};
+
 export class SupabaseAuthGateway implements AuthPort {
   private serviceClient: SupabaseClient | null = null;
   private anonClient: SupabaseClient | null = null;
@@ -39,7 +52,7 @@ export class SupabaseAuthGateway implements AuthPort {
       .eq("user_id", userId)
       .single();
     if (error || !data) {
-      throw error ?? new Error("User profile not found.");
+      throw toError(error, "User profile not found.");
     }
     return (data as { role: User["role"] }).role;
   }
@@ -58,7 +71,7 @@ export class SupabaseAuthGateway implements AuthPort {
     });
 
     if (error || !data.user) {
-      throw error ?? new Error("Failed to create Supabase auth user.");
+      throw toError(error, "Failed to create Supabase auth user.");
     }
 
     const userId = data.user.id;
@@ -70,7 +83,7 @@ export class SupabaseAuthGateway implements AuthPort {
       role: input.role,
     });
     if (insertError) {
-      throw insertError;
+      throw toError(insertError, "Failed to persist user profile.");
     }
 
     return { userId };
@@ -88,7 +101,7 @@ export class SupabaseAuthGateway implements AuthPort {
       password: input.password,
     });
     if (error || !data.user || !data.session) {
-      throw error ?? new Error("Failed to sign in.");
+      throw toError(error, "Failed to sign in.");
     }
 
     const role = await this.fetchUserRole(data.user.id);
@@ -113,7 +126,7 @@ export class SupabaseAuthGateway implements AuthPort {
       refresh_token: input.refreshToken,
     });
     if (error || !data.session || !data.user) {
-      throw error ?? new Error("Failed to refresh session.");
+      throw toError(error, "Failed to refresh session.");
     }
 
     const role = await this.fetchUserRole(data.user.id);
@@ -129,14 +142,14 @@ export class SupabaseAuthGateway implements AuthPort {
   async logoutUser(input: { accessToken: string }): Promise<void> {
     const { error } = await this.getServiceClient().auth.admin.signOut(input.accessToken, "global");
     if (error) {
-      throw error;
+      throw toError(error, "Failed to sign out.");
     }
   }
 
   async getUserFromAccessToken(accessToken: string): Promise<{ userId: string; role: User["role"] }> {
     const { data, error } = await this.getServiceClient().auth.getUser(accessToken);
     if (error || !data.user) {
-      throw error ?? new Error("Invalid access token.");
+      throw toError(error, "Invalid access token.");
     }
     const role = await this.fetchUserRole(data.user.id);
     return { userId: data.user.id, role };
