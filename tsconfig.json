@@ -29,6 +29,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "src/type/**/*.ts",
+    "src/types/**/*.d.ts",
     "src/application/**/*.ts",
     "src/views/**/*.ts",
     "src/views/**/*.tsx",
@@ -37,6 +38,7 @@
     "src/components/MentorFeedbackPreview.tsx",
     "src/interfaceAdapters/**/*.ts",
     "src/interfaceAdapters/**/*.tsx",
+    "src/server/**/*.ts",
     "Presenter/**/*.ts",
     "Presenter/**/*.tsx",
     ".next/types/**/*.ts"

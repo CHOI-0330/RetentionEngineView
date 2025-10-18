@@ -251,9 +251,18 @@ export const reduceAssistantStreamUseCase = (prev: Message, delta: string) => {
     return { ...prev, status: "PARTIAL", content: delta };
   if (prev.status === "PARTIAL")
     return { ...prev, content: prev.content + delta };
-  return prev; // DONE/CANCELLED は変更しない
+ return prev; // DONE/CANCELLED は変更しない
 };
 ```
+
+- `createConversationUseCase`
+  - **入力**: `requester (NEW_HIRE)`, `title`, `mentorId`, `allowedMentorIds`
+  - **検証**:
+    - タイトルが必須かつ上限文字数以内であること
+    - 発話者が `NEW_HIRE` であること
+    - 選択した `mentorId` が `allowedMentorIds` に含まれていること（候補が存在する場合）
+  - **出力**: 正規化されたタイトルとメンター ID を返し、永続化ロジック（Gateway）がこれを利用して `conversation` と `mentor_assignment` を作成する
+  - **備考**: 候補メンターが一人もいない場合は `mentorId` を `null` とし、学生が後で手動で設定できるようにする
 
 ---
 
