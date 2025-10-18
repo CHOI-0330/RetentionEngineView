@@ -9,13 +9,13 @@ export default function Page() {
       <section className="mx-auto max-w-3xl space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold">Retention Engine UI</h1>
-          <p className="text-muted-foreground">Entitle용 인증/샘플 페이지입니다.</p>
+          <p className="text-muted-foreground">Entitle 用の認証・サンプルページです。</p>
           <div className="flex gap-4 text-sm">
             <Link className="underline" href="/student">
-              학생 화면
+              新入社員画面
             </Link>
             <Link className="underline" href="/mentor">
-              멘토 화면
+              メンター画面
             </Link>
           </div>
         </header>

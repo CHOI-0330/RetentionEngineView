@@ -69,7 +69,8 @@ const MentorDashboardView = ({
           <Input
             value={viewModel.searchQuery}
             onChange={(event) => viewModel.onChangeSearch(event.target.value)}
-            placeholder="若手社員や科目で検索"
+            placeholder="新入社員や科目で検索"
+            aria-label="新入社員や科目で検索"
             className="pl-9"
           />
         </div>
@@ -83,97 +84,16 @@ const MentorDashboardView = ({
         ) : null}
       </header>
 
-      <div className="grid gap-4">
-        {viewModel.students.map((student) => {
-          const qualitySubmitting = Boolean(meta.qualitySubmitting[student.id]);
-          const isSelected = meta.selectedStudentId === student.id;
-          return (
-            <Card
-              key={student.conversationId}
-              className={isSelected ? "border-primary" : undefined}
-            >
-              <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:gap-6">
-                <div className="flex items-start gap-4">
-                  <Avatar className="h-14 w-14">
-                    <AvatarFallback>{student.name.slice(0, 2)}</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-semibold">{student.name}</h2>
-                      <Badge variant="secondary" className="capitalize">
-                        {student.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      最終活動: {student.lastActivity.toLocaleString()} /
-                      総チャット数: {student.totalChats}
-                    </p>
-                    <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 flex-col">
-                          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                            トピック
-                          </span>
-                          <span
-                            className="mt-1 line-clamp-2 text-base font-semibold text-foreground"
-                            title={student.recentChat.subject}
-                          >
-                            {student.recentChat.subject}
-                          </span>
-                        </div>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {student.recentChat.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <p className="mt-3 font-medium text-foreground">
-                        若手社員: {student.recentChat.summary || "(メッセージなし)"}
-                      </p>
-                      <p className="mt-1 text-muted-foreground">
-                        AI: {student.recentChat.aiResponse || "(未回答)"}
-                      </p>
-                      {student.recentChat.needsReview ? (
-                        <Badge variant="destructive" className="mt-2">
-                          レビューが必要
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="ml-auto flex flex-col items-end gap-2 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={qualitySubmitting}
-                    onClick={() => viewModel.onFeedback(student.id, true)}
-                  >
-                    <ThumbsUp className="mr-2 h-4 w-4" /> 良かった
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={qualitySubmitting}
-                    onClick={() => viewModel.onFeedback(student.id, false)}
-                  >
-                    <ThumbsDown className="mr-2 h-4 w-4" /> 改善必要
-                  </Button>
-                  <Button asChild variant="secondary" size="sm">
-                    <Link
-                      href={`/mentor/chat/${encodeURIComponent(
-                        student.conversationId
-                      )}`}
-                    >
-                      チャットを見る
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+        {viewModel.students.map((student) => (
+          <MentorDashboardStudentCard
+            key={student.conversationId}
+            student={student}
+            isSelected={meta.selectedStudentId === student.id}
+            isSubmitting={Boolean(meta.qualitySubmitting[student.id])}
+            onFeedback={(isPositive) => viewModel.onFeedback(student.id, isPositive)}
+          />
+        ))}
 
         {viewModel.students.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/20 py-16 text-center text-sm text-muted-foreground">
@@ -186,3 +106,108 @@ const MentorDashboardView = ({
 };
 
 export default MentorDashboardView;
+
+interface MentorDashboardStudentCardProps {
+  student: MentorDashboardStudentItem;
+  isSelected: boolean;
+  isSubmitting: boolean;
+  onFeedback: (isPositive: boolean) => void;
+}
+
+const MentorDashboardStudentCard = ({
+  student,
+  isSelected,
+  isSubmitting,
+  onFeedback,
+}: MentorDashboardStudentCardProps) => {
+  return (
+    <Card className={isSelected ? "border-primary" : undefined}>
+      <CardContent className="flex flex-col gap-4 p-5 sm:gap-5 lg:flex-row lg:items-start lg:gap-6">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-14 w-14">
+            <AvatarFallback>{student.name.slice(0, 2)}</AvatarFallback>
+          </Avatar>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <h2 className="text-lg font-semibold">{student.name}</h2>
+              <Badge variant="secondary" className="w-fit capitalize">
+                {student.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              最終活動: {student.lastActivity.toLocaleString()} / 総チャット数: {student.totalChats}
+            </p>
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">トピック</span>
+                  <span
+                    className="mt-1 block text-base font-semibold text-foreground sm:line-clamp-2"
+                    title={student.recentChat.subject}
+                  >
+                    {student.recentChat.subject}
+                  </span>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {student.recentChat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <p className="mt-3 font-medium text-foreground">
+                新入社員: {student.recentChat.summary || "(メッセージなし)"}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                AI: {student.recentChat.aiResponse || "(未回答)"}
+              </p>
+              {student.recentChat.needsReview ? (
+                <Badge variant="destructive" className="mt-2 w-fit">
+                  レビューが必要
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end lg:ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isSubmitting}
+            onClick={() => onFeedback(true)}
+            className="min-w-[140px] justify-center"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
+              </>
+            ) : (
+              <>
+                <ThumbsUp className="mr-2 h-4 w-4" /> 良かった
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isSubmitting}
+            onClick={() => onFeedback(false)}
+            className="min-w-[140px] justify-center"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
+              </>
+            ) : (
+              <>
+                <ThumbsDown className="mr-2 h-4 w-4" /> 改善必要
+              </>
+            )}
+          </Button>
+          <Button asChild variant="secondary" size="sm" className="justify-center">
+            <Link href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}>
+              チャットを見る
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
