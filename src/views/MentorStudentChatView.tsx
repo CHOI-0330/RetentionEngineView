@@ -1,5 +1,9 @@
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { Loader2 } from "lucide-react";
 
 interface MentorChatMessage {
   id: string;
@@ -20,6 +24,11 @@ interface MentorStudentChatViewProps {
   studentName: string;
   mentorName: string;
   messages: MentorChatMessage[];
+  feedbackDrafts: Record<string, string>;
+  feedbackSubmitting: Record<string, boolean>;
+  feedbackErrors: Record<string, string | null | undefined>;
+  onFeedbackDraftChange: (messageId: string, value: string) => void;
+  onSubmitFeedback: (messageId: string) => void;
 }
 
 const MentorStudentChatView = ({
@@ -27,6 +36,11 @@ const MentorStudentChatView = ({
   studentName,
   mentorName,
   messages,
+  feedbackDrafts,
+  feedbackSubmitting,
+  feedbackErrors,
+  onFeedbackDraftChange,
+  onSubmitFeedback,
 }: MentorStudentChatViewProps) => {
   return (
     <div className="flex flex-col gap-6">
@@ -72,6 +86,44 @@ const MentorStudentChatView = ({
                         <p className="mt-2 whitespace-pre-wrap leading-relaxed">{feedback.content}</p>
                       </div>
                     ))}
+                  </div>
+                ) : null}
+                {message.role === "ASSISTANT" ? (
+                  <div className="mt-3 w-full max-w-[70%] rounded-md border bg-background p-3">
+                    <form
+                      className="space-y-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        onSubmitFeedback(message.id);
+                      }}
+                    >
+                      <div className="space-y-1">
+                        <Label htmlFor={`mentor-feedback-${message.id}`} className="text-xs uppercase tracking-wide text-muted-foreground">
+                          学生へのフィードバック
+                        </Label>
+                        <Textarea
+                          id={`mentor-feedback-${message.id}`}
+                          value={feedbackDrafts[message.id] ?? ""}
+                          onChange={(event) => onFeedbackDraftChange(message.id, event.target.value)}
+                          rows={3}
+                          placeholder="気づきやアドバイスを入力してください"
+                        />
+                      </div>
+                      {feedbackErrors[message.id] ? (
+                        <p className="text-sm text-destructive">{feedbackErrors[message.id]}</p>
+                      ) : null}
+                      <div className="flex justify-end">
+                        <Button type="submit" size="sm" disabled={feedbackSubmitting[message.id] ?? false}>
+                          {feedbackSubmitting[message.id] ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
+                            </>
+                          ) : (
+                            "フィードバックを送信"
+                          )}
+                        </Button>
+                      </div>
+                    </form>
                   </div>
                 ) : null}
               </div>
