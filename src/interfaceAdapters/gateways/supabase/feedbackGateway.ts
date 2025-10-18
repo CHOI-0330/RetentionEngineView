@@ -13,6 +13,16 @@ export class SupabaseFeedbackGateway implements FeedbackPort {
   constructor(private readonly client = createServerSupabaseClient()) {}
 
   async createFeedback(input: ValidatedFeedback & { visibility?: "ALL" | "OWNER_ONLY" | "MENTOR_ONLY" }): Promise<Feedback> {
+    const { count, error: countError } = await this.client
+      .from("feedback")
+      .select("fb_id", { count: "exact", head: true })
+      .eq("target_msg_id", input.targetMsgId);
+    if (countError) {
+      throw countError;
+    }
+    if ((count ?? 0) > 0) {
+      throw new Error("Feedback already exists for this message.");
+    }
     const { data, error } = await this.client
       .from("feedback")
       .insert({
@@ -64,5 +74,18 @@ export class SupabaseFeedbackGateway implements FeedbackPort {
     const items = (data as FeedbackRow[]).map(mapFeedbackRow);
     const nextCursor = items.length === pageSize ? items[items.length - 1]?.fbId : undefined;
     return { items, nextCursor };
+  }
+
+  async updateFeedback(input: { feedbackId: string; content: string }): Promise<Feedback> {
+    const { data, error } = await this.client
+      .from("feedback")
+      .update({ content: input.content, updated_at: new Date().toISOString() })
+      .eq("fb_id", input.feedbackId)
+      .select()
+      .single();
+    if (error || !data) {
+      throw error ?? new Error("Failed to update feedback.");
+    }
+    return mapFeedbackRow(data as FeedbackRow);
   }
 }

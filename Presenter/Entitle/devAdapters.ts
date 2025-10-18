@@ -132,6 +132,10 @@ class InMemoryFeedbackPort implements FeedbackPort {
   constructor(private readonly store: Store) {}
 
   async createFeedback(input: ValidatedFeedback & { visibility?: "ALL" | "OWNER_ONLY" | "MENTOR_ONLY" }): Promise<Feedback> {
+    const list = this.store.feedbacks[input.targetMsgId] ?? [];
+    if (list.length > 0) {
+      throw new Error("Feedback already exists for this message.");
+    }
     const feedback: Feedback = {
       fbId: createId("fb"),
       targetMsgId: input.targetMsgId,
@@ -141,10 +145,24 @@ class InMemoryFeedbackPort implements FeedbackPort {
       createdAt: new Date().toISOString(),
       visibility: input.visibility ?? "ALL",
     };
-    const list = this.store.feedbacks[input.targetMsgId] ?? [];
-    list.push(feedback);
-    this.store.feedbacks[input.targetMsgId] = list;
+    this.store.feedbacks[input.targetMsgId] = [feedback];
     return feedback;
+  }
+
+  async updateFeedback(input: { feedbackId: string; content: string }): Promise<Feedback> {
+    for (const [msgId, feedbacks] of Object.entries(this.store.feedbacks)) {
+      const index = feedbacks.findIndex((entry) => entry.fbId === input.feedbackId);
+      if (index >= 0) {
+        const updated: Feedback = {
+          ...feedbacks[index],
+          content: input.content,
+          updatedAt: new Date().toISOString(),
+        };
+        this.store.feedbacks[msgId] = [updated];
+        return updated;
+      }
+    }
+    throw new Error("Feedback not found.");
   }
 
   async listFeedbacks(input: { msgId: string; cursor?: string; limit?: number }): Promise<{

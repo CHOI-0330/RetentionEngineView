@@ -1,4 +1,4 @@
-import type { Conversation, FeedbackAuthorRole, Message, MentorAssignment, User } from "../../type/core";
+import type { Conversation, Feedback, FeedbackAuthorRole, Message, MentorAssignment, User } from "../../type/core";
 import type {
   MessageDelta,
   Prompt,
@@ -275,9 +275,14 @@ export function validateFeedbackRulesUseCase(args: {
   targetMessage: Message;
   content: string;
   mentorAssignments?: MentorAssignment[];
+  existingFeedbackCount?: number;
 }): UseCaseResult<ValidatedFeedback> {
   if (args.targetMessage.role !== "ASSISTANT") {
     return failure("ValidationError", "Feedback can be written only for assistant messages.");
+  }
+
+  if ((args.existingFeedbackCount ?? 0) > 0) {
+    return failure("ValidationError", "Feedback already exists for this message.");
   }
 
   const trimmed = args.content.trim();
@@ -320,6 +325,41 @@ export function createFeedbackUseCase(args: {
     kind: "READY_TO_PERSIST",
     payload: args.validated,
   };
+}
+
+export function validateFeedbackUpdateUseCase(args: {
+  requester: User;
+  conversation: Conversation;
+  targetMessage: Message;
+  existingFeedback: Feedback;
+  content: string;
+  mentorAssignments?: MentorAssignment[];
+}): UseCaseResult<{ feedbackId: string; content: string }> {
+  if (!canAccessConversation(args.requester, args.conversation, args.mentorAssignments)) {
+    return failure("Forbidden", "User is not allowed to access this conversation.");
+  }
+  if (args.targetMessage.role !== "ASSISTANT") {
+    return failure("ValidationError", "Feedback can be written only for assistant messages.");
+  }
+  if (args.existingFeedback.targetMsgId !== args.targetMessage.msgId) {
+    return failure("ValidationError", "Feedback does not belong to the specified message.");
+  }
+  if (args.existingFeedback.authorId !== args.requester.userId) {
+    return failure("Forbidden", "Only the original author can update this feedback.");
+  }
+
+  const trimmed = args.content.trim();
+  if (trimmed.length === 0) {
+    return failure("ValidationError", "Feedback content must not be empty.");
+  }
+  if (trimmed.length > MAX_FEEDBACK_LENGTH) {
+    return failure("ValidationError", "Feedback content exceeds the allowed length.");
+  }
+
+  return success({
+    feedbackId: args.existingFeedback.fbId,
+    content: trimmed,
+  });
 }
 
 const canAccessConversation = (

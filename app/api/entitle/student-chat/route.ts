@@ -33,6 +33,18 @@ type StudentChatAction =
   | "createFeedback"
   | "createConversation";
 
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+const MAX_MESSAGE_LENGTH = 4000;
+
 const listAvailableMentors = async (
   client: ReturnType<typeof createServerSupabaseClient>,
   newhireId: string
@@ -108,85 +120,131 @@ export async function POST(request: NextRequest) {
   const ensureConversationAccess = async (convId: string) => {
     const { data: conversationRow, error: conversationError } = await adminClient
       .from("conversation")
-      .select("owner_id")
+      .select()
       .eq("conv_id", convId)
       .single();
     if (conversationError || !conversationRow) {
-      throw conversationError ?? new Error("Conversation not found.");
+      throw new HttpError(404, "Conversation not found.");
     }
 
-    const ownerId = (conversationRow as { owner_id: string }).owner_id;
-    const mentorAssignments = await mentorAssignmentGateway.listActiveAssignments({ newhireId: ownerId });
-    const isOwner = ownerId === user.userId;
-    const isMentor = user.role === "MENTOR" && mentorAssignments.some((assignment) => assignment.mentorId === user.userId);
+    const conversation = mapConversationRow(conversationRow as ConversationRow);
+    const mentorAssignments = await mentorAssignmentGateway.listActiveAssignments({
+      newhireId: conversation.ownerId,
+    });
+    const isOwner = conversation.ownerId === user.userId;
+    const isMentor =
+      user.role === "MENTOR" &&
+      mentorAssignments.some((assignment) => assignment.mentorId === user.userId);
     if (!isOwner && !isMentor) {
-      throw new Error("Forbidden");
+      throw new HttpError(403, "Forbidden");
     }
-    return { ownerId, mentorAssignments };
+    return { conversation, mentorAssignments };
   };
 
   const ensureMessageAccess = async (msgId: string) => {
     const { data, error } = await adminClient
       .from("message")
-      .select("conv_id")
+      .select()
       .eq("msg_id", msgId)
       .single();
     if (error || !data) {
-      throw error ?? new Error("Message not found.");
+      throw new HttpError(404, "Message not found.");
     }
-    return ensureConversationAccess((data as { conv_id: string }).conv_id);
+    const message = mapMessageRow(data as MessageRow);
+    const access = await ensureConversationAccess(message.convId);
+    return { message, ...access };
   };
 
   try {
     switch (action) {
       case "createUserMessage": {
-        const result = await messageGateway.createUserMessage(
-          payload as Parameters<typeof messageGateway.createUserMessage>[0]
-        );
-        if (result.convId !== (payload as { convId: string }).convId || result.role !== "NEW_HIRE") {
-          throw new Error("Invalid conversation binding.");
+        const input = (payload ?? {}) as { convId?: string; content?: string };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
         }
-        if (result.convId !== (payload as { convId: string }).convId || user.userId !== result.convId) {
-          // placeholder check, actual enforcement occurs in GET bootstrap
+        const content = typeof input.content === "string" ? input.content : "";
+        const trimmedContent = content.trim();
+        if (!trimmedContent) {
+          throw new HttpError(400, "Message content must not be empty.");
         }
-        await ensureConversationAccess((payload as { convId: string }).convId);
+        if (trimmedContent.length > MAX_MESSAGE_LENGTH) {
+          throw new HttpError(400, "Message content exceeds the allowed length.");
+        }
+
+        const access = await ensureConversationAccess(input.convId);
+        if (access.conversation.ownerId !== user.userId) {
+          throw new HttpError(403, "Only the conversation owner can post messages.");
+        }
+
+        const result = await messageGateway.createUserMessage({
+          convId: access.conversation.convId,
+          authorId: user.userId,
+          content: trimmedContent,
+        });
         return NextResponse.json({ data: result });
       }
       case "beginAssistantMessage": {
-        await ensureConversationAccess((payload as { convId: string }).convId);
-        const result = await messageGateway.beginAssistantMessage((payload as { convId: string }).convId);
+        const input = (payload ?? {}) as { convId?: string };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
+        }
+        const access = await ensureConversationAccess(input.convId);
+        if (access.conversation.ownerId !== user.userId) {
+          throw new HttpError(403, "Only the conversation owner can request an assistant response.");
+        }
+        const result = await messageGateway.beginAssistantMessage(input.convId);
         return NextResponse.json({ data: result });
       }
       case "appendAssistantDelta": {
-        await ensureMessageAccess((payload as { msgId: string }).msgId);
+        const input = (payload ?? {}) as { msgId?: string };
+        if (!input.msgId || typeof input.msgId !== "string") {
+          throw new HttpError(400, "msgId is required.");
+        }
+        await ensureMessageAccess(input.msgId);
         await messageGateway.appendAssistantDelta(
           payload as Parameters<typeof messageGateway.appendAssistantDelta>[0]
         );
         return NextResponse.json({ data: { ok: true } });
       }
       case "finalizeAssistantMessage": {
-        await ensureMessageAccess((payload as { msgId: string }).msgId);
+        const input = (payload ?? {}) as { msgId?: string };
+        if (!input.msgId || typeof input.msgId !== "string") {
+          throw new HttpError(400, "msgId is required.");
+        }
+        await ensureMessageAccess(input.msgId);
         const result = await messageGateway.finalizeAssistantMessage(
           payload as Parameters<typeof messageGateway.finalizeAssistantMessage>[0]
         );
         return NextResponse.json({ data: result });
       }
       case "cancelAssistantMessage": {
-        await ensureMessageAccess((payload as { msgId: string }).msgId);
-        const result = await messageGateway.cancelAssistantMessage((payload as { msgId: string }).msgId);
+        const input = (payload ?? {}) as { msgId?: string };
+        if (!input.msgId || typeof input.msgId !== "string") {
+          throw new HttpError(400, "msgId is required.");
+        }
+        await ensureMessageAccess(input.msgId);
+        const result = await messageGateway.cancelAssistantMessage(input.msgId);
         return NextResponse.json({ data: result });
       }
       case "listConversationMessages": {
-        await ensureConversationAccess((payload as { convId: string }).convId);
+        const input = (payload ?? {}) as { convId?: string; cursor?: string; limit?: number };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
+        }
+        await ensureConversationAccess(input.convId);
         const result = await messageGateway.listConversationMessages(
-          payload as Parameters<typeof messageGateway.listConversationMessages>[0]
+          input as Parameters<typeof messageGateway.listConversationMessages>[0]
         );
         return NextResponse.json({ data: result });
       }
       case "listFeedbacks": {
-        await ensureMessageAccess((payload as { msgId: string }).msgId);
+        const input = (payload ?? {}) as { msgId?: string; cursor?: string; limit?: number };
+        if (!input.msgId || typeof input.msgId !== "string") {
+          throw new HttpError(400, "msgId is required.");
+        }
+        await ensureMessageAccess(input.msgId);
         const result = await feedbackGateway.listFeedbacks(
-          payload as Parameters<typeof feedbackGateway.listFeedbacks>[0]
+          input as Parameters<typeof feedbackGateway.listFeedbacks>[0]
         );
         const authorIds = Array.from(new Set(result.items.map((feedback) => feedback.authorId)));
         const authorEntries = await Promise.all(
@@ -204,7 +262,21 @@ export async function POST(request: NextRequest) {
         });
       }
       case "createFeedback": {
-        await ensureMessageAccess((payload as { targetMsgId: string }).targetMsgId);
+        const input = (payload ?? {}) as { targetMsgId?: string };
+        if (!input.targetMsgId || typeof input.targetMsgId !== "string") {
+          throw new HttpError(400, "targetMsgId is required.");
+        }
+        await ensureMessageAccess(input.targetMsgId);
+        const { count: existingCount, error: countError } = await adminClient
+          .from("feedback")
+          .select("fb_id", { count: "exact", head: true })
+          .eq("target_msg_id", input.targetMsgId);
+        if (countError) {
+          throw countError;
+        }
+        if ((existingCount ?? 0) > 0) {
+          throw new HttpError(400, "Feedback already exists for this message.");
+        }
         const feedback = await feedbackGateway.createFeedback(
           payload as Parameters<typeof feedbackGateway.createFeedback>[0]
         );
@@ -269,11 +341,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });
     }
   } catch (error) {
-    if (error && typeof error === "object") {
-      if ("message" in error && typeof (error as { message: unknown }).message === "string") {
-        return NextResponse.json({ error: (error as { message: string }).message }, { status: 500 });
-      }
-      return NextResponse.json({ error: JSON.stringify(error) }, { status: 500 });
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }
@@ -409,7 +481,9 @@ export async function GET(request: NextRequest) {
     if (feedbackRows) {
       for (const row of feedbackRows as FeedbackRow[]) {
         const mapped = mapFeedbackRow(row);
-        feedbackByMessageId[mapped.targetMsgId] = [...(feedbackByMessageId[mapped.targetMsgId] ?? []), mapped];
+        if (!feedbackByMessageId[mapped.targetMsgId]?.length) {
+          feedbackByMessageId[mapped.targetMsgId] = [mapped];
+        }
       }
     }
 
@@ -430,7 +504,7 @@ export async function GET(request: NextRequest) {
     const isOwner = conversation.ownerId === authUser.userId;
     const isMentorUser = mentorAssignments.some((assignment) => assignment.mentorId === authUser.userId);
     if (!isOwner && !isMentorUser) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      throw new HttpError(403, "Forbidden");
     }
 
     return NextResponse.json({
@@ -450,11 +524,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    if (error && typeof error === "object") {
-      if ("message" in error && typeof (error as { message: unknown }).message === "string") {
-        return NextResponse.json({ error: (error as { message: string }).message }, { status: 500 });
-      }
-      return NextResponse.json({ error: JSON.stringify(error) }, { status: 500 });
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }

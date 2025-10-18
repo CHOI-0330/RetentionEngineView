@@ -261,6 +261,14 @@ export function createFeedbackUseCase(args: { validated: ValidatedFeedback }): {
   fbId: string;
 };
 
+// Update / 編集
+export function validateFeedbackUpdateUseCase(args: {
+  targetMsgId: string;
+  feedbackId: string;
+  authorId: string;
+  content: string;
+}): { feedbackId: string; content: string } | ValidationError;
+
 // 一覧取得
 export function listConversationMessagesUseCase(args: {
   convId: string;

@@ -21,6 +21,7 @@ import {
 import {
   createFeedbackUseCase,
   validateFeedbackRulesUseCase,
+  validateFeedbackUpdateUseCase,
 } from "../../../../../src/application/entitle/useCases";
 
 interface MentorRequestContext {
@@ -132,7 +133,9 @@ export async function GET(
     if (feedbackRows) {
       for (const row of feedbackRows as FeedbackRow[]) {
         const mapped = mapFeedbackRow(row);
-        feedbackByMessageId[mapped.targetMsgId] = [...(feedbackByMessageId[mapped.targetMsgId] ?? []), mapped];
+        if (!feedbackByMessageId[mapped.targetMsgId]?.length) {
+          feedbackByMessageId[mapped.targetMsgId] = [mapped];
+        }
       }
     }
 
@@ -209,12 +212,44 @@ export async function POST(
       return NextResponse.json({ error: "Message does not belong to the conversation." }, { status: 400 });
     }
 
+    const existing = await feedbackGateway.listFeedbacks({ msgId: message.msgId, limit: 1 });
+    const existingFeedback = existing.items[0] ?? null;
+
+    if (existingFeedback) {
+      if (existingFeedback.authorId !== mentor.userId) {
+        return NextResponse.json({ error: "既存のフィードバックを更新する権限がありません。" }, { status: 403 });
+      }
+      const updateValidation = validateFeedbackUpdateUseCase({
+        requester: mentor,
+        conversation,
+        targetMessage: message,
+        existingFeedback,
+        content,
+        mentorAssignments: assignments,
+      });
+      if (updateValidation.kind === "failure") {
+        const status = updateValidation.error.kind === "Forbidden" ? 403 : 400;
+        return NextResponse.json({ error: updateValidation.error.message }, { status });
+      }
+      const updated = await feedbackGateway.updateFeedback({
+        feedbackId: updateValidation.value.feedbackId,
+        content: updateValidation.value.content,
+      });
+      return NextResponse.json({
+        data: {
+          feedback: updated,
+          authorName: mentor.displayName,
+        },
+      });
+    }
+
     const validation = validateFeedbackRulesUseCase({
       requester: mentor,
       conversation,
       targetMessage: message,
       content,
       mentorAssignments: assignments,
+      existingFeedbackCount: existing.items.length,
     });
 
     if (validation.kind === "failure") {

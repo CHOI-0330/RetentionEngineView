@@ -32,6 +32,7 @@ export interface FeedbackPort {
     items: Feedback[];
     nextCursor?: string;
   }>;
+  updateFeedback(input: { feedbackId: string; content: string }): Promise<Feedback>;
 }
 
 export interface AuthPort {
