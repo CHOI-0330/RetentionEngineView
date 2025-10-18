@@ -15,6 +15,7 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_FEEDBACK_LENGTH = 2000;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const MAX_CONVERSATION_TITLE_LENGTH = 120;
 
 const success = <T>(value: T): UseCaseResult<T> => ({ kind: "success", value });
 
@@ -44,6 +45,45 @@ export function createUserMessageUseCase(args: {
     authorId: args.user.userId,
     content: trimmed,
   });
+}
+
+export function createConversationUseCase(args: {
+  requester: Pick<User, "userId" | "role">;
+  title: string;
+  mentorId?: string | null;
+  allowedMentorIds: string[];
+}): UseCaseResult<{ title: string; mentorId?: string | null }> {
+  if (args.requester.role !== "NEW_HIRE") {
+    return failure("Forbidden", "Only new hires can create conversations.");
+  }
+
+  const title = args.title.trim();
+  if (title.length === 0) {
+    return failure("ValidationError", "Conversation title must not be empty.");
+  }
+  if (title.length > MAX_CONVERSATION_TITLE_LENGTH) {
+    return failure(
+      "ValidationError",
+      `Conversation title must be ${MAX_CONVERSATION_TITLE_LENGTH} characters or fewer.`
+    );
+  }
+
+  const mentorId = args.mentorId ?? null;
+  if (args.allowedMentorIds.length > 0) {
+    if (!mentorId) {
+      return failure("ValidationError", "A mentor must be selected for this conversation.");
+    }
+    if (!args.allowedMentorIds.includes(mentorId)) {
+      return failure("ValidationError", "Selected mentor is not available.");
+    }
+    return success({ title, mentorId });
+  }
+
+  if (mentorId) {
+    return failure("ValidationError", "Mentor cannot be selected for this conversation.");
+  }
+
+  return success({ title, mentorId: null });
 }
 
 export function buildPromptForConversationUseCase(args: {

@@ -250,6 +250,7 @@ export interface DevEntitleAdapters {
   initialFeedbacks: Record<string, Feedback[]>;
   runtimes: LLMRuntime[];
   modelConfigs: ModelConfig[];
+  replaceConversation?: (conversation: Conversation) => void;
 }
 
 export const createDevEntitleAdapters = (): DevEntitleAdapters => {
@@ -356,7 +357,7 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
     },
   ];
 
-  return {
+  const adapters: DevEntitleAdapters = {
     conversation,
     newHire: users["user-nh"],
     mentor: users["user-mentor"],
@@ -371,4 +372,15 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
     runtimes,
     modelConfigs,
   };
+
+  adapters.replaceConversation = (nextConversation: Conversation) => {
+    store.conversation = nextConversation;
+    store.messages = [];
+    store.feedbacks = {};
+    adapters.conversation = nextConversation;
+    adapters.initialMessages = [];
+    adapters.initialFeedbacks = {};
+  };
+
+  return adapters;
 };

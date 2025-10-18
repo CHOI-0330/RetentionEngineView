@@ -34,6 +34,29 @@ export interface FeedbackPort {
   }>;
 }
 
+export interface AuthPort {
+  registerUser(input: {
+    email: string;
+    password: string;
+    displayName: string;
+    role: User["role"];
+  }): Promise<{ userId: string }>;
+  loginUser(input: { email: string; password: string }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    role: User["role"];
+  }>;
+  refreshSession(input: { refreshToken: string }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    role: User["role"];
+  }>;
+  logoutUser(input: { accessToken: string }): Promise<void>;
+  getUserFromAccessToken(accessToken: string): Promise<{ userId: string; role: User["role"] }>;
+}
+
 export interface ConversationPort {
   getConversation(convId: string): Promise<Conversation | null>;
   touchLastActive(convId: string): Promise<void>;
@@ -75,4 +98,3 @@ export interface MentorDashboardPort {
 export interface FeedbackLookupPort {
   getUserDisplayName(userId: string): Promise<string | null>;
 }
-
