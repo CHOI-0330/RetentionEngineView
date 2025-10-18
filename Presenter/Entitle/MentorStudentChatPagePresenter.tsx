@@ -33,6 +33,7 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
+  const [editingFlags, setEditingFlags] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +55,14 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
         const json = (await response.json()) as { data: MentorChatBootstrap };
         if (!cancelled) {
           setBootstrap(json.data);
+          setEditingFlags(() => {
+            const flags: Record<string, boolean> = {};
+            json.data.messages.forEach((message) => {
+              const hasFeedback = json.data.feedbackByMessageId[message.msgId]?.length ?? 0;
+              flags[message.msgId] = hasFeedback === 0;
+            });
+            return flags;
+          });
           setLoadError(null);
         }
       } catch (error) {
@@ -103,9 +112,25 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
     setFormErrors((previous) => ({ ...previous, [messageId]: null }));
   }, []);
 
+  const handleToggleEditing = useCallback(
+    (messageId: string, next: boolean) => {
+      setEditingFlags((previous) => ({ ...previous, [messageId]: next }));
+      if (next) {
+        const existingFeedback = bootstrap?.feedbackByMessageId[messageId]?.[0];
+        if (existingFeedback) {
+          setDrafts((previous) => ({ ...previous, [messageId]: existingFeedback.content }));
+        }
+        setFormErrors((previous) => ({ ...previous, [messageId]: null }));
+      }
+    },
+    [bootstrap]
+  );
+
   const handleSubmitFeedback = useCallback(
     async (messageId: string) => {
-      const trimmed = drafts[messageId]?.trim() ?? "";
+      const existingFeedback = bootstrap?.feedbackByMessageId[messageId]?.[0] ?? null;
+      const rawDraft = drafts[messageId] ?? existingFeedback?.content ?? "";
+      const trimmed = rawDraft.trim();
       if (!trimmed) {
         setFormErrors((previous) => ({ ...previous, [messageId]: "フィードバック内容を入力してください。" }));
         return;
@@ -116,7 +141,7 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
         const response = await fetch(`/api/entitle/mentor-chat/${encodeURIComponent(convId)}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId, content: trimmed }),
+          body: JSON.stringify({ messageId, content: trimmed, feedbackId: existingFeedback?.fbId }),
         });
 
         if (!response.ok) {
@@ -149,7 +174,7 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
           }
           const nextFeedbacks = {
             ...previous.feedbackByMessageId,
-            [messageId]: [...(previous.feedbackByMessageId[messageId] ?? []), json.data.feedback],
+            [messageId]: [json.data.feedback],
           };
           const nextAuthorNames = {
             ...previous.authorNames,
@@ -161,8 +186,9 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
             authorNames: nextAuthorNames,
           };
         });
-        setDrafts((previous) => ({ ...previous, [messageId]: "" }));
+        setDrafts((previous) => ({ ...previous, [messageId]: trimmed }));
         setFormErrors((previous) => ({ ...previous, [messageId]: null }));
+        setEditingFlags((previous) => ({ ...previous, [messageId]: false }));
       } catch (error) {
         setFormErrors((previous) => ({
           ...previous,
@@ -176,7 +202,7 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
         });
       }
     },
-    [convId, drafts]
+    [bootstrap?.feedbackByMessageId, convId, drafts]
   );
 
   if (isLoading || !bootstrap) {
@@ -196,7 +222,9 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
       feedbackDrafts={drafts}
       feedbackSubmitting={submitting}
       feedbackErrors={formErrors}
+      editingFlags={editingFlags}
       onFeedbackDraftChange={handleDraftChange}
+      onToggleEditing={handleToggleEditing}
       onSubmitFeedback={handleSubmitFeedback}
     />
   );

@@ -18,7 +18,7 @@ const AuthPagePresenter = () => {
     []
   );
 
-  // 단순한 fetch 래퍼: payload가 없으면 본문을 생략해 로그아웃 호출이 간단해집니다.
+  // シンプルな fetch ラッパー: payload がなければ本文を省略し、ログアウトの呼び出しを簡潔にします。
   const callAuthAction = async (action: AuthAction, payload?: unknown) => {
     const init: RequestInit = { method: "POST", cache: "no-store" };
     if (payload !== undefined) {
@@ -81,7 +81,7 @@ const AuthPagePresenter = () => {
       }
     };
 
-    // 로그인 페이지를 열었을 때 쿠키만으로도 세션을 복원할 수 있다는 점을 보여주기 위한 초기화입니다.
+    // ログインページを開いた際、クッキーのみでセッションを復元できることを示す初期化です。
     void bootstrapSession();
     return () => {
       cancelled = true;
@@ -93,7 +93,7 @@ const AuthPagePresenter = () => {
       return;
     }
     if (!supabaseEnabled) {
-      controller.actions.setError({ kind: "ValidationError", message: "Supabase 환경 변수가 설정되지 않았습니다." });
+      controller.actions.setError({ kind: "ValidationError", message: "Supabase の環境変数が設定されていません。" });
       processingRef.current = false;
       controller.state.pendingEffects.forEach((pending) => controller.actions.acknowledgeEffect(pending.id));
       return;

@@ -81,6 +81,7 @@ export interface StudentChatControllerState {
   activeAssistantMessageId?: string | null;
   pendingUserMessage?: { convId: string; authorId: string; content: string } | null;
   assistantSeqByMessageId: Record<string, number>;
+  editingMessageIds: Record<string, boolean>;
 }
 
 export interface StudentChatControllerActions {
@@ -97,6 +98,7 @@ export interface StudentChatControllerActions {
   requestFeedbackForMessage: (msgId: string) => void;
   applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
   requestCreateFeedback: (content: string, targetMessage: Message) => void;
+  toggleFeedbackEditing: (msgId: string, isEditing: boolean) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
 }
@@ -157,6 +159,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     activeAssistantMessageId: null,
     pendingUserMessage: null,
     assistantSeqByMessageId: {},
+    editingMessageIds: {},
   }));
 
   const mutateState = useCallback((updater: (previous: StudentChatControllerState) => StudentChatControllerState) => {
@@ -492,13 +495,18 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
 
   const applyFeedbackForMessage = useCallback(
     (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => {
+      const normalized = feedbacks.length > 0 ? [feedbacks[0]] : [];
       mutateState((previous) => ({
         ...previous,
         feedbackByMessageId: {
           ...previous.feedbackByMessageId,
-          [msgId]: feedbacks,
+          [msgId]: normalized,
         },
         authorNames: authorNames ? { ...previous.authorNames, ...authorNames } : previous.authorNames,
+        editingMessageIds: {
+          ...previous.editingMessageIds,
+          [msgId]: false,
+        },
       }));
     },
     [mutateState]
@@ -506,12 +514,14 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
 
   const requestCreateFeedback = useCallback(
     (content: string, targetMessage: Message) => {
+      const existingFeedbackCount = state.feedbackByMessageId[targetMessage.msgId]?.length ?? 0;
       const validationResult = validateFeedbackRulesUseCase({
         requester: currentUser,
         conversation,
         targetMessage,
         content,
         mentorAssignments,
+        existingFeedbackCount,
       });
       if (validationResult.kind === "failure") {
         mutateState((previous) => ({
@@ -529,7 +539,20 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         ],
       }));
     },
-    [conversation, createEffect, currentUser, mentorAssignments, mutateState]
+    [conversation, createEffect, currentUser, mentorAssignments, mutateState, state.feedbackByMessageId]
+  );
+
+  const toggleFeedbackEditing = useCallback(
+    (msgId: string, isEditing: boolean) => {
+      mutateState((previous) => ({
+        ...previous,
+        editingMessageIds: {
+          ...previous.editingMessageIds,
+          [msgId]: isEditing,
+        },
+      }));
+    },
+    [mutateState]
   );
 
   const clearError = useCallback(() => {
@@ -564,6 +587,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       requestFeedbackForMessage,
       applyFeedbackForMessage,
       requestCreateFeedback,
+      toggleFeedbackEditing,
       clearError,
       reportExternalFailure,
     }),

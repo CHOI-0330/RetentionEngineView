@@ -27,7 +27,9 @@ interface MentorStudentChatViewProps {
   feedbackDrafts: Record<string, string>;
   feedbackSubmitting: Record<string, boolean>;
   feedbackErrors: Record<string, string | null | undefined>;
+  editingFlags: Record<string, boolean>;
   onFeedbackDraftChange: (messageId: string, value: string) => void;
+  onToggleEditing: (messageId: string, isEditing: boolean) => void;
   onSubmitFeedback: (messageId: string) => void;
 }
 
@@ -39,7 +41,9 @@ const MentorStudentChatView = ({
   feedbackDrafts,
   feedbackSubmitting,
   feedbackErrors,
+  editingFlags,
   onFeedbackDraftChange,
+  onToggleEditing,
   onSubmitFeedback,
 }: MentorStudentChatViewProps) => {
   return (
@@ -55,6 +59,10 @@ const MentorStudentChatView = ({
         <div className="space-y-4">
           {messages.map((message) => {
             const isStudent = message.role === "NEW_HIRE";
+            const hasFeedback = message.feedbacks.length > 0;
+            const isEditing = editingFlags[message.id] ?? false;
+            const draftValue = feedbackDrafts[message.id] ?? (hasFeedback ? message.feedbacks[0]?.content ?? "" : "");
+            const submitLabel = hasFeedback ? "フィードバックを更新" : "フィードバックを送信";
             return (
               <div
                 key={message.id}
@@ -76,7 +84,18 @@ const MentorStudentChatView = ({
                 </Card>
                 {message.feedbacks.length ? (
                   <div className="mt-3 w-full max-w-[70%] space-y-3 rounded-md bg-muted/40 p-3 text-sm">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">Feedback</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">Feedback</p>
+                      {message.role === "ASSISTANT" && hasFeedback ? (
+                        <button
+                          type="button"
+                          className="text-xs text-primary underline"
+                          onClick={() => onToggleEditing(message.id, !isEditing)}
+                        >
+                          {isEditing ? "編集をやめる" : "編集"}
+                        </button>
+                      ) : null}
+                    </div>
                     {message.feedbacks.map((feedback) => (
                       <div key={feedback.id} className="rounded-md border bg-background p-3">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -88,7 +107,7 @@ const MentorStudentChatView = ({
                     ))}
                   </div>
                 ) : null}
-                {message.role === "ASSISTANT" ? (
+                {message.role === "ASSISTANT" && (isEditing || !hasFeedback) ? (
                   <div className="mt-3 w-full max-w-[70%] rounded-md border bg-background p-3">
                     <form
                       className="space-y-3"
@@ -103,7 +122,7 @@ const MentorStudentChatView = ({
                         </Label>
                         <Textarea
                           id={`mentor-feedback-${message.id}`}
-                          value={feedbackDrafts[message.id] ?? ""}
+                          value={draftValue}
                           onChange={(event) => onFeedbackDraftChange(message.id, event.target.value)}
                           rows={3}
                           placeholder="気づきやアドバイスを入力してください"
@@ -119,7 +138,7 @@ const MentorStudentChatView = ({
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
                             </>
                           ) : (
-                            "フィードバックを送信"
+                            submitLabel
                           )}
                         </Button>
                       </div>
