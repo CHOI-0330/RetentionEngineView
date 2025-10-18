@@ -6,7 +6,7 @@ import { setAuthCookies } from "../utils";
 const authGateway = new SupabaseAuthGateway();
 
 export async function POST(request: NextRequest) {
-  // Refresh 토큰은 재발급 전용으로만 사용하므로 서버에서 직접 읽습니다.
+  // リフレッシュトークンは再発行専用のため、サーバー側で直接読み取ります。
   const refreshToken = request.cookies.get("auth_refresh_token")?.value;
   if (!refreshToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

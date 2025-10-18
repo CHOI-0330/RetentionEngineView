@@ -7,7 +7,7 @@ import { clearAuthCookies } from "../utils";
 const authGateway = new SupabaseAuthGateway();
 
 export async function POST(request: NextRequest) {
-  // httpOnly 쿠키는 브라우저에서 읽을 수 없지만 API 라우트에서는 바로 사용할 수 있습니다.
+  // httpOnly クッキーはブラウザからは読み取れませんが、API ルートからは直接参照できます。
   const accessToken = request.cookies.get("auth_access_token")?.value;
   if (!accessToken) {
     const response = NextResponse.json({ data: { ok: true } });
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     await authGateway.logoutUser(result.value);
     const response = NextResponse.json({ data: { ok: true } });
-    // 사용자를 로그아웃할 때는 모든 인증 쿠키를 반드시 정리합니다.
+    // ログアウト時にはすべての認証クッキーを必ず削除します。
     clearAuthCookies(response);
     return response;
   } catch (error) {

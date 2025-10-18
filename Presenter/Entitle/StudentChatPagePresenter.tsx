@@ -179,8 +179,7 @@ const StudentChatRuntime = ({
             feedback: Feedback;
             authorName?: string;
           };
-          const existing = controller.state.feedbackByMessageId[result.feedback.targetMsgId] ?? [];
-          controller.actions.applyFeedbackForMessage(result.feedback.targetMsgId, [...existing, result.feedback], {
+          controller.actions.applyFeedbackForMessage(result.feedback.targetMsgId, [result.feedback], {
             [result.feedback.authorId]: result.authorName ?? result.feedback.authorId,
           });
           break;
@@ -263,8 +262,7 @@ const StudentChatRuntime = ({
         }
         case "REQUEST_CREATE_FEEDBACK": {
           const created = await devAdapters.feedbackPort.createFeedback(effect.payload);
-          const existing = controller.state.feedbackByMessageId[created.targetMsgId] ?? [];
-          controller.actions.applyFeedbackForMessage(created.targetMsgId, [...existing, created]);
+          controller.actions.applyFeedbackForMessage(created.targetMsgId, [created]);
           break;
         }
         default:
@@ -325,7 +323,7 @@ const StudentChatRuntime = ({
 
   const handleOpenCreateDialog = useCallback(() => {
     if (!mentorOptions.length) {
-      window.alert("선택할 수 있는 멘토가 없습니다. 멘토에게 문의해 주세요.");
+      window.alert("選択できるメンターがいません。メンターにお問い合わせください。");
       return;
     }
     setCreateTitle("");
@@ -339,7 +337,7 @@ const StudentChatRuntime = ({
 
   const handleSubmitCreateDialog = useCallback(async () => {
     if (mentorOptions.length > 0 && !selectedMentorId) {
-      window.alert("멘토를 선택해 주세요.");
+      window.alert("メンターを選択してください。");
       return;
     }
     setIsCreating(true);
@@ -452,13 +450,13 @@ const StudentChatPagePresenter = () => {
       }
       setIsLoading(true);
       try {
-        // convId를 넘기면 해당 대화를, 생략하면 최신 대화를 서버가 알아서 골라줍니다.
+        // convId を指定するとその会話を、指定しない場合は最新の会話をサーバー側が選択します。
         const url = targetConvId ? `/api/entitle/student-chat?convId=${encodeURIComponent(targetConvId)}` : "/api/entitle/student-chat";
         const response = await fetch(url, { cache: "no-store" });
         if (response.status === 401 || response.status === 403) {
           router.push("/?redirected=1");
           setBootstrap(null);
-          setLoadError({ kind: "Forbidden", message: "인증이 필요합니다." });
+          setLoadError({ kind: "Forbidden", message: "認証が必要です。" });
           return;
         }
         if (!response.ok) {
@@ -507,7 +505,7 @@ const StudentChatPagePresenter = () => {
 
   const createConversation = useCallback(
     async ({ title, mentorId }: { title: string; mentorId?: string | null }) => {
-      const normalizedTitle = title.trim() || "새 대화";
+      const normalizedTitle = title.trim() || "新しい会話";
       const normalizedMentorId = mentorId ?? undefined;
 
       if (supabaseEnabled) {
@@ -580,10 +578,10 @@ const StudentChatPagePresenter = () => {
   const handleInitialCreateSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (mentorOptions.length > 0 && !initialMentorId) {
-        window.alert("멘토를 선택해 주세요.");
-        return;
-      }
+    if (mentorOptions.length > 0 && !initialMentorId) {
+      window.alert("メンターを選択してください。");
+      return;
+    }
       setIsInitialCreating(true);
       try {
         await createConversation({ title: initialTitle, mentorId: initialMentorId ?? undefined });
@@ -622,14 +620,14 @@ const StudentChatPagePresenter = () => {
   if (!bootstrap?.conversation) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-        <p>열람 가능한 대화가 없습니다. 새 대화를 생성해 시작해 보세요.</p>
+        <p>閲覧できる会話がありません。新しい会話を作成して始めましょう。</p>
         {mentorOptions.length ? (
           <form className="flex w-full max-w-sm flex-col gap-3" onSubmit={handleInitialCreateSubmit}>
             <input
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={initialTitle}
               onChange={(event) => setInitialTitle(event.target.value)}
-              placeholder="대화 제목"
+              placeholder="会話タイトル"
             />
             <select
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -637,7 +635,7 @@ const StudentChatPagePresenter = () => {
               onChange={(event) => setInitialMentorId(event.target.value || null)}
             >
               <option value="" disabled>
-                멘토를 선택하세요
+                メンターを選択してください
               </option>
               {mentorOptions.map((option) => (
                 <option key={option.mentorId} value={option.mentorId}>
@@ -650,11 +648,11 @@ const StudentChatPagePresenter = () => {
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm"
               disabled={isInitialCreating || (mentorOptions.length > 0 && !initialMentorId)}
             >
-              {isInitialCreating ? "생성 중..." : "새 대화 만들기"}
+              {isInitialCreating ? "作成中..." : "新しい会話を作成"}
             </button>
           </form>
         ) : (
-          <p className="text-xs text-muted-foreground">선택할 수 있는 멘토가 없습니다. 관리자에게 문의해 주세요.</p>
+          <p className="text-xs text-muted-foreground">選択できるメンターがいません。管理者にお問い合わせください。</p>
         )}
       </div>
     );
