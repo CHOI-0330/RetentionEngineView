@@ -11,6 +11,22 @@ import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Loader2, Search, ThumbsDown, ThumbsUp } from "lucide-react";
 
+export interface MentorDashboardStudentItem {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastActivity: Date;
+  status: "active" | "idle" | "offline";
+  recentChat: {
+    summary: string;
+    aiResponse: string;
+    subject: string;
+    timestamp: Date;
+    needsReview: boolean;
+  };
+  totalChats: number;
+}
+
 interface MentorDashboardViewProps {
   viewModel: MentorDashboardPresenterViewModel;
   status: MentorDashboardPresenterStatus;
@@ -123,4 +139,3 @@ const MentorDashboardView = ({ viewModel, status, meta, interactions }: MentorDa
 };
 
 export default MentorDashboardView;
-
