@@ -1,4 +1,3 @@
-"use client";
 import StudentChatPagePresenter from "../../Presenter/Entitle/StudentChatPagePresenter";
 
 export default function StudentPage() {

@@ -1,4 +1,3 @@
-"use client";
 import MentorDashboardPagePresenter from "../../Presenter/Entitle/MentorDashboardPagePresenter";
 
 export default function MentorPage() {
