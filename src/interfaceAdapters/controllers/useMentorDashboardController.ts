@@ -7,12 +7,12 @@ export type MentorDashboardControllerEffect =
   | {
       id: string;
       kind: "REQUEST_REFRESH_SUMMARIES";
-      payload: { mentorId: string };
+      payload: Record<string, never>;
     }
   | {
       id: string;
       kind: "REQUEST_SUBMIT_FEEDBACK_QUALITY";
-      payload: { mentorId: string; studentId: string; isPositive: boolean };
+      payload: { studentId: string; isPositive: boolean };
     };
 
 export interface MentorDashboardControllerState {
@@ -38,10 +38,6 @@ export interface MentorDashboardControllerActions {
   selectStudent: (studentId: string | null) => void;
 }
 
-export interface UseMentorDashboardControllerParams {
-  mentorId: string;
-}
-
 export interface MentorDashboardController {
   state: MentorDashboardControllerState;
   actions: MentorDashboardControllerActions;
@@ -57,10 +53,7 @@ const createInitialState = (): MentorDashboardControllerState => ({
   selectedStudentId: null,
 });
 
-export const useMentorDashboardController = (
-  params: UseMentorDashboardControllerParams
-): MentorDashboardController => {
-  const { mentorId } = params;
+export const useMentorDashboardController = (): MentorDashboardController => {
   const [state, setState] = useState<MentorDashboardControllerState>(createInitialState);
   const effectIdRef = useRef(0);
 
@@ -84,12 +77,12 @@ export const useMentorDashboardController = (
           {
             id: `mentor-dashboard-effect-${effectIdRef.current++}`,
             kind: "REQUEST_REFRESH_SUMMARIES",
-            payload: { mentorId },
+            payload: {},
           },
         ],
       };
     });
-  }, [mentorId]);
+  }, []);
 
   const applySummaries = useCallback((summaries: StudentSummary[]) => {
     setState((previous) => ({
@@ -115,12 +108,12 @@ export const useMentorDashboardController = (
           {
             id: `mentor-dashboard-effect-${effectIdRef.current++}`,
             kind: "REQUEST_SUBMIT_FEEDBACK_QUALITY",
-            payload: { mentorId, studentId, isPositive },
+            payload: { studentId, isPositive },
           },
         ],
       }));
     },
-    [mentorId]
+    []
   );
 
   const finalizeSubmitFeedbackQuality = useCallback((studentId: string) => {

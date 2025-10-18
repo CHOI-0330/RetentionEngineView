@@ -48,22 +48,16 @@ export class SupabaseMentorDashboardGateway implements MentorDashboardPort {
     }
 
     const conversationRows = conversations as ConversationRow[];
-    const conversationMap = new Map<string, ConversationRow>();
-    for (const conversation of conversationRows) {
-      if (!conversationMap.has(conversation.owner_id)) {
-        conversationMap.set(conversation.owner_id, conversation);
-      }
-    }
+    const assignedNewhireIds = new Set(assignmentRows.map((assignment) => assignment.newhire_id));
 
     const summaries: StudentSummary[] = [];
-    for (const assignment of assignmentRows) {
-      const user = userMap.get(assignment.newhire_id);
-      if (!user) {
+    for (const conversationRow of conversationRows) {
+      if (!assignedNewhireIds.has(conversationRow.owner_id)) {
         continue;
       }
 
-      const conversationRow = conversationMap.get(assignment.newhire_id);
-      if (!conversationRow) {
+      const user = userMap.get(conversationRow.owner_id);
+      if (!user) {
         continue;
       }
 

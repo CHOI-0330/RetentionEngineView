@@ -21,15 +21,11 @@ type MentorDashboardAction = "listStudentSummaries" | "submitFeedbackQuality";
 const MentorDashboardPagePresenter = () => {
   const devAdapters = useMemo(() => createDevEntitleAdapters(), []);
 
-  const supabaseMentorId = process.env.NEXT_PUBLIC_SUPABASE_MENTOR_ID;
   const supabaseEnabled =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
-    Boolean(supabaseMentorId);
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-  const mentorId = supabaseEnabled ? supabaseMentorId! : devAdapters.mentor.userId;
-
-  const controller = useMentorDashboardController({ mentorId });
+  const controller = useMentorDashboardController();
   const presenter = useMentorDashboardPresenter(controller);
 
   const processingRef = useRef(false);
@@ -59,10 +55,7 @@ const MentorDashboardPagePresenter = () => {
     async (effect: MentorDashboardControllerEffect) => {
       switch (effect.kind) {
         case "REQUEST_REFRESH_SUMMARIES": {
-          const summaries = (await callMentorDashboardAction(
-            "listStudentSummaries",
-            effect.payload
-          )) as StudentSummary[];
+          const summaries = (await callMentorDashboardAction("listStudentSummaries", {})) as StudentSummary[];
           controller.actions.applySummaries(summaries);
           controller.actions.finalizeRefresh();
           break;
@@ -83,13 +76,19 @@ const MentorDashboardPagePresenter = () => {
     async (effect: MentorDashboardControllerEffect) => {
       switch (effect.kind) {
         case "REQUEST_REFRESH_SUMMARIES": {
-          const summaries = await devAdapters.dashboardPort.listStudentSummaries(effect.payload);
+          const summaries = await devAdapters.dashboardPort.listStudentSummaries({
+            mentorId: devAdapters.mentor.userId,
+          });
           controller.actions.applySummaries(summaries);
           controller.actions.finalizeRefresh();
           break;
         }
         case "REQUEST_SUBMIT_FEEDBACK_QUALITY": {
-          await devAdapters.dashboardPort.submitFeedbackQuality(effect.payload);
+          await devAdapters.dashboardPort.submitFeedbackQuality({
+            mentorId: devAdapters.mentor.userId,
+            studentId: effect.payload.studentId,
+            isPositive: effect.payload.isPositive,
+          });
           controller.actions.finalizeSubmitFeedbackQuality(effect.payload.studentId);
           break;
         }

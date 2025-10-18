@@ -10,6 +10,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Loader2, Search, ThumbsDown, ThumbsUp } from "lucide-react";
+import Link from "next/link";
 
 export interface MentorDashboardStudentItem {
   id: string;
@@ -25,6 +26,7 @@ export interface MentorDashboardStudentItem {
     needsReview: boolean;
   };
   totalChats: number;
+  conversationId: string;
 }
 
 interface MentorDashboardViewProps {
@@ -34,17 +36,31 @@ interface MentorDashboardViewProps {
   interactions: MentorDashboardPresenterInteractions;
 }
 
-const MentorDashboardView = ({ viewModel, status, meta, interactions }: MentorDashboardViewProps) => {
+const MentorDashboardView = ({
+  viewModel,
+  status,
+  meta,
+  interactions,
+}: MentorDashboardViewProps) => {
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 rounded-2xl border bg-card px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Mentor Dashboard</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Mentor Dashboard
+            </p>
             <h1 className="text-xl font-semibold">担当中の新入社員一覧</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={interactions.requestRefresh} disabled={status.isLoading}>
-            {status.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={interactions.requestRefresh}
+            disabled={status.isLoading}
+          >
+            {status.isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
             再読み込み
           </Button>
         </div>
@@ -72,7 +88,10 @@ const MentorDashboardView = ({ viewModel, status, meta, interactions }: MentorDa
           const qualitySubmitting = Boolean(meta.qualitySubmitting[student.id]);
           const isSelected = meta.selectedStudentId === student.id;
           return (
-            <Card key={student.id} className={isSelected ? "border-primary" : undefined}>
+            <Card
+              key={student.conversationId}
+              className={isSelected ? "border-primary" : undefined}
+            >
               <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:gap-6">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-14 w-14">
@@ -86,17 +105,39 @@ const MentorDashboardView = ({ viewModel, status, meta, interactions }: MentorDa
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      最終活動: {student.lastActivity.toLocaleString()} / 総チャット数: {student.totalChats}
+                      最終活動: {student.lastActivity.toLocaleString()} /
+                      総チャット数: {student.totalChats}
                     </p>
                     <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{student.recentChat.subject}</span>
-                        <span>{student.recentChat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                            トピック
+                          </span>
+                          <span
+                            className="mt-1 line-clamp-2 text-base font-semibold text-foreground"
+                            title={student.recentChat.subject}
+                          >
+                            {student.recentChat.subject}
+                          </span>
+                        </div>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {student.recentChat.timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
                       </div>
-                      <p className="mt-2 font-medium text-foreground">若手社員: {student.recentChat.summary || "(メッセージなし)"}</p>
-                      <p className="mt-1 text-muted-foreground">AI: {student.recentChat.aiResponse || "(未回答)"}</p>
+                      <p className="mt-3 font-medium text-foreground">
+                        若手社員: {student.recentChat.summary || "(メッセージなし)"}
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        AI: {student.recentChat.aiResponse || "(未回答)"}
+                      </p>
                       {student.recentChat.needsReview ? (
-                        <Badge variant="destructive" className="mt-2">レビューが必要</Badge>
+                        <Badge variant="destructive" className="mt-2">
+                          レビューが必要
+                        </Badge>
                       ) : null}
                     </div>
                   </div>
@@ -119,8 +160,14 @@ const MentorDashboardView = ({ viewModel, status, meta, interactions }: MentorDa
                   >
                     <ThumbsDown className="mr-2 h-4 w-4" /> 改善必要
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => viewModel.onViewStudentChat(student.id)}>
-                    チャットを見る
+                  <Button asChild variant="secondary" size="sm">
+                    <Link
+                      href={`/mentor/chat/${encodeURIComponent(
+                        student.conversationId
+                      )}`}
+                    >
+                      チャットを見る
+                    </Link>
                   </Button>
                 </div>
               </CardContent>

@@ -27,7 +27,6 @@ export interface MentorDashboardPresenterViewModel {
   students: MentorDashboardStudentItem[];
   searchQuery: string;
   onChangeSearch: (value: string) => void;
-  onViewStudentChat: (studentId: string) => void;
   onFeedback: (studentId: string, isGood: boolean) => void;
 }
 
@@ -84,6 +83,7 @@ export const useMentorDashboardPresenter = (
         avatar: undefined,
         lastActivity: new Date(lastActivityAt),
         status: deriveStatus(summary),
+        conversationId: conversation.convId,
         recentChat: {
           summary: studentMessage,
           aiResponse: assistantMessage,
@@ -103,13 +103,6 @@ export const useMentorDashboardPresenter = (
     [actions]
   );
 
-  const handleViewStudentChat = useCallback(
-    (studentId: string) => {
-      actions.selectStudent(studentId);
-    },
-    [actions]
-  );
-
   const handleFeedback = useCallback(
     (studentId: string, isGood: boolean) => {
       if (controller.state.qualitySubmitting[studentId]) {
@@ -125,10 +118,9 @@ export const useMentorDashboardPresenter = (
       students,
       searchQuery: state.searchQuery,
       onChangeSearch: handleChangeSearch,
-      onViewStudentChat: handleViewStudentChat,
       onFeedback: handleFeedback,
     }),
-    [handleChangeSearch, handleFeedback, handleViewStudentChat, state.searchQuery, students]
+    [handleChangeSearch, handleFeedback, state.searchQuery, students]
   );
 
   const status: MentorDashboardPresenterStatus = useMemo(
