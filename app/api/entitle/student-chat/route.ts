@@ -428,7 +428,8 @@ export async function GET(request: NextRequest) {
     const mentorAssignments = await mentorAssignmentGateway.listActiveAssignments({ newhireId: conversation.ownerId });
 
     const isOwner = conversation.ownerId === authUser.userId;
-    if (!isOwner) {
+    const isMentorUser = mentorAssignments.some((assignment) => assignment.mentorId === authUser.userId);
+    if (!isOwner && !isMentorUser) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
