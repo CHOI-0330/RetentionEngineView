@@ -29,7 +29,9 @@ interface MentorRequestContext {
   conversation: ReturnType<typeof mapConversationRow>;
   student: ReturnType<typeof mapUserRow>;
   mentor: ReturnType<typeof mapUserRow>;
-  assignments: Awaited<ReturnType<SupabaseMentorAssignmentGateway["listActiveAssignments"]>>;
+  assignments: Awaited<
+    ReturnType<SupabaseMentorAssignmentGateway["listActiveAssignments"]>
+  >;
 }
 
 const authGateway = new SupabaseAuthGateway();
@@ -60,13 +62,19 @@ const resolveMentorRequest = async (
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [{ data: conversationRow, error: conversationError }, { data: mentorRow, error: mentorError }] = await Promise.all([
+  const [
+    { data: conversationRow, error: conversationError },
+    { data: mentorRow, error: mentorError },
+  ] = await Promise.all([
     client.from("conversation").select().eq("conv_id", convId).single(),
     client.from("user").select().eq("user_id", authUser.userId).single(),
   ]);
 
   if (conversationError || !conversationRow) {
-    return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Conversation not found." },
+      { status: 404 }
+    );
   }
   if (mentorError || !mentorRow) {
     return NextResponse.json({ error: "Mentor not found." }, { status: 404 });
@@ -74,9 +82,13 @@ const resolveMentorRequest = async (
 
   const conversation = mapConversationRow(conversationRow as ConversationRow);
 
-  const assignments = await mentorAssignmentGateway.listActiveAssignments({ mentorId: authUser.userId });
+  const assignments = await mentorAssignmentGateway.listActiveAssignments({
+    mentorId: authUser.userId,
+  });
   const isAssigned = assignments.some(
-    (assignment) => assignment.newhireId === conversation.ownerId && assignment.revokedAt == null
+    (assignment) =>
+      assignment.newhireId === conversation.ownerId &&
+      assignment.revokedAt == null
   );
   if (!isAssigned) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -118,7 +130,9 @@ export async function GET(
 
     const { conversation, student, mentor } = context;
 
-    const messagesResponse = await messageGateway.listConversationMessages({ convId });
+    const messagesResponse = await messageGateway.listConversationMessages({
+      convId,
+    });
     const messages = messagesResponse.items;
 
     const messageIds = messages.map((message) => message.msgId);
@@ -129,7 +143,10 @@ export async function GET(
       throw feedbackError;
     }
 
-    const feedbackByMessageId: Record<string, ReturnType<typeof mapFeedbackRow>[]> = {};
+    const feedbackByMessageId: Record<
+      string,
+      ReturnType<typeof mapFeedbackRow>[]
+    > = {};
     if (feedbackRows) {
       for (const row of feedbackRows as FeedbackRow[]) {
         const mapped = mapFeedbackRow(row);
@@ -146,7 +163,9 @@ export async function GET(
 
     const authorEntries = await Promise.all(
       Array.from(authorIds).map(async (authorId) => {
-        const displayName = await feedbackLookupGateway.getUserDisplayName(authorId);
+        const displayName = await feedbackLookupGateway.getUserDisplayName(
+          authorId
+        );
         return [authorId, displayName ?? authorId] as const;
       })
     );
@@ -173,6 +192,8 @@ export async function POST(
 ) {
   const convId = params.convId;
 
+  console.log("Received POST request for convId:", convId);
+
   if (!convId) {
     return NextResponse.json({ error: "convId is required." }, { status: 400 });
   }
@@ -189,11 +210,17 @@ export async function POST(
     try {
       body = (await request.json()) as { messageId?: string; content?: string };
     } catch {
-      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid JSON body." },
+        { status: 400 }
+      );
     }
 
     if (!body.messageId || typeof body.messageId !== "string") {
-      return NextResponse.json({ error: "messageId is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "messageId is required." },
+        { status: 400 }
+      );
     }
     const content = typeof body.content === "string" ? body.content : "";
 
@@ -203,21 +230,33 @@ export async function POST(
       .eq("msg_id", body.messageId)
       .single();
     if (messageError || !messageRow) {
-      return NextResponse.json({ error: "Message not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Message not found." },
+        { status: 404 }
+      );
     }
 
     const message = mapMessageRow(messageRow as MessageRow);
 
     if (message.convId !== conversation.convId) {
-      return NextResponse.json({ error: "Message does not belong to the conversation." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Message does not belong to the conversation." },
+        { status: 400 }
+      );
     }
 
-    const existing = await feedbackGateway.listFeedbacks({ msgId: message.msgId, limit: 1 });
+    const existing = await feedbackGateway.listFeedbacks({
+      msgId: message.msgId,
+      limit: 1,
+    });
     const existingFeedback = existing.items[0] ?? null;
 
     if (existingFeedback) {
       if (existingFeedback.authorId !== mentor.userId) {
-        return NextResponse.json({ error: "既存のフィードバックを更新する権限がありません。" }, { status: 403 });
+        return NextResponse.json(
+          { error: "既存のフィードバックを更新する権限がありません。" },
+          { status: 403 }
+        );
       }
       const updateValidation = validateFeedbackUpdateUseCase({
         requester: mentor,
@@ -229,7 +268,10 @@ export async function POST(
       });
       if (updateValidation.kind === "failure") {
         const status = updateValidation.error.kind === "Forbidden" ? 403 : 400;
-        return NextResponse.json({ error: updateValidation.error.message }, { status });
+        return NextResponse.json(
+          { error: updateValidation.error.message },
+          { status }
+        );
       }
       const updated = await feedbackGateway.updateFeedback({
         feedbackId: updateValidation.value.feedbackId,
