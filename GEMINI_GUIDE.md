@@ -11,48 +11,49 @@
 ### a. 학생-AI 학습 루프 (기본 학습)
 - **주체**: 학생
 - **프로세스**:
-    1. 학생이 `StudentChatScreen`을 통해 AI 튜터에게 질문합니다.
+    1. 학생이 `StudentChatView`(App Router: `/student`)를 통해 AI 튜터에게 질문합니다.
     2. AI가 실시간으로 답변하며 기본 학습 경험을 제공합니다.
-    3. 모든 대화는 `StudentChatHistoryScreen`에 기록되어 학생이 복습할 수 있습니다.
+    3. 대화 이력과 피드백은 동일 뷰에서 로드되어 학생이 즉시 복습할 수 있습니다.
 
 ### b. 멘토-AI 품질 관리 루프 (피드백 및 교정)
 - **주체**: 멘토
 - **프로세스**:
     1. 시스템이 특정 AI 대화를 '리뷰 필요'로 자동 분류합니다.
-    2. 멘토는 `MentorDashboard`에서 리뷰가 필요한 대화 목록을 확인합니다.
-    3. `MentorChatReviewScreen`을 통해 해당 대화 내용을 검토합니다.
+    2. 멘토는 `MentorDashboardView`(App Router: `/mentor`)에서 리뷰가 필요한 대화 목록을 확인합니다.
+    3. 세부 검토는 `MentorStudentChatView`(App Router: `/mentor/chat/[convId]`)에서 이루어집니다.
     4. 멘토는 AI의 답변을 직접 **첨삭(添削)**하고, 왜 그렇게 수정했는지에 대한 **코멘트**를 추가할 수 있습니다.
-    5. 이 피드백은 학생의 채팅 화면(`StudentChatScreen`)에 `MentorFeedbackPreview` 컴포넌트를 통해 표시되어, 학생은 더 높은 품질의 정보를 바탕으로 2차 학습을 하게 됩니다.
+    5. 반영된 피드백은 학생 채팅 화면에서 즉시 노출되고 재학습에 사용됩니다.
 
 ### c. 지식 베이스 강화 루프 (시스템 성장)
 - **주체**: 멘토
 - **프로세스**:
     1. 멘토의 첨삭 내용은 일회성 피드백으로 끝나지 않고, 영구적인 지식 자산으로 전환됩니다.
-    2. 멘토는 `KnowledgeCorrectionScreen`에서 첨삭한 내용을 '주제', '난이도', '태그' 등의 메타데이터와 함께 정제된 지식 문서로 만듭니다.
-    3. '공개'된 문서는 중앙 지식 베이스인 `KnowledgeSummaryScreen`에 축적됩니다.
+    2. 지식 베이스 전환 플로우는 현재 문서 설계 단계이며, 차후 `docs/` 디렉터리의 사양에 따라 구현될 예정입니다.
+    3. '공개'된 문서는 중앙 지식 베이스에 축적된다는 비전을 기준으로 API·UI를 설계합니다.
     4. 이 검증된 지식 베이스는 향후 AI 모델을 미세 조정(fine-tuning)하거나, 유사 질문에 대한 AI의 답변 정확도를 높이는 데 사용됩니다. 이를 통해 시스템 전체가 시간이 지남에 따라 점진적으로 똑똑해집니다.
 
-## 3. 주요 컴포넌트 기능
+## 3. 주요 화면 & 진입점
 
-### 최상위 인터페이스
-- **`App.tsx`**: 앱의 진입점. `UserRoleSelector`를 통해 역할을 선택받고, `StudentInterface` 또는 `MentorInterface`를 렌더링합니다.
-- **`StudentInterface.tsx`**: 학생 경험을 위한 메인 컨테이너. 학생용 사이드바, 레이아웃, 현재 활성화된 화면을 관리합니다.
-- **`MentorInterface.tsx`**: 멘토 경험을 위한 메인 컨테이너. 멘토용 사이드바와 레이아웃, 화면 전환을 관리합니다.
+### Next.js 엔트리
+- **`app/page.tsx`**: 공개 홈. 인증 상태를 확인하고 `AuthPage`를 마운트합니다.
+- **`app/student/page.tsx`**: 학생용 채팅 화면(`StudentChatPage`) 진입점입니다.
+- **`app/mentor/page.tsx`**: 멘토 대시보드(`MentorDashboardPage`) 진입점입니다.
+- **`app/mentor/chat/[convId]/page.tsx`**: 특정 대화를 검토하는 멘토용 상세 페이지입니다.
 
-### 핵심 기능 화면
-- **`StudentChatScreen.tsx`**: 학생이 AI와 대화하는 메인 채팅 화면입니다.
-- **`StudentChatHistoryScreen.tsx`**: 학생이 자신의 과거 대화 기록을 보는 화면입니다.
-- **`StudentFeedbackScreen.tsx`**: 학생이 멘토로부터 받은 모든 첨삭 피드백을 목록 형태로 확인하는 전용 페이지입니다.
-- **`MentorDashboard.tsx`**: 멘토의 랜딩 페이지. 리뷰가 필요한 학생 및 대화 목록을 보여줍니다.
-- **`MentorChatReviewScreen.tsx`**: 멘토가 특정 학생과 AI의 대화를 상세히 검토하고, 첨삭 및 코멘트를 작성하는 화면입니다.
-- **`KnowledgeCorrectionScreen.tsx`**: 멘토가 AI 답변을 영구적인 지식 베이스 아티클로 편집하고 발행하는 화면입니다.
-- **`KnowledgeSummaryScreen.tsx`**: 멘토가 축적된 모든 지식 베이스 아티클을 검색하고 열람하는 라이브러리입니다.
+### Interface Adapters (컨테이너)
+- **`src/interfaceAdapters/pages/entitle/AuthPage.tsx`**: 인증 컨트롤러/프레젠터를 묶어 AuthView에 전달합니다.
+- **`src/interfaceAdapters/pages/entitle/StudentChatPage.tsx`**: StudentChat 컨트롤러와 프레젠터, Supabase/샌드박스 어댑터를 통합합니다.
+- **`src/interfaceAdapters/pages/entitle/MentorDashboardPage.tsx`**: Mentor 대시보드 컨트롤 플로우를 관리합니다.
+- **`src/interfaceAdapters/pages/entitle/MentorStudentChatPage.tsx`**: 멘토-학생 대화 검토 화면 로직을 담당합니다.
 
-### 공용 및 UI 컴포넌트
-- **`AppSidebar.tsx`**: 역할(`student`/`mentor`)에 따라 다른 메뉴 항목을 보여주는 메인 사이드바 네비게이션입니다.
-- **`MentorFeedbackPreview.tsx`**: 학생 채팅창에서 멘토의 피드백이 존재함을 알려주고, 클릭 시 상세 내용을 다이얼로그로 보여주는 컴포넌트입니다.
-- **`UserRoleSelector.tsx`**: 사용자가 '학생' 또는 '멘토' 역할을 선택하는 초기 화면입니다.
-- **`src/components/ui/`**: shadcn/ui 기반의 재사용 가능한 UI 컴포넌트(Button, Card, Dialog 등)가 모여있는 디렉토리입니다.
+### View 레이어
+- **`src/views/StudentChatView.tsx`**: 학생과 AI의 대화, 피드백, 대화 선택 UI를 담당합니다.
+- **`src/views/MentorDashboardView.tsx`**: 리뷰가 필요한 학생 목록과 상태 지표를 시각화합니다.
+- **`src/views/MentorStudentChatView.tsx`**: 멘토가 단일 대화를 검토·수정할 때 사용하는 UI입니다.
+- **`src/views/AuthView.tsx`**: 로그인/회원가입/세션 상태를 보여줍니다.
+
+### UI 프리미티브
+- **`src/components/ui/`**: shadcn/ui 기반의 재사용 가능한 버튼, 카드, 다이얼로그 등 기본 컴포넌트 모음입니다.
 
 ## 4. 개발 환경 실행
 

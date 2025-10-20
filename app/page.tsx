@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 
-import AuthPagePresenter from '../Presenter/Entitle/AuthPagePresenter';
+import AuthPage from '../src/interfaceAdapters/pages/entitle/AuthPage';
 
 export default function Page() {
   return (
@@ -19,7 +19,7 @@ export default function Page() {
             </Link>
           </div>
         </header>
-        <AuthPagePresenter />
+        <AuthPage />
       </section>
     </main>
   );

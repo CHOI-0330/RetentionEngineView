@@ -33,14 +33,12 @@
     "src/application/**/*.ts",
     "src/views/**/*.ts",
     "src/views/**/*.tsx",
-    "src/components/ui/**/*.ts",
-    "src/components/ui/**/*.tsx",
-    "src/components/MentorFeedbackPreview.tsx",
+    "src/components/**/*.ts",
+    "src/components/**/*.tsx",
+    "src/mocks/**/*.ts",
     "src/interfaceAdapters/**/*.ts",
     "src/interfaceAdapters/**/*.tsx",
     "src/server/**/*.ts",
-    "Presenter/**/*.ts",
-    "Presenter/**/*.tsx",
     ".next/types/**/*.ts"
   ],
   "exclude": [

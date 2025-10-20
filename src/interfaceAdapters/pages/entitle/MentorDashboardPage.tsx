@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-import MentorDashboardView from "../../src/views/MentorDashboardView";
-import { useMentorDashboardController } from "../../src/interfaceAdapters/controllers/useMentorDashboardController";
-import { useMentorDashboardPresenter } from "../../src/interfaceAdapters/presenters/useMentorDashboardPresenter";
-import type { MentorDashboardControllerEffect } from "../../src/interfaceAdapters/controllers/useMentorDashboardController";
-import type { UseCaseFailure } from "../../src/application/entitle/models";
-import type { StudentSummary } from "../../src/application/entitle/ports";
-import { createDevEntitleAdapters } from "./devAdapters";
+import MentorDashboardView from "../../../views/MentorDashboardView";
+import { useMentorDashboardController } from "../../controllers/useMentorDashboardController";
+import { useMentorDashboardPresenter } from "../../presenters/useMentorDashboardPresenter";
+import type { MentorDashboardControllerEffect } from "../../controllers/useMentorDashboardController";
+import type { UseCaseFailure } from "../../../application/entitle/models";
+import type { StudentSummary } from "../../../application/entitle/ports";
+import { createDevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
   kind: "ValidationError",
@@ -18,12 +18,11 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
 
 type MentorDashboardAction = "listStudentSummaries" | "submitFeedbackQuality";
 
-const MentorDashboardPagePresenter = () => {
-  const devAdapters = useMemo(() => createDevEntitleAdapters(), []);
-
+const MentorDashboardPage = () => {
   const supabaseEnabled =
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const sandboxEnabled = process.env.NEXT_PUBLIC_ENTITLE_SANDBOX === "1";
+  const devAdapters = useMemo(() => (sandboxEnabled ? createDevEntitleAdapters() : null), [sandboxEnabled]);
 
   const controller = useMentorDashboardController();
   const presenter = useMentorDashboardPresenter(controller);
@@ -74,6 +73,9 @@ const MentorDashboardPagePresenter = () => {
 
   const processEffectDev = useCallback(
     async (effect: MentorDashboardControllerEffect) => {
+      if (!devAdapters) {
+        throw new Error("Dev sandbox is disabled.");
+      }
       switch (effect.kind) {
         case "REQUEST_REFRESH_SUMMARIES": {
           const summaries = await devAdapters.dashboardPort.listStudentSummaries({
@@ -96,7 +98,7 @@ const MentorDashboardPagePresenter = () => {
           break;
       }
     },
-    [controller.actions, devAdapters.dashboardPort]
+    [controller.actions, devAdapters]
   );
 
   useEffect(() => {
@@ -110,7 +112,17 @@ const MentorDashboardPagePresenter = () => {
 
     processingRef.current = true;
 
-    const runner = supabaseEnabled ? processEffectSupabase : processEffectDev;
+    const runner = supabaseEnabled ? processEffectSupabase : sandboxEnabled ? processEffectDev : null;
+
+    if (!runner) {
+      controller.actions.reportExternalFailure({
+        kind: "ValidationError",
+        message: "Supabase 未設定のためデータを取得できません。開発サンドボックスを使う場合は NEXT_PUBLIC_ENTITLE_SANDBOX=1 を設定してください。",
+      });
+      controller.actions.acknowledgeEffect(effect.id);
+      processingRef.current = false;
+      return;
+    }
 
     void runner(effect)
       .catch((error) => {
@@ -123,13 +135,29 @@ const MentorDashboardPagePresenter = () => {
         controller.actions.acknowledgeEffect(effect.id);
         processingRef.current = false;
       });
-  }, [controller.actions, presenter.pendingEffects, processEffectDev, processEffectSupabase, router, supabaseEnabled]);
+  }, [
+    controller.actions,
+    presenter.pendingEffects,
+    processEffectDev,
+    processEffectSupabase,
+    router,
+    sandboxEnabled,
+    supabaseEnabled,
+  ]);
 
   useEffect(() => {
     if (!controller.state.summaries.length && !controller.state.isRefreshing) {
       controller.actions.requestRefresh();
     }
   }, [controller.actions, controller.state.isRefreshing, controller.state.summaries.length]);
+
+  if (!supabaseEnabled && !sandboxEnabled) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+        Supabase 環境変数が設定されていません。開発サンドボックスを利用する場合は `NEXT_PUBLIC_ENTITLE_SANDBOX=1` を指定してください。
+      </div>
+    );
+  }
 
   return (
     <MentorDashboardView
@@ -141,4 +169,4 @@ const MentorDashboardPagePresenter = () => {
   );
 };
 
-export default MentorDashboardPagePresenter;
+export default MentorDashboardPage;
