@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { createServerSupabaseClient } from "../../../lib/supabaseClient";
 import type { AuthPort } from "../../../application/entitle/ports";
-import type { User } from "../../../type/core";
+import type { User } from "../../../domain/core";
 
 interface SupabaseRegisterResult {
   userId: string;

@@ -1,4 +1,4 @@
-import { createDevEntitleAdapters } from "../../entitle/devAdapters";
+import { createDevEntitleAdapters } from '../../../src/dev/devAdapters';
 
 async function runScenario() {
   const adapters = createDevEntitleAdapters();

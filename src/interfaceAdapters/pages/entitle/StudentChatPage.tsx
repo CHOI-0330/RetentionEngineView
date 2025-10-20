@@ -8,10 +8,10 @@ import { useStudentChatController } from "../../controllers/useStudentChatContro
 import { useStudentChatPresenter } from "../../presenters/useStudentChatPresenter";
 import type { StudentChatControllerEffect } from "../../controllers/useStudentChatController";
 import type { UseCaseFailure } from "../../../application/entitle/models";
-import type { Conversation, Feedback, MentorAssignment, Message, User } from "../../../type/core";
+import type { Conversation, Feedback, MentorAssignment, Message, User } from "../../../domain/core";
 import type { LLMPort } from "../../../application/entitle/ports";
-import type { DevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
-import { createDevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
+import type { DevEntitleAdapters } from "../../../../src/dev/devAdapters";
+import { createDevEntitleAdapters } from "../../../../src/dev/devAdapters";
 import { GeminiLLMPort } from "../../gateways/llm/geminiClientPort";
 import { InMemoryLLMPort } from "../../../mocks/llm/inMemoryLLMPort";
 

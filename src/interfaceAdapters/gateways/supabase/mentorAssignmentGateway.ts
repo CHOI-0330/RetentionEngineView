@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from "../../../lib/supabaseClient";
 import type { MentorAssignmentPort } from "../../../application/entitle/ports";
-import type { MentorAssignment } from "../../../type/core";
+import type { MentorAssignment } from "../../../domain/core";
 import { mapMentorAssignmentRow, type MentorAssignmentRow } from "./types";
 
 export class SupabaseMentorAssignmentGateway implements MentorAssignmentPort {

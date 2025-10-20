@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { Conversation, Feedback, Message, MentorAssignment, User } from "../../type/core";
+import type { Conversation, Feedback, Message, MentorAssignment, User } from "../../domain/core";
 import {
   beginAssistantMessageUseCase,
   buildPromptForConversationUseCase,

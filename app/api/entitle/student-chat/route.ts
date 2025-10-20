@@ -21,7 +21,7 @@ import {
   type UserRow,
 } from "../../../../src/interfaceAdapters/gateways/supabase/types";
 import { createConversationUseCase } from "../../../../src/application/entitle/useCases";
-import type { Conversation } from "../../../../src/type/core";
+import type { Conversation } from "../../../../src/domain/core";
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"

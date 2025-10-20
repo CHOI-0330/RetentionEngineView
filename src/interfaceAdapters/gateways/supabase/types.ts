@@ -7,7 +7,7 @@ import type {
   Conversation,
   MentorAssignment,
   User,
-} from "../../../type/core";
+} from "../../../domain/core";
 
 export interface MessageRow {
   msg_id: string;

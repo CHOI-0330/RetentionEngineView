@@ -1,4 +1,4 @@
-import type { FeedbackAuthorRole } from "../../type/core";
+import type { FeedbackAuthorRole } from "../../domain/core";
 
 export type UseCaseFailureKind = "Forbidden" | "NotFound" | "ValidationError";
 
