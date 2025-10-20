@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import MentorStudentChatView from "../../../views/MentorStudentChatView";
-import type { Conversation, Feedback, Message, User } from "../../../type/core";
+import type { Conversation, Feedback, Message, User } from "../../../domain/core";
 import type { UseCaseFailure } from "../../../application/entitle/models";
 
 interface MentorChatBootstrap {
