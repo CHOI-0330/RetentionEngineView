@@ -18,21 +18,33 @@ const mapPromptToContents = (prompt: Prompt): GeminiContent[] =>
   }));
 
 export async function POST(request: NextRequest) {
+  console.info("[Gemini API] Incoming request to /api/llm/gemini");
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.error("[Gemini API] Missing GEMINI_API_KEY environment variable");
     return NextResponse.json({ error: "Gemini API key is not configured." }, { status: 500 });
   }
 
   let body: { prompt: Prompt; modelId?: string };
   try {
     body = (await request.json()) as { prompt: Prompt; modelId?: string };
+    console.info("[Gemini API] Parsed request body", {
+      modelId: body.modelId ?? DEFAULT_MODEL_ID,
+      messageCount: body.prompt?.messages?.length ?? 0,
+      hasSystem: Boolean(body.prompt?.system),
+    });
   } catch (error) {
+    console.error("[Gemini API] Failed to parse request body", error);
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
   try {
     const client = new GoogleGenAI({ apiKey });
     const modelId = body.modelId ?? DEFAULT_MODEL_ID;
+    console.info("[Gemini API] Sending request to Gemini", {
+      modelId,
+      messageRoles: body.prompt.messages.map((message) => message.role),
+    });
     const result = await client.models.generateContent({
       model: modelId,
       contents: mapPromptToContents(body.prompt),
@@ -40,15 +52,26 @@ export async function POST(request: NextRequest) {
         ? { systemInstruction: { parts: [{ text: body.prompt.system }] } }
         : {}),
     });
+    console.info("[Gemini API] Received response from Gemini", {
+      resultKeys: Object.keys(result ?? {}),
+      hasText: Boolean((result as { text?: unknown })?.text),
+    });
     const text = result.text;
     if (!text) {
+      console.error("[Gemini API] Gemini response did not include text", { modelId });
       return NextResponse.json({ error: "Gemini response did not include text." }, { status: 502 });
     }
+    console.info("[Gemini API] Returning response to client", {
+      modelId,
+      textPreview: text.slice(0, 80),
+      textLength: text.length,
+    });
     return NextResponse.json({
       text,
       model: modelId,
     });
   } catch (error) {
+    console.error("[Gemini API] Gemini request failed", error);
     const message = error instanceof Error ? error.message : "Gemini request failed.";
     return NextResponse.json({ error: message }, { status: 502 });
   }

@@ -352,7 +352,9 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackPort = new InMemoryFeedbackPort(store);
   const mentorAssignmentPort = new StaticMentorAssignmentPort(store);
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
-  const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
+  const rawEnableGemini = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_ENABLE_GEMINI : undefined;
+  console.info("[LLM] NEXT_PUBLIC_ENABLE_GEMINI value", { rawEnableGemini });
+  const shouldUseGemini = rawEnableGemini === "1";
   if (shouldUseGemini) {
     console.info("[LLM] Gemini gateway enabled. Streaming responses will be proxied via /api/llm/gemini.");
   } else {
