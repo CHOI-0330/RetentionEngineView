@@ -12,6 +12,7 @@ import type { Conversation, Feedback, MentorAssignment, Message, User } from "..
 import type { LLMPort } from "../../../application/entitle/ports";
 import type { DevEntitleAdapters } from "../../../../src/dev/devAdapters";
 import { createDevEntitleAdapters } from "../../../../src/dev/devAdapters";
+import { Skeleton } from "../../../components/ui/skeleton";
 import { GeminiLLMPort } from "../../gateways/llm/geminiClientPort";
 import { InMemoryLLMPort } from "../../../mocks/llm/inMemoryLLMPort";
 
@@ -631,13 +632,24 @@ const StudentChatPage = () => {
   );
 
   if (supabaseEnabled && (isLoading || !bootstrap)) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading conversation…</div>;
+    return (
+      <div className="p-6" aria-busy="true" aria-live="polite">
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-7 w-64" />
+          </div>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-[320px] w-full" />
+        </div>
+      </div>
+    );
   }
 
   if (loadError) {
     return (
-      <div className="p-4 text-sm text-destructive">
-        Failed to load conversation: {loadError.message}
+      <div className="p-4 text-sm text-destructive" role="alert" aria-live="polite">
+        会話の読み込みに失敗しました: {loadError.message}
       </div>
     );
   }

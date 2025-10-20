@@ -55,11 +55,11 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
         const json = (await response.json()) as { data: MentorChatBootstrap };
         if (!cancelled) {
           setBootstrap(json.data);
+          // 初期表示で編集モードに入らないよう、すべて false に設定
           setEditingFlags(() => {
             const flags: Record<string, boolean> = {};
             json.data.messages.forEach((message) => {
-              const hasFeedback = json.data.feedbackByMessageId[message.msgId]?.length ?? 0;
-              flags[message.msgId] = hasFeedback === 0;
+              flags[message.msgId] = false;
             });
             return flags;
           });
@@ -207,8 +207,23 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
 
   if (isLoading || !bootstrap) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
-        {loadError ? `Failed to load conversation: ${loadError.message}` : "Loading conversation…"}
+      <div className="p-6" aria-busy="true" aria-live="polite">
+        <div className="mx-auto max-w-5xl space-y-4">
+          {loadError ? (
+            <div className="text-sm text-destructive" role="alert">
+              会話の読み込みに失敗しました: {loadError.message}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-7 w-72" />
+              </div>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-[320px] w-full" />
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -231,3 +246,4 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
 };
 
 export default MentorStudentChatPage;
+import { Skeleton } from "../../../components/ui/skeleton";

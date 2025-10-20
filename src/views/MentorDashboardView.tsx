@@ -9,7 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { Loader2, Search, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Loader2, Search, Clock, Bot, User as UserIcon, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
 export interface MentorDashboardStudentItem {
@@ -44,7 +44,7 @@ const MentorDashboardView = ({
 }: MentorDashboardViewProps) => {
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-3 rounded-2xl border bg-card px-6 py-4">
+      <header className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -64,7 +64,7 @@ const MentorDashboardView = ({
             再読み込み
           </Button>
         </div>
-        <div className="relative max-w-md">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={viewModel.searchQuery}
@@ -122,12 +122,12 @@ const MentorDashboardStudentCard = ({
 }: MentorDashboardStudentCardProps) => {
   return (
     <Card className={isSelected ? "border-primary" : undefined}>
-      <CardContent className="flex flex-col gap-4 p-5 sm:gap-5 lg:flex-row lg:items-start lg:gap-6">
-        <div className="flex items-start gap-4">
+      <CardContent className="flex flex-col gap-4 p-5 sm:gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:pr-8">
+        <div className="flex items-start gap-4 pr-4 lg:pr-6 w-full">
           <Avatar className="h-14 w-14">
             <AvatarFallback>{student.name.slice(0, 2)}</AvatarFallback>
           </Avatar>
-          <div className="space-y-3">
+          <div className="flex-1 min-w-0 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <h2 className="text-lg font-semibold">{student.name}</h2>
               <Badge variant="secondary" className="w-fit capitalize">
@@ -137,71 +137,57 @@ const MentorDashboardStudentCard = ({
             <p className="text-sm text-muted-foreground leading-relaxed">
               最終活動: {student.lastActivity.toLocaleString()} / 総チャット数: {student.totalChats}
             </p>
-            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="w-full rounded-lg border bg-card p-3 sm:p-4 text-sm shadow-sm flex flex-col justify-between overflow-hidden" style={{ height: "11rem" }}>
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">トピック</span>
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+                    <MessageSquare className="h-3.5 w-3.5" /> トピック
+                  </div>
                   <span
-                    className="mt-1 block text-base font-semibold text-foreground sm:line-clamp-2"
+                    className="mt-1 block text-base font-semibold text-foreground whitespace-nowrap overflow-hidden"
                     title={student.recentChat.subject}
+                    style={{ textOverflow: "ellipsis" }}
                   >
                     {student.recentChat.subject}
                   </span>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <Clock className="h-3 w-3" />
                   {student.recentChat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
-              <p className="mt-3 font-medium text-foreground">
-                新入社員: {student.recentChat.summary || "(メッセージなし)"}
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                AI: {student.recentChat.aiResponse || "(未回答)"}
-              </p>
+              <div className="mt-3 space-y-2 overflow-hidden">
+                <div className="flex items-start gap-2">
+                  <UserIcon className="mt-0.5 h-4 w-4 text-foreground/70" />
+                  <p
+                    className="font-medium text-foreground line-clamp-2"
+                    title={student.recentChat.summary || "(メッセージなし)"}
+                  >
+                    {student.recentChat.summary || "(メッセージなし)"}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Bot className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <p
+                    className="text-muted-foreground line-clamp-2"
+                    title={student.recentChat.aiResponse || "(未回答)"}
+                  >
+                    {student.recentChat.aiResponse || "(未回答)"}
+                  </p>
+                </div>
+              </div>
               {student.recentChat.needsReview ? (
-                <Badge variant="destructive" className="mt-2 w-fit">
-                  レビューが必要
-                </Badge>
+                <div className="mt-3 flex justify-end">
+                  <Badge variant="destructive" className="w-fit">
+                    レビューが必要
+                  </Badge>
+                </div>
               ) : null}
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end lg:ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isSubmitting}
-            onClick={() => onFeedback(true)}
-            className="min-w-[140px] justify-center"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
-              </>
-            ) : (
-              <>
-                <ThumbsUp className="mr-2 h-4 w-4" /> 良かった
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isSubmitting}
-            onClick={() => onFeedback(false)}
-            className="min-w-[140px] justify-center"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
-              </>
-            ) : (
-              <>
-                <ThumbsDown className="mr-2 h-4 w-4" /> 改善必要
-              </>
-            )}
-          </Button>
-          <Button asChild variant="secondary" size="sm" className="justify-center">
+        <div className="w-full pr-4 lg:justify-self-end lg:pl-3">
+          <Button asChild variant="secondary" size="sm" className="w-full justify-center">
             <Link href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}>
               チャットを見る
             </Link>

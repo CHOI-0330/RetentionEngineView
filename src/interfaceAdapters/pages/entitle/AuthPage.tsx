@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
@@ -12,6 +13,7 @@ const AuthPage = () => {
   const controller = useAuthController();
   const presenter = useAuthPresenter(controller);
   const processingRef = useRef(false);
+  const router = useRouter();
 
   const supabaseEnabled = useMemo(
     () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
@@ -87,6 +89,17 @@ const AuthPage = () => {
       cancelled = true;
     };
   }, [controller.actions, supabaseEnabled]);
+
+  // ログイン成功後、ロールに応じて自動遷移します。
+  useEffect(() => {
+    const session = controller.state.session;
+    if (!session) return;
+    if (session.role === "MENTOR") {
+      router.push("/mentor");
+    } else if (session.role === "NEW_HIRE") {
+      router.push("/student");
+    }
+  }, [controller.state.session, router]);
 
   useEffect(() => {
     if (processingRef.current || !controller.state.pendingEffects.length) {

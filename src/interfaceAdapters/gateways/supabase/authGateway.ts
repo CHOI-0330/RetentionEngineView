@@ -57,6 +57,19 @@ export class SupabaseAuthGateway implements AuthPort {
     return (data as { role: User["role"] }).role;
   }
 
+  async getUserProfile(userId: string): Promise<{ role: User["role"]; displayName: string }>{
+    const { data, error } = await this.getServiceClient()
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (error || !data) {
+      throw toError(error, "User profile not found.");
+    }
+    const record = data as { role: User["role"]; display_name: string };
+    return { role: record.role, displayName: record.display_name };
+  }
+
   async registerUser(input: {
     email: string;
     password: string;

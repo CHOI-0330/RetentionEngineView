@@ -1063,8 +1063,16 @@
     animation: enter var(--tw-duration, .15s) var(--tw-ease, ease);
   }
 
+  .animate-out {
+    animation: exit var(--tw-duration, .15s) var(--tw-ease, ease);
+  }
+
   .animate-pulse {
     animation: var(--animate-pulse);
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
   }
 
   .cursor-default {
@@ -3088,6 +3096,12 @@
     a.\[a\&\]\:hover\:text-accent-foreground:hover {
       color: var(--accent-foreground);
     }
+  }
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
   }
 }
 
