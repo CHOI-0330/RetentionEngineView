@@ -1,4 +1,4 @@
-import type { MessageDelta, Prompt, ValidatedFeedback } from "../../src/application/entitle/models";
+import type { ValidatedFeedback } from "../../src/application/entitle/models";
 import type {
   FeedbackLookupPort,
   FeedbackPort,
@@ -59,23 +59,6 @@ class InMemoryMessagePort implements MessagePort {
     };
     this.store.messages.push(message);
     return message;
-  }
-
-  async appendAssistantDelta(input: { msgId: string; delta: string; seqNo: number }): Promise<void> {
-    const message = this.store.messages.find((entry) => entry.msgId === input.msgId);
-    if (!message) {
-      throw new Error("Assistant message not found");
-    }
-    if (!message.status || message.status === "DRAFT") {
-      message.status = "PARTIAL";
-      message.content = input.delta;
-      return;
-    }
-    if (message.status === "PARTIAL") {
-      message.content += input.delta;
-      return;
-    }
-    throw new Error("Cannot append to completed message");
   }
 
   async finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message> {
@@ -336,7 +319,7 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
   const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
   if (shouldUseGemini) {
-    console.info("[LLM] Gemini gateway enabled. Streaming responses will be proxied via /api/llm/gemini.");
+    console.info("[LLM] Gemini gateway enabled. Responses will be proxied via /api/llm/gemini.");
   } else {
     console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable Gemini gateway.");
   }

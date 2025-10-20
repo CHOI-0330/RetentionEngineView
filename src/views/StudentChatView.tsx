@@ -99,7 +99,7 @@ const StudentChatView = ({
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
     }
-  }, [viewModel.messages, status.isStreaming]);
+  }, [viewModel.messages, status.isAwaitingAssistant]);
 
   return (
     <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-2xl border bg-card">
@@ -130,7 +130,7 @@ const StudentChatView = ({
           <div className="flex items-center justify-between border-b px-4 py-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="rounded-full">チャット</Badge>
-              {status.isStreaming ? (
+              {status.isAwaitingAssistant ? (
                 <span className="flex items-center gap-2 text-primary">
                   <Loader2 className="h-4 w-4 animate-spin" /> AI が回答中です…
                 </span>
@@ -144,9 +144,6 @@ const StudentChatView = ({
                 disabled={!meta.hasMoreHistory || meta.isHistoryLoading}
               >
                 履歴を読み込む
-              </Button>
-              <Button variant="ghost" size="sm" onClick={interactions.cancelAssistantStream} disabled={!status.isStreaming}>
-                ストリーム中止
               </Button>
             </div>
           </div>
@@ -322,9 +319,15 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
         </Avatar>
       ) : null}
       <div className={`flex w-full flex-col gap-2 ${isStudent ? "items-end" : "items-start"}`}>
-        <Card className={`${isStudent ? "bg-primary text-primary-foreground" : "bg-muted/60"} w-full max-w-full sm:max-w-[70%]`}>
+            <Card className={`${isStudent ? "bg-primary text-primary-foreground" : "bg-muted/60"} w-full max-w-full sm:max-w-[70%]`}>
           <CardContent className="space-y-2 p-4">
-            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            {message.sender === "ai" && message.status !== "DONE" ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> 回答を生成しています...
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            )}
             <span className="block text-xs text-muted-foreground/80">
               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>

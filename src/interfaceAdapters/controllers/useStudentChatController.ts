@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { Conversation, Feedback, Message, MentorAssignment, User } from "../../type/core";
 import {
-  appendAssistantDeltaUseCase,
   beginAssistantMessageUseCase,
   buildPromptForConversationUseCase,
   cancelAssistantMessageUseCase,
@@ -13,7 +12,7 @@ import {
   listMessageFeedbacksUseCase,
   validateFeedbackRulesUseCase,
 } from "../../application/entitle/useCases";
-import type { MessageDelta, Prompt, UseCaseFailure, ValidatedFeedback } from "../../application/entitle/models";
+import type { Prompt, UseCaseFailure, ValidatedFeedback } from "../../application/entitle/models";
 
 const DEFAULT_HISTORY_WINDOW = 6;
 
@@ -38,7 +37,7 @@ export type StudentChatControllerEffect =
     }
   | {
       id: string;
-      kind: "REQUEST_STREAM_ASSISTANT_RESPONSE";
+      kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE";
       payload: { prompt: Prompt; modelId?: string; runtimeId?: string };
     }
   | {
@@ -74,13 +73,11 @@ export interface StudentChatControllerState {
   newMessage: string;
   isSending: boolean;
   isAwaitingAssistant: boolean;
-  isStreaming: boolean;
   pendingEffects: StudentChatControllerEffect[];
   error: UseCaseFailure | null;
   nextCursor?: string;
   activeAssistantMessageId?: string | null;
   pendingUserMessage?: { convId: string; authorId: string; content: string } | null;
-  assistantSeqByMessageId: Record<string, number>;
 }
 
 export interface StudentChatControllerActions {
@@ -91,9 +88,8 @@ export interface StudentChatControllerActions {
   notifyMessagesLoaded: (input: { items: Message[]; nextCursor?: string }) => void;
   notifyUserMessagePersisted: (message: Message) => void;
   notifyAssistantMessageCreated: (message: Message) => void;
-  notifyAssistantDelta: (delta: MessageDelta) => void;
-  notifyAssistantStreamCompleted: (finalText: string) => void;
-  notifyAssistantStreamCancelled: () => void;
+  notifyAssistantResponseReady: (finalText: string) => void;
+  notifyAssistantResponseCancelled: () => void;
   syncAssistantMessage: (message: Message) => void;
   requestFeedbackForMessage: (msgId: string) => void;
   applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
@@ -151,13 +147,11 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     newMessage: "",
     isSending: false,
     isAwaitingAssistant: false,
-    isStreaming: false,
     pendingEffects: [],
     error: null,
     nextCursor: initialCursor,
     activeAssistantMessageId: null,
     pendingUserMessage: null,
-    assistantSeqByMessageId: {},
   }));
 
   const mutateState = useCallback((updater: (previous: StudentChatControllerState) => StudentChatControllerState) => {
@@ -290,7 +284,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           ...previous.pendingEffects,
           createEffect({ kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE", payload: { convId: conversation.convId } }),
           createEffect({
-            kind: "REQUEST_STREAM_ASSISTANT_RESPONSE",
+            kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
             payload: {
               prompt: promptResult.value,
               modelId,
@@ -343,58 +337,15 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         return {
           ...previous,
           messages: updated,
-          isAwaitingAssistant: false,
+          isAwaitingAssistant: true,
           activeAssistantMessageId: message.msgId,
-          assistantSeqByMessageId: {
-            ...previous.assistantSeqByMessageId,
-            [message.msgId]: 0,
-          },
         };
       });
     },
     [mutateState]
   );
 
-  const notifyAssistantDelta = useCallback(
-    (delta: MessageDelta) => {
-      mutateState((previous) => {
-        const activeId = previous.activeAssistantMessageId;
-        if (!activeId) {
-          return previous;
-        }
-        const index = previous.messages.findIndex((item) => item.msgId === activeId);
-        if (index < 0) {
-          return previous;
-        }
-        const target = previous.messages[index];
-        const appendResult = appendAssistantDeltaUseCase({
-          message: target,
-          delta,
-          lastSeqNo: previous.assistantSeqByMessageId[target.msgId],
-        });
-        if (appendResult.kind === "failure") {
-          return {
-            ...previous,
-            error: appendResult.error,
-          };
-        }
-        const updated = [...previous.messages];
-        updated[index] = appendResult.value.message;
-      return {
-        ...previous,
-        messages: updated,
-        isStreaming: true,
-        assistantSeqByMessageId: {
-            ...previous.assistantSeqByMessageId,
-            [target.msgId]: delta.seqNo,
-          },
-        };
-      });
-    },
-    [mutateState]
-  );
-
-  const notifyAssistantStreamCompleted = useCallback(
+  const notifyAssistantResponseReady = useCallback(
     (finalText: string) => {
       setState((previous) => {
         const activeId = previous.activeAssistantMessageId;
@@ -405,25 +356,13 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         if (index < 0) {
           return previous;
         }
-        const finalizeResult = finalizeAssistantMessageUseCase({
-          message: previous.messages[index],
-          finalText,
-        });
-        if (finalizeResult.kind === "failure") {
-          return { ...previous, error: finalizeResult.error };
-        }
-        const updatedMessages = [...previous.messages];
-        updatedMessages[index] = finalizeResult.value;
         return {
           ...previous,
-          messages: updatedMessages,
-          isStreaming: false,
-          isAwaitingAssistant: false,
           pendingEffects: [
             ...previous.pendingEffects,
             createEffect({
               kind: "REQUEST_FINALIZE_ASSISTANT_MESSAGE",
-              payload: { msgId: finalizeResult.value.msgId, finalText: finalizeResult.value.content },
+              payload: { msgId: activeId, finalText },
             }),
           ],
         };
@@ -432,7 +371,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     [createEffect]
   );
 
-  const notifyAssistantStreamCancelled = useCallback(() => {
+  const notifyAssistantResponseCancelled = useCallback(() => {
     setState((previous) => {
       const activeId = previous.activeAssistantMessageId;
       if (!activeId) {
@@ -453,7 +392,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       return {
         ...previous,
         messages: updatedMessages,
-        isStreaming: false,
         isAwaitingAssistant: false,
         activeAssistantMessageId: null,
         pendingEffects: [
@@ -473,9 +411,13 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         }
         const updatedMessages = [...previous.messages];
         updatedMessages[index] = message;
+        const isActiveMessage = previous.activeAssistantMessageId === message.msgId;
+        const shouldClearActive = isActiveMessage && (message.status === "DONE" || message.status === "CANCELLED");
         return {
           ...previous,
           messages: updatedMessages,
+          isAwaitingAssistant: shouldClearActive ? false : previous.isAwaitingAssistant,
+          activeAssistantMessageId: shouldClearActive ? null : previous.activeAssistantMessageId,
         };
       });
     },
@@ -581,9 +523,8 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       notifyMessagesLoaded,
       notifyUserMessagePersisted,
       notifyAssistantMessageCreated,
-      notifyAssistantDelta,
-      notifyAssistantStreamCompleted,
-      notifyAssistantStreamCancelled,
+      notifyAssistantResponseReady,
+      notifyAssistantResponseCancelled,
       syncAssistantMessage,
       requestFeedbackForMessage,
       applyFeedbackForMessage,
@@ -595,10 +536,9 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       acknowledgeEffect,
       applyFeedbackForMessage,
       clearError,
-      notifyAssistantDelta,
       notifyAssistantMessageCreated,
-      notifyAssistantStreamCancelled,
-      notifyAssistantStreamCompleted,
+      notifyAssistantResponseCancelled,
+      notifyAssistantResponseReady,
       notifyMessagesLoaded,
       notifyUserMessagePersisted,
       reportExternalFailure,

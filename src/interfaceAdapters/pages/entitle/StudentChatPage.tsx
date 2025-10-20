@@ -23,7 +23,6 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"
-  | "appendAssistantDelta"
   | "finalizeAssistantMessage"
   | "cancelAssistantMessage"
   | "listConversationMessages"
@@ -127,26 +126,17 @@ const StudentChatRuntime = ({
           controller.actions.notifyAssistantMessageCreated(message);
           break;
         }
-        case "REQUEST_STREAM_ASSISTANT_RESPONSE": {
+        case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not set.");
           }
-          let accumulated = "";
           try {
-            for await (const delta of llmPort.streamGenerate(effect.payload)) {
-              accumulated += delta.text;
-              controller.actions.notifyAssistantDelta(delta);
-              await callStudentChatAction("appendAssistantDelta", {
-                msgId: targetMsgId,
-                delta: delta.text,
-                seqNo: delta.seqNo,
-              });
-            }
-            controller.actions.notifyAssistantStreamCompleted(accumulated);
+            const finalText = await llmPort.generate(effect.payload);
+            controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
-            controller.actions.notifyAssistantStreamCancelled();
+            controller.actions.notifyAssistantResponseCancelled();
             await callStudentChatAction("cancelAssistantMessage", { msgId: targetMsgId });
           }
           break;
@@ -214,26 +204,17 @@ const StudentChatRuntime = ({
           controller.actions.notifyAssistantMessageCreated(assistant);
           break;
         }
-        case "REQUEST_STREAM_ASSISTANT_RESPONSE": {
+        case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not available.");
           }
-          let accumulated = "";
           try {
-            for await (const delta of sandboxAdapters.llmPort.streamGenerate(effect.payload)) {
-              accumulated += delta.text;
-              controller.actions.notifyAssistantDelta(delta);
-              await sandboxAdapters.messagePort.appendAssistantDelta({
-                msgId: targetMsgId,
-                delta: delta.text,
-                seqNo: delta.seqNo,
-              });
-            }
-            controller.actions.notifyAssistantStreamCompleted(accumulated);
+            const finalText = await sandboxAdapters.llmPort.generate(effect.payload);
+            controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
-            controller.actions.notifyAssistantStreamCancelled();
+            controller.actions.notifyAssistantResponseCancelled();
             await sandboxAdapters.messagePort.cancelAssistantMessage(targetMsgId);
           }
           break;

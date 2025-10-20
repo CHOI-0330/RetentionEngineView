@@ -14,6 +14,7 @@ export interface StudentChatMessageView {
   content: string;
   sender: StudentChatMessageSender;
   timestamp: Date;
+  status?: Message["status"];
 }
 
 export interface StudentChatFeedbackView {
@@ -36,7 +37,6 @@ export interface StudentChatViewModel {
 export interface StudentChatPresenterStatus {
   isSending: boolean;
   isAwaitingAssistant: boolean;
-  isStreaming: boolean;
   error: UseCaseFailure | null;
 }
 
@@ -54,7 +54,6 @@ export interface StudentChatPresenterInteractions {
   requestCreateFeedback: (content: string, message: Message) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
-  cancelAssistantStream: () => void;
 }
 
 export interface StudentChatPresenterOutput {
@@ -70,6 +69,7 @@ const toMessageView = (message: Message): StudentChatMessageView => ({
   content: message.content,
   sender: message.role === "ASSISTANT" ? "ai" : "student",
   timestamp: new Date(message.createdAt),
+  status: message.status,
 });
 
 const toFeedbackView = (
@@ -126,22 +126,21 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
     () => ({
       isSending: state.isSending,
       isAwaitingAssistant: state.isAwaitingAssistant,
-      isStreaming: state.isStreaming,
       error: state.error,
     }),
-    [state.error, state.isAwaitingAssistant, state.isSending, state.isStreaming]
+    [state.error, state.isAwaitingAssistant, state.isSending]
   );
 
   const meta = useMemo<StudentChatPresenterMeta>(() => {
     const hasMoreHistory = Boolean(state.nextCursor);
     const isHistoryLoading = state.pendingEffects.some((effect) => effect.kind === "REQUEST_LIST_MESSAGES");
-    const canSend = state.newMessage.trim().length > 0 && !state.isSending && !state.isStreaming;
+    const canSend = state.newMessage.trim().length > 0 && !state.isSending && !state.isAwaitingAssistant;
     return {
       canSend,
       hasMoreHistory,
       isHistoryLoading,
     };
-  }, [state.nextCursor, state.pendingEffects, state.newMessage, state.isSending, state.isStreaming]);
+  }, [state.nextCursor, state.pendingEffects, state.newMessage, state.isAwaitingAssistant, state.isSending]);
 
   const interactions = useMemo<StudentChatPresenterInteractions>(
     () => ({
@@ -152,7 +151,6 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       requestCreateFeedback: actions.requestCreateFeedback,
       clearError: actions.clearError,
       reportExternalFailure: actions.reportExternalFailure,
-      cancelAssistantStream: actions.notifyAssistantStreamCancelled,
     }),
     [
       actions.acknowledgeEffect,
@@ -162,7 +160,6 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       actions.requestCreateFeedback,
       actions.requestFeedbackForMessage,
       actions.requestOlderMessages,
-      actions.notifyAssistantStreamCancelled,
     ]
   );
 

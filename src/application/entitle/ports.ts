@@ -7,7 +7,7 @@ import type {
   ModelConfig,
   User,
 } from "../../type/core";
-import type { MessageDelta, Prompt, QuerySpec, ValidatedFeedback } from "./models";
+import type { Prompt, QuerySpec, ValidatedFeedback } from "./models";
 
 export interface MessagePort {
   createUserMessage(input: {
@@ -16,7 +16,6 @@ export interface MessagePort {
     content: string;
   }): Promise<Message>;
   beginAssistantMessage(convId: string): Promise<Message>;
-  appendAssistantDelta(input: { msgId: string; delta: string; seqNo: number }): Promise<void>;
   finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message>;
   cancelAssistantMessage(msgId: string): Promise<Message>;
   listConversationMessages(input: { convId: string; cursor?: string; limit?: number }): Promise<{
@@ -69,12 +68,12 @@ export interface MentorAssignmentPort {
 }
 
 export interface LLMPort {
-  streamGenerate(input: {
+  generate(input: {
     prompt: Prompt;
     modelId?: string;
     runtimeId?: string;
     signal?: AbortSignal;
-  }): AsyncIterable<MessageDelta>;
+  }): Promise<string>;
 }
 
 export interface ModelConfigPort {

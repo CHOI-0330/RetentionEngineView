@@ -103,7 +103,7 @@ erDiagram
 | --------------------------------- | -------------------- | -------------------------- | ---------------------- | ---------------- |
 | CreateUserMessageUseCase          | NH の質問を保存      | `convId, content`          | `{msgId}`              | MessagePort      |
 | BuildPromptForConversationUseCase | 履歴圧縮＋安全化     | `convId, question, window` | `Prompt`               | PolicyPort(任意) |
-| StreamAssistantAnswerUseCase      | LLM 実行・デルタ受信 | `prompt, modelId?`         | `AsyncIterable<delta>` | LLMPort          |
+| GenerateAssistantAnswerUseCase    | LLM 応答生成         | `prompt, modelId?`         | `string`               | LLMPort          |
 | ListConversationMessagesUseCase   | 1 会話の一覧         | `convId, cursor?, limit?`  | `{items, nextCursor?}` | MessagePort      |
 | ListMessageFeedbacksUseCase       | FB 一覧              | `msgId, cursor?, limit?`   | `{items, nextCursor?}` | FeedbackPort     |
 
@@ -112,7 +112,6 @@ erDiagram
 | UseCase                         | 目的         | 入力                  | 出力        | Ports       |
 | ------------------------------- | ------------ | --------------------- | ----------- | ----------- |
 | BeginAssistantMessageUseCase    | DRAFT 作成   | `convId`              | `{msgId}`   | MessagePort |
-| AppendAssistantDeltaUseCase     | PARTIAL 反映 | `msgId, delta, seqNo` | `{ok:true}` | MessagePort |
 | FinalizeAssistantMessageUseCase | DONE 確定    | `msgId, finalText`    | `{ok:true}` | MessagePort |
 
 ### 4.3 メンター（MT）
@@ -136,7 +135,7 @@ erDiagram
 
 - **MessagePort**：作成・増分・確定・一覧
 - **FeedbackPort**：作成・一覧
-- **LLMPort**：`streamGenerate({prompt, model:{name,params}, runtime}) → AsyncIterable<delta>`
+- **LLMPort**：`generate({prompt, model?, runtime?}) → Promise<string>`
 - **PolicyPort**：`isOwner`, `isMentorMapped`, `canCreateFeedback`
 
 ### 5.2 Adapters（実装例）
@@ -269,13 +268,13 @@ create table model_config (
 create unique index uq_model_default on model_config(is_default) where is_default = true;
 ```
 
-> 厳密なデルタ追跡が必要なら `message_chunk(msg_id, seq_no, delta_text)` を追加（`(msg_id,seq_no)` ユニーク）。
+> 必要に応じて補助テーブルで生成ログを保持することも可能だが、現状は最終応答のみを保存する設計。
 
 ---
 
 ## 9. シーケンス（代表フロー）
 
-### 9.1 NH: 質問 → LLM ストリーム → 保存
+### 9.1 NH: 質問 → LLM 応答生成 → 保存
 
 ```mermaid
 sequenceDiagram
@@ -292,14 +291,10 @@ sequenceDiagram
   CT->>GW: MessagePort.createUserMessage()
   CT->>UC: BeginAssistantMessageUseCase
   CT->>GW: MessagePort.beginAssistantMessage()
-  CT->>GW: LLMPort.streamGenerate(prompt, model/runtime)
-  loop delta streaming
-    GW-->>CT: delta
-    CT->>UC: AppendAssistantDeltaUseCase
-    CT->>GW: MessagePort.appendAssistantDelta()
-  end
+  CT->>GW: LLMPort.generate(prompt, model/runtime)
+  GW-->>CT: finalText
   CT->>UC: FinalizeAssistantMessageUseCase
-  CT->>GW: MessagePort.finalizeAssistantMessage()
+  CT->>GW: MessagePort.finalizeAssistantMessage(finalText)
   CT-->>UI: 完了
 ```
 
