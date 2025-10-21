@@ -4,14 +4,14 @@ import type {
   StudentChatPresenterStatus,
   StudentChatViewModel,
 } from "../interfaceAdapters/presenters/useStudentChatPresenter";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { AlertTriangle, Loader2, MessageCircle } from "lucide-react";
+import { AlertTriangle, Loader2, MessageCircle, Eye } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
+import { Textarea } from "../components/ui/textarea";
+import { Skeleton } from "../components/ui/skeleton";
 
 interface ConversationSummary {
   convId: string;
@@ -93,16 +96,37 @@ const StudentChatView = ({
     "";
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
-    }
-  }, [viewModel.messages, status.isAwaitingAssistant]);
+    if (meta.isHistoryLoading) return;
+    const anchor = bottomRef.current;
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    if (!anchor) return;
+
+    // Prefer a single smooth path to avoid jank
+    const smoothToBottom = () => {
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      }
+      anchor.scrollIntoView({ behavior: "smooth", block: "end" });
+      const comp = composerRef.current;
+      if (comp) comp.scrollIntoView({ behavior: "smooth", block: "end" });
+    };
+
+    smoothToBottom();
+    const rafId = requestAnimationFrame(smoothToBottom);
+    const timeoutId = setTimeout(smoothToBottom, 140);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+    };
+  }, [viewModel.messages.length, status.isAwaitingAssistant, meta.isHistoryLoading]);
 
   return (
-    <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-2xl border bg-card">
+    <div className="flex min-h-[80vh] flex-col overflow-hidden rounded-2xl border bg-card">
       <ConversationHeader
         conversationTitle={conversationTitle}
         conversationOptions={conversationOptions}
@@ -112,7 +136,11 @@ const StudentChatView = ({
         createDialog={createDialog}
       />
       {status.error ? (
-        <div className="border-b border-dashed border-destructive/40 bg-destructive/5 px-6 py-3 text-sm text-destructive">
+        <div
+          className="border-b border-dashed border-destructive/40 bg-destructive/5 px-6 py-3 text-sm text-destructive"
+          aria-live="polite"
+          role="status"
+        >
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -125,7 +153,7 @@ const StudentChatView = ({
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-6 sm:py-6">
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden pl-4 pr-0 py-4 sm:pl-6 sm:pr-0 sm:py-6">
         <section className="flex h-full w-full flex-col overflow-hidden rounded-xl border bg-background/60">
           <div className="flex items-center justify-between border-b px-4 py-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
@@ -150,10 +178,12 @@ const StudentChatView = ({
 
           <StudentChatMessageList
             containerRef={scrollAreaRef}
+            bottomRef={bottomRef}
             messages={viewModel.messages}
             feedbackByMessageId={feedbackByMessageId}
           />
           <ChatComposer
+            containerRef={composerRef}
             value={viewModel.newMessage}
             onChange={viewModel.onChangeNewMessage}
             onSend={viewModel.onSend}
@@ -190,17 +220,23 @@ const ConversationHeader = ({
         <h1 className="text-lg font-semibold">{conversationTitle}</h1>
       </div>
       {showConversationPicker ? (
-        <select
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm md:w-auto md:min-w-[220px]"
-          value={pickerValue}
-          onChange={(event) => onConversationChange?.(event.target.value)}
-        >
-          {conversationOptions?.map((option) => (
-            <option key={option.convId} value={option.convId}>
-              {option.title}
-            </option>
-          ))}
-        </select>
+        <>
+          <Label htmlFor="student-conversation-picker" className="sr-only">
+            会話を選択
+          </Label>
+          <Select value={pickerValue} onValueChange={(value) => onConversationChange?.(value)}>
+            <SelectTrigger id="student-conversation-picker" className="md:w-auto md:min-w-[220px]" aria-label="会話を選択">
+            <SelectValue placeholder="会話を選択" />
+            </SelectTrigger>
+            <SelectContent>
+              {conversationOptions?.map((option) => (
+                <SelectItem key={option.convId} value={option.convId}>
+                  {option.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
       ) : null}
     </div>
     <div className="flex items-center justify-between gap-3 md:flex-col md:items-end md:justify-start">
@@ -284,21 +320,29 @@ const ConversationHeader = ({
 
 interface StudentChatMessageListProps {
   containerRef: RefObject<HTMLDivElement>;
+  bottomRef?: RefObject<HTMLDivElement>;
   messages: StudentChatViewModel["messages"];
   feedbackByMessageId: Record<string, StudentChatViewModel["mentorFeedbacks"]>;
 }
 
-const StudentChatMessageList = ({ containerRef, messages, feedbackByMessageId }: StudentChatMessageListProps) => (
+const StudentChatMessageList = ({ containerRef, bottomRef, messages, feedbackByMessageId }: StudentChatMessageListProps) => (
   <div ref={containerRef} className="flex-1">
-    <ScrollArea className="h-full px-3 py-3 sm:px-4">
-      <div className="space-y-4">
-        {messages.map((message) => (
-          <StudentChatMessageBubble
-            key={message.id}
-            message={message}
-            feedbacks={feedbackByMessageId[message.id] ?? []}
-          />
-        ))}
+    <ScrollArea className="h-full pl-2 py-3 sm:pl-4">
+      <div className="flex flex-col">
+        {messages.map((message, index) => {
+          const prev = index > 0 ? messages[index - 1] : null;
+          const isTurnChange = !prev || prev.sender !== message.sender;
+          const marginClass = index === 0 ? "" : isTurnChange ? "mt-6" : "mt-3";
+          return (
+            <div key={message.id} className={marginClass}>
+              <StudentChatMessageBubble
+                message={message}
+                feedbacks={feedbackByMessageId[message.id] ?? []}
+              />
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   </div>
@@ -311,31 +355,269 @@ interface StudentChatMessageBubbleProps {
 
 const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubbleProps) => {
   const isStudent = message.sender === "student";
+  const hasFeedback = feedbacks.length > 0;
+  const [isAIFeedbackOpen, setAIFeedbackOpen] = useState(false);
   return (
-    <div className={`flex items-end gap-3 ${isStudent ? "justify-end" : "justify-start"}`}>
+    <div className={`flex items-end ${isStudent ? "gap-0" : "gap-2 sm:gap-3"} ${isStudent ? "justify-end" : "justify-start"}`}>
       {!isStudent ? (
         <Avatar className="hidden h-9 w-9 sm:inline-flex">
           <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
         </Avatar>
       ) : null}
-      <div className={`flex w-full flex-col gap-2 ${isStudent ? "items-end" : "items-start"}`}>
-            <Card className={`${isStudent ? "bg-primary text-primary-foreground" : "bg-muted/60"} w-full max-w-full sm:max-w-[70%]`}>
+      <div className={`flex w-full flex-col gap-2 ${isStudent ? "items-end" : "items-start pr-4"}`}>
+        <Card
+          className={`${
+            isStudent
+              ? `bg-primary text-primary-foreground w-fit sm:max-w-[70%] ml-auto mr-2`
+              : `bg-muted/60 w-fit sm:max-w-[70%] mr-4`
+          }`}
+          style={hasFeedback ? { boxShadow: "0 0 0 2px rgba(59,130,246,0.55)" } : undefined}
+        >
           <CardContent className="space-y-2 p-4">
             {message.sender === "ai" && message.status !== "DONE" ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> 回答を生成しています...
+              <div
+                className="space-y-3"
+                aria-live="polite"
+                role="status"
+              >
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> AI が回答中です… <TypingDots />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[92%]" />
+                  <Skeleton className="h-4 w-[86%]" />
+                  <Skeleton className="h-4 w-[64%]" />
+                </div>
               </div>
             ) : (
               <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
             )}
-            <span className="block text-xs text-muted-foreground/80">
-              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
+            <div className={`flex items-center ${isStudent ? "justify-end" : "justify-between"} text-xs text-muted-foreground/80`}>
+              <span>
+                {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+              {message.sender === "ai" && feedbacks.length ? (
+                <button
+                  type="button"
+                  onClick={() => setAIFeedbackOpen((v) => !v)}
+                  className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-primary hover:bg-primary/10 focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  aria-expanded={isAIFeedbackOpen}
+                  title="フィードバックを確認"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> フィードバック {feedbacks.length}件
+                </button>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
-        {feedbacks.length ? (
-          <Card className="w-full max-w-full border-dashed bg-muted/30 sm:max-w-[70%]">
-            <CardContent className="space-y-2 p-3 text-sm">
+        
+        {!isStudent && feedbacks.length ? (
+          <div className="w-full">
+            {isAIFeedbackOpen ? (
+              <div className="flex w-full justify-start">
+                <div className="w-auto">
+                  <Card className="w-fit sm:max-w-[70%] mr-4 border-dashed bg-muted/30">
+                    <CardContent className="space-y-3 p-4 text-base">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MessageCircle className="h-4 w-4" />
+                        <span>メンターからのフィードバック</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{feedbacks[0]?.authorName}</span>
+                          <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <p className="leading-relaxed">{feedbacks[0]?.content}</p>
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {feedbacks[0]?.status}
+                        </Badge>
+                      </div>
+                      {feedbacks.length > 1 ? (
+                        <Collapsible>
+                          <CollapsibleTrigger className="text-xs text-primary underline">
+                            さらに表示（{feedbacks.length - 1}）
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2 space-y-2">
+                            {feedbacks.slice(1).map((fb) => (
+                            <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span>{fb.authorName}</span>
+                                  <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                </div>
+                                <p className="mt-1 leading-relaxed">{fb.content}</p>
+                                <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                                  {fb.status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {isStudent && feedbacks.length ? (
+          <div className="w-full">
+            <div className="flex w-full justify-start">
+              <div className="w-full sm:max-w-[70%] mr-4">
+                <FeedbackToggle feedbacks={feedbacks} fullRow />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+      {isStudent ? null : null}
+    </div>
+  );
+};
+
+interface ChatComposerProps {
+  containerRef?: RefObject<HTMLDivElement>;
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  canSend: boolean;
+  isSending: boolean;
+}
+
+const ChatComposer = ({ containerRef, value, onChange, onSend, canSend, isSending }: ChatComposerProps) => (
+  <div ref={containerRef} className="border-t bg-background pl-4 py-3 sm:pl-6">
+    <form
+      className="flex flex-col gap-2 items-end"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSend) return;
+        onSend();
+      }}
+    >
+      <div className="w-full sm:max-w-[70%]">
+        <Textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (canSend && !isSending) onSend();
+            }
+          }}
+          placeholder="質問を入力してください…"
+          className="min-h-12 w-full"
+          rows={2}
+          disabled={isSending}
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">Enterで送信、Shift+Enterで改行</p>
+          <Button type="submit" disabled={!canSend} className="rounded-full px-6">
+            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "送信"}
+          </Button>
+        </div>
+      </div>
+    </form>
+  </div>
+);
+
+export default StudentChatView;
+
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1 ml-1" aria-hidden="true">
+      <span
+        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
+        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "0ms" }}
+      />
+      <span
+        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
+        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "200ms" }}
+      />
+      <span
+        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
+        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "400ms" }}
+      />
+      <style jsx>{`
+        @keyframes typingDot {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.6;
+          }
+          30% {
+            transform: translateY(-3px);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </span>
+  );
+}
+
+function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = false }: { feedbacks: StudentChatViewModel["mentorFeedbacks"]; inline?: boolean; iconOnly?: boolean; fullRow?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        {fullRow ? (
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md px-2 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            aria-expanded={open}
+          >
+            <span className="inline-flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" /> フィードバック {feedbacks.length}件
+            </span>
+            <Eye className="h-4 w-4" />
+          </button>
+        ) : iconOnly ? (
+          <Button variant="ghost" size="icon" aria-label={open ? "閉じる" : "フィードバックを確認"}>
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">{open ? "閉じる" : "フィードバックを確認"}</span>
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" className="h-7 px-2">
+            {open ? "閉じる" : "確認"}
+          </Button>
+        )}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        {inline ? (
+          <div className="space-y-3 text-base">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{feedbacks[0]?.authorName}</span>
+                <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+              <p className="leading-relaxed">{feedbacks[0]?.content}</p>
+              <Badge variant="secondary" className="text-xs capitalize">
+                {feedbacks[0]?.status}
+              </Badge>
+            </div>
+            {feedbacks.length > 1 ? (
+              <Collapsible>
+                <CollapsibleTrigger className="text-xs text-primary underline">
+                  さらに表示（{feedbacks.length - 1}）
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-2">
+                  {feedbacks.slice(1).map((fb) => (
+                  <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{fb.authorName}</span>
+                        <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <p className="mt-1 leading-relaxed">{fb.content}</p>
+                      <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                        {fb.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            ) : null}
+          </div>
+        ) : (
+          <Card className="border-dashed bg-muted/30">
+            <CardContent className="space-y-3 p-4 text-base">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MessageCircle className="h-4 w-4" />
                 <span>メンターからのフィードバック</span>
@@ -345,60 +627,36 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                   <span>{feedbacks[0]?.authorName}</span>
                   <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
-                <p className="text-sm leading-relaxed">{feedbacks[0]?.content}</p>
+                <p className="leading-relaxed">{feedbacks[0]?.content}</p>
                 <Badge variant="secondary" className="text-xs capitalize">
                   {feedbacks[0]?.status}
                 </Badge>
               </div>
+              {feedbacks.length > 1 ? (
+                <Collapsible>
+                  <CollapsibleTrigger className="text-xs text-primary underline">
+                    さらに表示（{feedbacks.length - 1}）
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 space-y-2">
+                    {feedbacks.slice(1).map((fb) => (
+                      <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{fb.authorName}</span>
+                          <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <p className="mt-1 leading-relaxed">{fb.content}</p>
+                        <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                          {fb.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : null}
             </CardContent>
           </Card>
-        ) : null}
-      </div>
-      {isStudent ? (
-        <Avatar className="hidden h-9 w-9 sm:inline-flex">
-          <AvatarFallback className="bg-primary/10 text-primary">NH</AvatarFallback>
-        </Avatar>
-      ) : null}
-    </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
-};
-
-interface ChatComposerProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
-  canSend: boolean;
-  isSending: boolean;
 }
-
-const ChatComposer = ({ value, onChange, onSend, canSend, isSending }: ChatComposerProps) => (
-  <div className="border-t bg-background px-4 py-3">
-    <form
-      className="flex flex-col gap-3 sm:flex-row sm:items-center"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!canSend) {
-          return;
-        }
-        onSend();
-      }}
-    >
-      <Input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="質問を入力してください…"
-        className="flex-1 rounded-full bg-background"
-        disabled={isSending}
-      />
-      <Button
-        type="submit"
-        disabled={!canSend}
-        className="rounded-full px-6"
-      >
-        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "送信"}
-      </Button>
-    </form>
-  </div>
-);
-
-export default StudentChatView;

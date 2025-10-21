@@ -9,7 +9,7 @@ import { useMentorDashboardPresenter } from "../../presenters/useMentorDashboard
 import type { MentorDashboardControllerEffect } from "../../controllers/useMentorDashboardController";
 import type { UseCaseFailure } from "../../../application/entitle/models";
 import type { StudentSummary } from "../../../application/entitle/ports";
-import { createDevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
+import { createDevEntitleAdapters } from "../../../../src/dev/devAdapters";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
   kind: "ValidationError",

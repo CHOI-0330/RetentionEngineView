@@ -2,6 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Alert } from "../components/ui/alert";
+import { Label } from "../components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import type { AuthPresenterInteractions, AuthPresenterStatus, AuthPresenterViewModel } from "../interfaceAdapters/presenters/useAuthPresenter";
 
 interface AuthViewProps {
@@ -27,10 +29,10 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
         </Alert>
       ) : null}
 
-      <Tabs defaultValue="register" className="w-full">
+      <Tabs defaultValue="login" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="register">新規登録</TabsTrigger>
           <TabsTrigger value="login">ログイン</TabsTrigger>
+          <TabsTrigger value="register">新規登録</TabsTrigger>
         </TabsList>
 
         <TabsContent value="register" className="space-y-4 pt-4">
@@ -61,15 +63,19 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">役割</label>
-            <select
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            <Label htmlFor="auth-register-role">役割</Label>
+            <Select
               value={viewModel.register.role}
-              onChange={(event) => interactions.setRegisterField("role", event.target.value)}
+              onValueChange={(value) => interactions.setRegisterField("role", value)}
             >
-              <option value="NEW_HIRE">新入社員</option>
-              <option value="MENTOR">メンター</option>
-            </select>
+              <SelectTrigger id="auth-register-role">
+                <SelectValue placeholder="役割を選択してください" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NEW_HIRE">新入社員</SelectItem>
+                <SelectItem value="MENTOR">メンター</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button className="w-full" onClick={interactions.submitRegistration} disabled={status.isSubmitting}>
             {status.isSubmitting ? "処理中..." : "新規登録"}

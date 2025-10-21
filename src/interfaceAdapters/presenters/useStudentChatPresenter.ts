@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 
-import type { Feedback, Message } from "../../type/core";
+import type { Feedback, Message } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type {
   StudentChatController,

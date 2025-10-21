@@ -1,4 +1,4 @@
-import type { User } from "../../type/core";
+import type { User } from "../../domain/core";
 import type { UseCaseResult } from "./models";
 
 export interface RegisterUserInput {

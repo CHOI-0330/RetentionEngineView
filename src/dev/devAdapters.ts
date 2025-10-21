@@ -18,7 +18,7 @@ import type {
   MentorAssignment,
   ModelConfig,
   User,
-} from "../../src/type/core";
+} from "../../src/domain/core";
 
 const createId = (() => {
   let counter = 0;

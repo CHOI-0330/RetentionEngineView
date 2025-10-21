@@ -1,4 +1,4 @@
-import type { Conversation, Feedback, FeedbackAuthorRole, Message, MentorAssignment, User } from "../../type/core";
+import type { Conversation, Feedback, FeedbackAuthorRole, Message, MentorAssignment, User } from "../../domain/core";
 import type {
   Prompt,
   PromptMessage,

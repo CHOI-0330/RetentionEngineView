@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 
 import { SupabaseAuthGateway } from "../interfaceAdapters/gateways/supabase/authGateway";
-import type { User } from "../type/core";
+import type { User } from "../domain/core";
 
 // Supabase の環境変数が揃っていない場合は認証を検証できないため、そのまま null を返します。
 const isSupabaseConfigured =

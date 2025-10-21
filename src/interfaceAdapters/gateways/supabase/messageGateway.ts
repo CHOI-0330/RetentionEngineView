@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 
 import { createServerSupabaseClient } from "../../../lib/supabaseClient";
 import type { MessagePort } from "../../../application/entitle/ports";
-import type { Message } from "../../../type/core";
+import type { Message } from "../../../domain/core";
 import { mapMessageRow, type MessageRow } from "./types";
 
 const MESSAGE_PAGE_SIZE_DEFAULT = 50;

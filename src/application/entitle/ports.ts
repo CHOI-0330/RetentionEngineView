@@ -6,7 +6,7 @@ import type {
   MentorAssignment,
   ModelConfig,
   User,
-} from "../../type/core";
+} from "../../domain/core";
 import type { Prompt, QuerySpec, ValidatedFeedback } from "./models";
 
 export interface MessagePort {

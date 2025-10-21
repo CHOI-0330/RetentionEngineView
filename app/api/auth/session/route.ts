@@ -14,13 +14,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { userId, role } = await authGateway.getUserFromAccessToken(accessToken);
+    const { userId } = await authGateway.getUserFromAccessToken(accessToken);
+    const profile = await authGateway.getUserProfile(userId);
     return NextResponse.json({
       data: {
         accessToken,
         refreshToken,
         userId,
-        role,
+        role: profile.role,
+        displayName: profile.displayName,
       },
     });
   } catch (error) {

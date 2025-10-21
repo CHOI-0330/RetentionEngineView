@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
 import { useAuthPresenter } from "../../presenters/useAuthPresenter";
+import { useSession } from "../../../components/SessionProvider";
 
 type AuthAction = "register" | "login" | "logout";
 
 const AuthPage = () => {
   const controller = useAuthController();
   const presenter = useAuthPresenter(controller);
+  const { interactions: sessionInteractions } = useSession();
   const processingRef = useRef(false);
+  const router = useRouter();
 
   const supabaseEnabled = useMemo(
     () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
@@ -88,6 +92,17 @@ const AuthPage = () => {
     };
   }, [controller.actions, supabaseEnabled]);
 
+  // ログイン成功後、ロールに応じて自動遷移します。
+  useEffect(() => {
+    const session = controller.state.session;
+    if (!session) return;
+    if (session.role === "MENTOR") {
+      router.push("/mentor");
+    } else if (session.role === "NEW_HIRE") {
+      router.push("/student");
+    }
+  }, [controller.state.session, router]);
+
   useEffect(() => {
     if (processingRef.current || !controller.state.pendingEffects.length) {
       return;
@@ -117,11 +132,13 @@ const AuthPage = () => {
               role: "NEW_HIRE" | "MENTOR" | "ADMIN";
             };
             controller.actions.setSession(session);
+            await sessionInteractions.refetchSession();
             break;
           }
           case "REQUEST_LOGOUT": {
             await callAuthAction("logout", effect.payload);
             controller.actions.setSession(null);
+            await sessionInteractions.refetchSession();
             break;
           }
           default:
@@ -142,7 +159,7 @@ const AuthPage = () => {
     };
 
     void run();
-  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled]);
+  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled, sessionInteractions]);
 
   return <AuthView viewModel={presenter.viewModel} status={presenter.status} interactions={presenter.interactions} />;
 };

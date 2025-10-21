@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { createServerSupabaseClient } from "../../../lib/supabaseClient";
 import type { FeedbackPort } from "../../../application/entitle/ports";
 import type { ValidatedFeedback } from "../../../application/entitle/models";
-import type { Feedback } from "../../../type/core";
+import type { Feedback } from "../../../domain/core";
 import { mapFeedbackRow, type FeedbackRow } from "./types";
 
 const FEEDBACK_PAGE_SIZE_DEFAULT = 50;
