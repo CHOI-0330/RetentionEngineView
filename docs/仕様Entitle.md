@@ -402,6 +402,26 @@ type/
 
 ---
 
+## 13) 全体的な UI 状態管理 (Global UI State Management)
+
+### 13.1) 課題 (Problem)
+ログイン・ログアウトといったグローバルな認証状態の変更が、ヘッダーのユーザーメニューのように、特定のページ Presenter に属さない共通 UI コンポーネントに即時反映されない。
+これにより、UI の一貫性が損なわれ、状態を同期するためにページリフレッシュが必要になるという問題があった。
+
+### 13.2) 解決策と実装 (Solution and Implementation)
+この課題に対し、React Context API を用いたグローバルな `SessionProvider` を導入する。これは「framework-presenter-view.md」で言及されている、共有状態を Context に昇格させるパターンに準拠する。
+
+- **`useSessionPresenter`**: 認証状態（セッション）の取得・保持・更新ロジックをカプセル化した、新しい Presenter フック。
+- **`SessionProvider`**: `useSessionPresenter` を利用し、アプリケーションのルート (`app/layout.tsx`) で子コンポーネントにセッション状態と更新用のインタラクション (`refetchSession`) を提供する。
+- **`useSession`**: コンポーネントがこのグローバルなセッション状態を購読するためのカスタムフック。
+
+### 13.3) フロー (Flow)
+1. ユーザーがログインに成功すると、`AuthPage` Presenter が `SessionProvider` から受け取った `refetchSession()` を呼び出す。
+2. `useSessionPresenter` 内でセッションの再取得が行われ、状態が更新される。
+3. この状態変更により、`useSession()` を通じて状態を購読している全てのコンポーネント (例: `AppUserMenu`) が自動的に再レンダリングされ、UI の一貫性が保たれる。
+
+---
+
 ### ひと言まとめ
 
 **エンティティは POJO ＋明確な状態遷移**、**Use Case は純粋関数**、**副作用は IA(Gateway)**。
