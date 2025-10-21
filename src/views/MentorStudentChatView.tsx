@@ -227,7 +227,7 @@ function MentorFeedbackSection({
   }, [isEditing]);
 
   return (
-    <div className="mt-3 w-full sm:max-w-[70%]">
+    <div className="mt-3 w-fit sm:max-w-[70%]">
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <button
