@@ -1,63 +1,25 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Button } from "../components/ui/button";
-
-type Role = "NEW_HIRE" | "MENTOR" | "ADMIN";
-
-interface SessionData {
-  accessToken: string;
-  refreshToken: string;
-  userId: string;
-  role: Role;
-  displayName?: string;
-}
+import Link from 'next/link';
+import { Button } from '../components/ui/button';
+import { useSession } from './SessionProvider';
 
 export default function AppUserMenu() {
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabaseEnabled = useMemo(
-    () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    []
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!supabaseEnabled) {
-      setLoading(false);
-      return;
-    }
-    const run = async () => {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!cancelled && res.ok) {
-          const json = (await res.json()) as { data: SessionData };
-          setSession(json.data);
-        }
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [supabaseEnabled]);
+  const { session, isLoading, interactions } = useSession();
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
-    } catch {
-      // ignore
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+    } catch (error) {
+      console.error('Logout failed:', error);
     } finally {
-      window.location.href = "/";
+      // Force a session refetch and then redirect to the home page.
+      await interactions.refetchSession();
+      window.location.href = '/';
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap sm:whitespace-normal">認証確認中…</div>;
   }
 
@@ -72,7 +34,7 @@ export default function AppUserMenu() {
     );
   }
 
-  const roleLabel = session.role === "MENTOR" ? "メンター" : session.role === "NEW_HIRE" ? "新入社員" : session.role;
+  const roleLabel = session.role === 'MENTOR' ? 'メンター' : session.role === 'NEW_HIRE' ? '新入社員' : session.role;
 
   return (
     <div className="flex items-center gap-2 sm:gap-3 whitespace-nowrap sm:whitespace-normal">
@@ -88,3 +50,4 @@ export default function AppUserMenu() {
     </div>
   );
 }
+

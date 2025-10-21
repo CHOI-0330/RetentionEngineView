@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
 import { useAuthPresenter } from "../../presenters/useAuthPresenter";
+import { useSession } from "../../../components/SessionProvider";
 
 type AuthAction = "register" | "login" | "logout";
 
 const AuthPage = () => {
   const controller = useAuthController();
   const presenter = useAuthPresenter(controller);
+  const { interactions: sessionInteractions } = useSession();
   const processingRef = useRef(false);
   const router = useRouter();
 
@@ -130,11 +132,13 @@ const AuthPage = () => {
               role: "NEW_HIRE" | "MENTOR" | "ADMIN";
             };
             controller.actions.setSession(session);
+            await sessionInteractions.refetchSession();
             break;
           }
           case "REQUEST_LOGOUT": {
             await callAuthAction("logout", effect.payload);
             controller.actions.setSession(null);
+            await sessionInteractions.refetchSession();
             break;
           }
           default:
@@ -155,7 +159,7 @@ const AuthPage = () => {
     };
 
     void run();
-  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled]);
+  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled, sessionInteractions]);
 
   return <AuthView viewModel={presenter.viewModel} status={presenter.status} interactions={presenter.interactions} />;
 };
