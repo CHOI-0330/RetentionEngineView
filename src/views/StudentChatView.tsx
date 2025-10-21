@@ -439,7 +439,7 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                           </CollapsibleTrigger>
                           <CollapsibleContent className="mt-2 space-y-2">
                             {feedbacks.slice(1).map((fb) => (
-                              <div key={`${fb.authorId}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                            <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                   <span>{fb.authorName}</span>
                                   <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -600,7 +600,7 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-2">
                   {feedbacks.slice(1).map((fb) => (
-                  <div key={`${fb.authorId}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                  <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{fb.authorName}</span>
                         <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -639,7 +639,7 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
                     {feedbacks.slice(1).map((fb) => (
-                      <div key={`${fb.authorId}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                      <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{fb.authorName}</span>
                           <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
