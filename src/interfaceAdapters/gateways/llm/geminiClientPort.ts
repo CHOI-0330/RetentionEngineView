@@ -1,12 +1,12 @@
 "use client";
 
 import type { LLMPort } from "../../../application/entitle/ports";
-import type { MessageDelta, Prompt } from "../../../application/entitle/models";
+import type { Prompt } from "../../../application/entitle/models";
 
 const DEFAULT_MODEL_ID = "gemini-2.0-flash-exp";
 
 export class GeminiLLMPort implements LLMPort {
-  async *streamGenerate(input: { prompt: Prompt; modelId?: string; runtimeId?: string; signal?: AbortSignal }): AsyncIterable<MessageDelta> {
+  async generate(input: { prompt: Prompt; modelId?: string; runtimeId?: string; signal?: AbortSignal }): Promise<string> {
     const response = await fetch("/api/llm/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,8 +28,8 @@ export class GeminiLLMPort implements LLMPort {
       throw new Error(json.error);
     }
     if (!json.text) {
-      return;
+      throw new Error("Gemini response did not include text.");
     }
-    yield { text: json.text, seqNo: 1 };
+    return json.text;
   }
 }

@@ -1,4 +1,4 @@
-import MentorStudentChatPagePresenter from "../../../../Presenter/Entitle/MentorStudentChatPagePresenter";
+import MentorStudentChatPage from "../../../../src/interfaceAdapters/pages/entitle/MentorStudentChatPage";
 
 interface MentorChatPageProps {
   params: { convId: string };
@@ -9,7 +9,7 @@ export default function MentorChatPage({ params }: MentorChatPageProps) {
   return (
     <main className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-5xl">
-        <MentorStudentChatPagePresenter convId={convId} />
+        <MentorStudentChatPage convId={convId} />
       </div>
     </main>
   );

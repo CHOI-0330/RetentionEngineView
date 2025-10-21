@@ -1,4 +1,4 @@
-import type { MessageDelta, Prompt, ValidatedFeedback } from "../../src/application/entitle/models";
+import type { ValidatedFeedback } from "../../src/application/entitle/models";
 import type {
   FeedbackLookupPort,
   FeedbackPort,
@@ -9,6 +9,7 @@ import type {
   StudentSummary,
 } from "../../src/application/entitle/ports";
 import { GeminiLLMPort } from "../../src/interfaceAdapters/gateways/llm/geminiClientPort";
+import { InMemoryLLMPort } from "../../src/mocks/llm/inMemoryLLMPort";
 import type {
   Conversation,
   Feedback,
@@ -58,23 +59,6 @@ class InMemoryMessagePort implements MessagePort {
     };
     this.store.messages.push(message);
     return message;
-  }
-
-  async appendAssistantDelta(input: { msgId: string; delta: string; seqNo: number }): Promise<void> {
-    const message = this.store.messages.find((entry) => entry.msgId === input.msgId);
-    if (!message) {
-      throw new Error("Assistant message not found");
-    }
-    if (!message.status || message.status === "DRAFT") {
-      message.status = "PARTIAL";
-      message.content = input.delta;
-      return;
-    }
-    if (message.status === "PARTIAL") {
-      message.content += input.delta;
-      return;
-    }
-    throw new Error("Cannot append to completed message");
   }
 
   async finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message> {
@@ -201,25 +185,6 @@ class StaticFeedbackLookupPort implements FeedbackLookupPort {
 
   async getUserDisplayName(userId: string): Promise<string | null> {
     return this.store.users[userId]?.displayName ?? null;
-  }
-}
-
-class InMemoryLLMPort implements LLMPort {
-  async *streamGenerate(_input: {
-    prompt: Prompt;
-    modelId?: string;
-    runtimeId?: string;
-    signal?: AbortSignal;
-  }): AsyncIterable<MessageDelta> {
-    const chunks = [
-      "もちろんです。二次方程式の基本から整理しましょう。",
-      " 一般形 ax^2 + bx + c = 0 では、解の公式を使って解を求められます。",
-      " さらにグラフで見ると、放物線が x 軸と交わる点が解になります。",
-    ];
-    for (let index = 0; index < chunks.length; index += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      yield { text: chunks[index], seqNo: index + 1 };
-    }
   }
 }
 
@@ -354,7 +319,7 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
   const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
   if (shouldUseGemini) {
-    console.info("[LLM] Gemini gateway enabled. Streaming responses will be proxied via /api/llm/gemini.");
+    console.info("[LLM] Gemini gateway enabled. Responses will be proxied via /api/llm/gemini.");
   } else {
     console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable Gemini gateway.");
   }

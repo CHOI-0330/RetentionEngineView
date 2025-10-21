@@ -4,17 +4,17 @@
 
 ## 1. 役割概要
 
-- **Presenter ディレクトリ (`Presenter/**`)** はページ単位のコンテナ。Interface Adapters のフックを束ねて ViewModel を構築し、`View/**` へ渡します。
-- **View ディレクトリ (`View/**`)** は純粋な描画コンポーネント。状態を持たず、Props で受け取ったデータのみを用いて UI を描画します。
-- Next.js の `app/**` ルートは Presenter をマウントするためのエントリポイントであり、サーバー／クライアントの境界を定義します。
+- **ページコンテナ (`src/interfaceAdapters/pages/**`)** は Interface Adapters のフックを束ねて ViewModel を構築し、`src/views/**` へ渡します。
+- **View ディレクトリ (`src/views/**`)** は純粋な描画コンポーネント。状態を持たず、Props で受け取ったデータのみを用いて UI を描画します。
+- Next.js の `app/**` ルートはページコンテナをマウントするためのエントリポイントであり、サーバー／クライアントの境界を定義します。
 
 ## 2. ディレクトリと命名規約
 
 | ディレクトリ | 内容 | 命名規約 |
 |---------------|------|-----------|
 | `app/(loggined)/**` | Next.js ルートとレイアウト | ページ名 + `page.tsx` / `layout.tsx` |
-| `Presenter/**` | ページコンテナ（Client Component） | `FeatureName` ディレクトリ配下に PascalCase のコンポーネント |
-| `View/**` | 描画専用コンポーネント | `FeatureName` ディレクトリ配下に `SomethingView.tsx` |
+| `src/interfaceAdapters/pages/**` | ページコンテナ（Client Component） | `FeatureName` ディレクトリ配下に PascalCase のコンポーネント |
+| `src/views/**` | 描画専用コンポーネント | `FeatureName` ディレクトリ配下に `SomethingView.tsx` |
 
 - Presenter は常に `"use client"` を宣言します。View は可能な限りサーバーコンポーネントですが、ブラウザ API を使う場合は `"use client"` を明示します。
 - View から Presenter/Controller を直接 import しないでください。Props で必要なデータとハンドラを受け渡します。
@@ -167,4 +167,3 @@ Presenter / View の構成は最上位レイヤーとして他の設計ガイド
 - [Controller ガイド](controller.md)
 - [Presenter (ViewModel) ガイド](viewmodel-presenter.md)
 - [Gateway ガイド](gateway.md)
-

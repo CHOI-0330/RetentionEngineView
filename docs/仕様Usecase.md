@@ -29,7 +29,7 @@
 | ------------------------------------- | ------------------------------- | ------------------------------------- | ------------------------ | -------------------- |
 | **CreateUserMessageUseCase**          | 会話へ NEW_HIRE メッセージ保存  | `convId`, `content`                   | `{ msgId }`              | `MessagePort`        |
 | **BuildPromptForConversationUseCase** | 会話履歴から LLM プロンプト生成 | `convId`, `question`, `historyWindow` | `Prompt`                 | （任意）`PolicyPort` |
-| **StreamAssistantAnswerUseCase**      | LLM へ依頼しデルタ受信          | `prompt`, `modelRef`                  | `AsyncIterable<delta>`   | `LLMPort`            |
+| **GenerateAssistantAnswerUseCase**    | LLM へ依頼し最終回答を取得      | `prompt`, `modelRef`                  | `string`                 | `LLMPort`            |
 | **ListConversationMessagesUseCase**   | メッセージ一覧（ページング）    | `convId`, `cursor?`, `limit?`         | `{ items, nextCursor? }` | `MessagePort`        |
 | **ListMessageFeedbacksUseCase**       | 指定メッセージの FB 一覧        | `msgId`, `cursor?`, `limit?`          | `{ items, nextCursor? }` | `FeedbackPort`       |
 
@@ -38,7 +38,6 @@
 | UseCase                             | 目的                                    | 主入力                    | 主出力         | 参照 Port     |
 | ----------------------------------- | --------------------------------------- | ------------------------- | -------------- | ------------- |
 | **BeginAssistantMessageUseCase**    | ASSISTANT メッセージ下書き作成（DRAFT） | `convId`                  | `{ msgId }`    | `MessagePort` |
-| **AppendAssistantDeltaUseCase**     | 受信デルタの部分反映（PARTIAL）         | `msgId`, `delta`, `seqNo` | `{ ok: true }` | `MessagePort` |
 | **FinalizeAssistantMessageUseCase** | 最終テキスト確定（DONE）                | `msgId`, `finalText`      | `{ ok: true }` | `MessagePort` |
 
 ### 2.3 メンター（ユーザー起点）
@@ -58,17 +57,14 @@
 ```ts
 // @/application/ports.ts
 export interface MessagePort {
-  createUserMessage(
-    convId: string,
-    content: string
-  ): Promise<{ msgId: string }>;
-  beginAssistantMessage(convId: string): Promise<{ msgId: string }>;
-  appendAssistantDelta(
-    msgId: string,
-    delta: string,
-    seqNo: number
-  ): Promise<void>;
-  finalizeAssistantMessage(msgId: string, finalText: string): Promise<void>;
+  createUserMessage(input: {
+    convId: string;
+    authorId: string;
+    content: string;
+  }): Promise<Message>;
+  beginAssistantMessage(convId: string): Promise<Message>;
+  finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message>;
+  cancelAssistantMessage(msgId: string): Promise<Message>;
   listConversationMessages(
     convId: string,
     cursor?: string,
@@ -88,11 +84,11 @@ export interface FeedbackPort {
   ): Promise<{ items: Feedback[]; nextCursor?: string }>;
 }
 export interface LLMPort {
-  streamGenerate(args: {
+  generate(args: {
     prompt: any;
-    model: { name: string; params?: Record<string, unknown> };
-    runtime: LLMRuntime;
-  }): AsyncIterable<string>;
+    model?: { name: string; params?: Record<string, unknown> };
+    runtime?: LLMRuntime;
+  }): Promise<string>;
 }
 // 実装例：GeminiLLMPort（NEXT_PUBLIC_ENABLE_GEMINI=1 で有効化、GEMINI_MODEL_ID でモデル指定可）
 export interface PolicyPort {
@@ -144,29 +140,21 @@ export interface PolicyPort {
 - **出力**：`Prompt`（`system`/`messages[]` 等）。
 - **ポイント**：Use Case は**純粋に構築**のみ。トークン制御・安全化はドメイン/ユーティリティに委譲。
 
-### 4.3 StreamAssistantAnswerUseCase
+### 4.3 GenerateAssistantAnswerUseCase
 
 - **目的**：LLM へ生成を依頼し、**デルタ**を順次受信。
 - **アクター**：新入社員（UI 起点）
 - **事前条件**：所有者検証済み。
 - **入力**：`prompt`, `modelRef(modelId など)`
-- **出力**：`AsyncIterable<string>`（delta）
+- **出力**：`string`（最終回答）
 - **連携**：
 
-  - Controller は実行前に **Begin→Append→Finalize** の内部 Use Case を呼び出す設計（下記）。
-  - Gateway が LLM ストリームを購読し、**例外・キャンセル**を責務内で処理。
+  - Controller は **Begin → LLM 応答生成 → Finalize** を順番に実行。
+  - Gateway は単発リクエストとして LLM を呼び出し、例外を捕捉して UI へ伝播。
 
 - **テスト**：デルタ順序／キャンセル時の後片付け／部分保存の一貫性。
 
-### 4.4 Begin / Append / Finalize（内部補助）
-
-- **BeginAssistantMessageUseCase**：`convId → msgId(DRAFT)` を確保。
-- **AppendAssistantDeltaUseCase**：`(msgId, delta, seqNo)` を **PARTIAL** に反映（順序/冪等性）。
-- **FinalizeAssistantMessageUseCase**：`finalText` を確定し **DONE**。
-- **注意**：Use Case 自体は「状態決定」のみ。実際の upsert/append は **MessagePort** 経由で IA が担う。
-- **信頼性**：`(msgId, seqNo)` ユニーク、再送を無害化。中断で **CANCELLED** 遷移あり。
-
-### 4.5 ListConversationMessagesUseCase
+### 4.4 ListConversationMessagesUseCase
 
 - **目的**：会話のメッセージ一覧（ページング）。
 - **入力**：`convId`, `cursor?`, `limit?`
@@ -175,7 +163,7 @@ export interface PolicyPort {
 - **権限**：所有者 or 担当メンターのみ。
 - **テスト**：安定ページング、境界（末尾/空）。
 
-### 4.6 ValidateFeedbackRulesUseCase / CreateFeedbackUseCase / ListMessageFeedbacksUseCase
+### 4.5 ValidateFeedbackRulesUseCase / CreateFeedbackUseCase / ListMessageFeedbacksUseCase
 
 - **Validate**：対象メッセージが `ASSISTANT` か、`isMentorMapped(mentorId, newhireId)` が真か、内容長/禁則を満たすか。
 - **Create**：検証済み入力を保存し `fbId` を返す。
@@ -187,7 +175,7 @@ export interface PolicyPort {
 
 ## 5) シーケンス（代表例）
 
-### 5.1 新入社員：質問 → LLM ストリーム → 保存
+### 5.1 新入社員：質問 → LLM 応答生成 → 保存
 
 ```mermaid
 sequenceDiagram
@@ -203,16 +191,11 @@ sequenceDiagram
   GP-->>CT: {msgIdUser}
   CT->>UC: BeginAssistantMessageUseCase
   CT->>GP: MessagePort.beginAssistantMessage()
-  CT->>GP: LLMPort.streamGenerate(prompt, model/runtime)
-  loop delta
-    GP-->>CT: delta
-    CT->>UC: AppendAssistantDeltaUseCase
-    CT->>GP: MessagePort.appendAssistantDelta()
-    CT->>VM: apply partial for streaming UI
-  end
+  CT->>GP: LLMPort.generate(prompt, model/runtime)
+  GP-->>CT: finalText
   CT->>UC: FinalizeAssistantMessageUseCase
   CT->>GP: MessagePort.finalizeAssistantMessage()
-  CT->>VM: complete streaming
+  CT->>VM: notify completion
 ```
 
 - Gateway はストリーム・例外・キャンセルを責任範囲で処理（進行中フラグ、リソース解放）。
@@ -233,20 +216,16 @@ export function buildPromptForConversationUseCase(args: {
   question: string;
   historyWindow: number;
 }): Prompt;
-export function streamAssistantAnswerUseCase(args: {
+export function generateAssistantAnswerUseCase(args: {
   prompt: Prompt;
   modelId?: string;
-}): AsyncIterable<string>;
+}): Promise<string>;
 
-// ストリーミング補助
+// 応答生成補助
 export function beginAssistantMessageUseCase(args: { convId: string }): {
   kind: "BEGIN";
   convId: string;
 };
-export function appendAssistantDeltaUseCase(
-  state: Message,
-  delta: { text: string; seqNo: number }
-): Message;
 export function finalizeAssistantMessageUseCase(
   state: Message,
   finalText: string
@@ -332,17 +311,16 @@ export function listMessageFeedbacksUseCase(args: {
 ### 付録：小さな実装スケッチ（純粋ロジック）
 
 ```ts
-// Append: 状態遷移の純粋ロジック例
-export function appendAssistantDeltaUseCase(
-  prev: Message,
-  delta: { text: string; seqNo: number }
-) {
-  if (prev.role !== "ASSISTANT") return prev;
-  if (prev.status === "DRAFT")
-    return { ...prev, status: "PARTIAL", content: delta.text };
-  if (prev.status === "PARTIAL")
-    return { ...prev, content: prev.content + delta.text };
-  return prev;
+// Finalize: 状態遷移の純粋ロジック例
+export function finalizeAssistantMessageUseCase(args: {
+  message: Message;
+  finalText: string;
+}) {
+  if (args.message.role !== "ASSISTANT") return args.message;
+  if (args.message.status === "CANCELLED") return args.message;
+  const trimmed = args.finalText.trim();
+  if (!trimmed) return args.message;
+  return { ...args.message, status: "DONE", content: trimmed };
 }
 
 // List: クエリ仕様を返す（永続化は Port 側）

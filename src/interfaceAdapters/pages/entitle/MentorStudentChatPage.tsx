@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import MentorStudentChatView from "../../src/views/MentorStudentChatView";
-import type { Conversation, Feedback, Message, User } from "../../src/type/core";
-import type { UseCaseFailure } from "../../src/application/entitle/models";
+import MentorStudentChatView from "../../../views/MentorStudentChatView";
+import type { Conversation, Feedback, Message, User } from "../../../type/core";
+import type { UseCaseFailure } from "../../../application/entitle/models";
 
 interface MentorChatBootstrap {
   conversation: Conversation;
@@ -16,7 +16,7 @@ interface MentorChatBootstrap {
   authorNames: Record<string, string>;
 }
 
-interface MentorStudentChatPagePresenterProps {
+interface MentorStudentChatPageProps {
   convId: string;
 }
 
@@ -25,7 +25,7 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
   message: reason instanceof Error ? reason.message : String(reason),
 });
 
-const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresenterProps) => {
+const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState<MentorChatBootstrap | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,4 +230,4 @@ const MentorStudentChatPagePresenter = ({ convId }: MentorStudentChatPagePresent
   );
 };
 
-export default MentorStudentChatPagePresenter;
+export default MentorStudentChatPage;

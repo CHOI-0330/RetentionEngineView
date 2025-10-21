@@ -31,7 +31,7 @@ Domain / Entities
 
 | Layer | 主な責務 | 代表ディレクトリ | 詳細ガイド |
 |-------|----------|------------------|------------|
-| Framework / UI | ページ構成・コンテナ・描画 | `app/**`, `Presenter/**`, `View/**` | [Framework / Presenter / View](architecture/framework-presenter-view.md) |
+| Framework / UI | ページ構成・コンテナ・描画 | `app/**`, `src/interfaceAdapters/pages/**`, `src/views/**` | [Framework / Presenter / View](architecture/framework-presenter-view.md) |
 | Interface Adapters: Controller | Use Case 呼び出しと UI 状態管理 | `interfaceAdapters/controllers/**` | [Controller ガイド](architecture/controller.md) |
 | Interface Adapters: Presenter | ViewModel 生成・派生値計算 | `interfaceAdapters/presenters/**` | [Presenter (ViewModel) ガイド](architecture/viewmodel-presenter.md) |
 | Interface Adapters: UI Event Adapter | DOM/Pointer 変換・正規化 | `interfaceAdapters/adapters/**` | [UI Event Adapter ガイド](architecture/ui-event-adapter.md) |
@@ -56,7 +56,7 @@ Domain / Entities
 2. **型・定数定義**: 必要な値オブジェクトや定数を `type/**`, `constants/**` に追加し、Cross-cutting ガイドに従って設計する。
 3. **Domain / Use Case 実装**: 純粋関数でロジックを構築し、テスト (テーブル駆動) を用意する。詳細は [Use Case ガイド](architecture/usecase.md) と [Domain ガイド](architecture/domain.md) を参照。
 4. **Interface Adapters 実装**: Controller・Presenter(ViewModel)・Adapter・Gateway を順に作成し、各ガイドの命名規約とテスト戦略に従う。
-5. **Presenter / View 統合**: `Presenter/**` で各フックを組み合わせ、`View/**` に Props を渡す。UI 開発ルールは [Framework / Presenter / View](architecture/framework-presenter-view.md) を参照。
+5. **ページコンテナ / View 統合**: `src/interfaceAdapters/pages/**` で各フックを組み合わせ、`src/views/**` に Props を渡す。UI 開発ルールは [Framework / Presenter / View](architecture/framework-presenter-view.md) を参照。
 6. **検証**: `npm run lint` や関連テストを実行し、依存方向が守られているか確認する。必要に応じてドキュメントを更新し、変更点を記録する。
 7. **ケーススタディ照合**: 類似機能が存在する場合 (例: WEB-24) を参照し、実装差分をレビューする。
 

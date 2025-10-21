@@ -12,53 +12,55 @@
 
 - **主体**: 若手社員
 - **プロセス**:
-  1. 若手社員が`StudentChatScreen`を通じて AI チューターに質問します。
+  1. 若手社員が`StudentChatView`（App Router: `/student`）を通じて AI チューターに質問します。
   2. AI がリアルタイムで回答し、基本的な学習体験を提供します。
-  3. すべての会話は`StudentChatHistoryScreen`に記録され、若手社員は後で復習することができます。
+  3. 会話履歴とフィードバックは同じ画面で読み込まれ、すぐに復習に活用できます。
 
 ### b. メンター-AI 品質管理ループ（フィードバックと添削）
 
 - **主体**: メンター
 - **プロセス**:
   1. システムが特定の AI との会話を「レビュー必要」として自動的に分類します。
-  2. メンターは`MentorDashboard`でレビューが必要な会話のリストを確認します。
-  3. `MentorChatReviewScreen`を使用して、該当する会話の内容を検討します。
+  2. メンターは`MentorDashboardView`（App Router: `/mentor`）でレビュー対象の会話リストを確認します。
+  3. 詳細レビューは`MentorStudentChatView`（App Router: `/mentor/chat/[convId]`）で行います。
   4. メンターは AI の回答を直接**添削**し、なぜそのように修正したかについての**コメント**を追加できます。
-  5. このフィードバックは、若手社員のチャット画面にある`MentorFeedbackPreview`コンポーネントを通じて表示され、若手社員はより質の高い情報に基づいて二次学習を行うことができます。
+  5. 添削の結果は学生チャット画面に即時反映され、二次学習に活用されます。
 
 ### c. 知識ベース強化ループ（システムの成長）
 
 - **主体**: メンター
 - **プロセス**:
   1. メンターの添削内容は、一回限りのフィードバックに留まらず、永続的な知識資産へと転換されます。
-  2. メンターは`KnowledgeCorrectionScreen`で、添削した内容を「科目」「難易度」「タグ」などのメタデータと共に、洗練された知識ドキュメントとして作成します。
-  3. 「公開」されたドキュメントは、中央の知識ベースである`KnowledgeSummaryScreen`に蓄積されます。
+  2. 知識ベース化のフローは現在ドキュメント設計段階であり、`docs/` の仕様に沿って今後実装される予定です。
+  3. 「公開」されたドキュメントは中央知識ベースに蓄積される想定で API / UI を設計します。
   4. この検証済みの知識ベースは、将来的に AI モデルのファインチューニングや、類似の質問に対する AI の回答精度を向上させるために使用されます。これにより、システム全体が時間と共により賢くなっていきます。
 
-## 3. 主要コンポーネントの機能
+## 3. 主要画面とエントリーポイント
 
-### 最上位インターフェース
+### Next.js エントリーポイント
 
-- **`App.tsx`**: アプリのエントリーポイント。`UserRoleSelector`を介して役割を選択させ、`StudentInterface`または`MentorInterface`をレンダリングします。
-- **`StudentInterface.tsx`**: 若手社員体験のためのメインコンテナ。若手社員用のサイドバー、レイアウト、現在アクティブなビューを管理します。
-- **`MentorInterface.tsx`**: メンター体験のためのメインコンテナ。メンター用のサイドバー、レイアウト、画面遷移を管理します。
+- **`app/page.tsx`**: 公開ホーム。認証状態を確認して `AuthPage` をレンダリングします。
+- **`app/student/page.tsx`**: 若手社員用チャット画面（`StudentChatPage`）へのエントリーポイントです。
+- **`app/mentor/page.tsx`**: メンター向けダッシュボード（`MentorDashboardPage`）のエントリーポイントです。
+- **`app/mentor/chat/[convId]/page.tsx`**: 特定の会話をレビューするメンター向け詳細ページです。
 
-### 主要機能画面
+### インターフェースアダプタ（ページコンテナ）
 
-- **`StudentChatScreen.tsx`**: 若手社員が AI と対話するためのメインチャット画面です。
-- **`StudentChatHistoryScreen.tsx`**: 若手社員が自身の過去の会話履歴を閲覧する画面です。
-- **`StudentFeedbackScreen.tsx`**: 若手社員がメンターから受け取ったすべての添削フィードバックをリスト形式で確認するための専用ページです。
-- **`MentorDashboard.tsx`**: メンターのランディングページ。レビューが必要な若手社員や会話のリストを表示します。
-- **`MentorChatReviewScreen.tsx`**: メンターが特定の若手社員と AI のチャットを詳細にレビューし、添削やコメントを作成する画面です。
-- **`KnowledgeCorrectionScreen.tsx`**: メンターが AI の回答を永続的な知識ベースの記事として編集・発行する画面です。
-- **`KnowledgeSummaryScreen.tsx`**: メンターが蓄積されたすべての知識ベース記事を検索・閲覧するライブラリです。
+- **`src/interfaceAdapters/pages/entitle/AuthPage.tsx`**: 認証コントローラ／プレゼンターをまとめて `AuthView` に渡します。
+- **`src/interfaceAdapters/pages/entitle/StudentChatPage.tsx`**: StudentChat のコントローラ・プレゼンター・Supabase/サンドボックス適応を統合します。
+- **`src/interfaceAdapters/pages/entitle/MentorDashboardPage.tsx`**: メンターのダッシュボード処理を管理します。
+- **`src/interfaceAdapters/pages/entitle/MentorStudentChatPage.tsx`**: メンターが個別会話をレビューするロジックを担当します。
 
-### 共通・UI コンポーネント
+### View レイヤー
 
-- **`AppSidebar.tsx`**: 役割（`student`/`mentor`）に応じて異なるメニュー項目を表示するメインサイドバーナビゲーションです。
-- **`MentorFeedbackPreview.tsx`**: 若手社員のチャットログ内でメンターからの添削があることを示し、クリックすると詳細内容をダイアログで表示するコンポーネントです。
-- **`UserRoleSelector.tsx`**: ユーザーが「若手社員」または「メンター」の役割を選択する初期画面です。
-- **`src/components/ui/`**: shadcn/ui ベースの再利用可能な UI コンポーネント（Button, Card, Dialog など）が格納されているディレクトリです。
+- **`src/views/StudentChatView.tsx`**: 若手社員と AI の会話、フィードバック、会話選択 UI を提供します。
+- **`src/views/MentorDashboardView.tsx`**: レビュー対象の学生一覧と状態指標を表示します。
+- **`src/views/MentorStudentChatView.tsx`**: メンターによる個別会話レビュー UI を提供します。
+- **`src/views/AuthView.tsx`**: ログイン／登録／セッション状態を表示します。
+
+### UI プリミティブ
+
+- **`src/components/ui/`**: shadcn/ui ベースの再利用可能なボタン、カード、ダイアログなどの基本コンポーネント群です。
 
 ## 4. 開発環境の実行
 

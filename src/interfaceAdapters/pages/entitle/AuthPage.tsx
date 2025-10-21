@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import AuthView from "../../src/views/AuthView";
-import { useAuthController } from "../../src/interfaceAdapters/controllers/useAuthController";
-import { useAuthPresenter } from "../../src/interfaceAdapters/presenters/useAuthPresenter";
+import AuthView from "../../../views/AuthView";
+import { useAuthController } from "../../controllers/useAuthController";
+import { useAuthPresenter } from "../../presenters/useAuthPresenter";
 
 type AuthAction = "register" | "login" | "logout";
 
-const AuthPagePresenter = () => {
+const AuthPage = () => {
   const controller = useAuthController();
   const presenter = useAuthPresenter(controller);
   const processingRef = useRef(false);
@@ -147,4 +147,4 @@ const AuthPagePresenter = () => {
   return <AuthView viewModel={presenter.viewModel} status={presenter.status} interactions={presenter.interactions} />;
 };
 
-export default AuthPagePresenter;
+export default AuthPage;

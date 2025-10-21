@@ -21,17 +21,7 @@ export interface Prompt {
   messages: PromptMessage[];
 }
 
-export interface StreamAssistantRequest {
-  kind: "REQUEST_STREAM";
-  prompt: Prompt;
-  modelId?: string;
-  runtimeId?: string;
-}
-
-export interface MessageDelta {
-  text: string;
-  seqNo: number;
-}
+export type AssistantResponse = { text: string };
 
 export interface ValidatedFeedback {
   targetMsgId: string;
@@ -46,4 +36,3 @@ export interface QuerySpec {
   cursor?: string;
   limit: number;
 }
-

@@ -51,27 +51,6 @@ export class SupabaseMessageGateway implements MessagePort {
     return mapMessageRow(data as MessageRow);
   }
 
-  async appendAssistantDelta(input: { msgId: string; delta: string; seqNo: number }): Promise<void> {
-    const { data, error } = await this.client
-      .from("message")
-      .select()
-      .eq("msg_id", input.msgId)
-      .single();
-    if (error || !data) {
-      throw error ?? new Error("Assistant message not found.");
-    }
-    const row = data as MessageRow;
-    const nextContent = `${row.content ?? ""}${input.delta}`;
-    const nextStatus = row.status === "DRAFT" ? "PARTIAL" : row.status ?? "PARTIAL";
-    const { error: updateError } = await this.client
-      .from("message")
-      .update({ content: nextContent, status: nextStatus })
-      .eq("msg_id", input.msgId);
-    if (updateError) {
-      throw updateError;
-    }
-  }
-
   async finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message> {
     const { data, error } = await this.client
       .from("message")

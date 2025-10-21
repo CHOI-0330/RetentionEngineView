@@ -1,10 +1,8 @@
 import type { Conversation, Feedback, FeedbackAuthorRole, Message, MentorAssignment, User } from "../../type/core";
 import type {
-  MessageDelta,
   Prompt,
   PromptMessage,
   QuerySpec,
-  StreamAssistantRequest,
   UseCaseFailure,
   UseCaseFailureKind,
   UseCaseResult,
@@ -137,19 +135,6 @@ export function buildPromptForConversationUseCase(args: {
   });
 }
 
-export function streamAssistantAnswerUseCase(args: {
-  prompt: Prompt;
-  modelId?: string;
-  runtimeId?: string;
-}): StreamAssistantRequest {
-  return {
-    kind: "REQUEST_STREAM",
-    prompt: args.prompt,
-    modelId: args.modelId,
-    runtimeId: args.runtimeId,
-  };
-}
-
 export function beginAssistantMessageUseCase(args: {
   conversation: Conversation;
   requester: User;
@@ -158,41 +143,6 @@ export function beginAssistantMessageUseCase(args: {
     return failure("Forbidden", "User is not allowed to request an assistant response for this conversation.");
   }
   return success({ kind: "BEGIN", convId: args.conversation.convId });
-}
-
-export function appendAssistantDeltaUseCase(args: {
-  message: Message;
-  delta: MessageDelta;
-  lastSeqNo?: number;
-}): UseCaseResult<{ message: Message; appended: MessageDelta }> {
-  if (args.message.role !== "ASSISTANT") {
-    return failure("ValidationError", "Only ASSISTANT messages can accept deltas.");
-  }
-  if (args.lastSeqNo !== undefined && args.delta.seqNo <= args.lastSeqNo) {
-    return failure("ValidationError", "Sequence number is invalid.");
-  }
-  if (args.delta.text.length === 0) {
-    return failure("ValidationError", "Delta text must not be empty.");
-  }
-
-  if (!args.message.status || args.message.status === "DRAFT") {
-    const nextMessage: Message = {
-      ...args.message,
-      status: "PARTIAL",
-      content: args.delta.text,
-    };
-    return success({ message: nextMessage, appended: args.delta });
-  }
-
-  if (args.message.status === "PARTIAL") {
-    const nextMessage: Message = {
-      ...args.message,
-      content: args.message.content + args.delta.text,
-    };
-    return success({ message: nextMessage, appended: args.delta });
-  }
-
-  return failure("ValidationError", "Completed messages do not accept additional deltas.");
 }
 
 export function finalizeAssistantMessageUseCase(args: {

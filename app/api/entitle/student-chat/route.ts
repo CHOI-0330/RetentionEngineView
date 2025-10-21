@@ -25,7 +25,6 @@ import type { Conversation } from "../../../../src/type/core";
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"
-  | "appendAssistantDelta"
   | "finalizeAssistantMessage"
   | "cancelAssistantMessage"
   | "listConversationMessages"
@@ -194,17 +193,6 @@ export async function POST(request: NextRequest) {
         }
         const result = await messageGateway.beginAssistantMessage(input.convId);
         return NextResponse.json({ data: result });
-      }
-      case "appendAssistantDelta": {
-        const input = (payload ?? {}) as { msgId?: string };
-        if (!input.msgId || typeof input.msgId !== "string") {
-          throw new HttpError(400, "msgId is required.");
-        }
-        await ensureMessageAccess(input.msgId);
-        await messageGateway.appendAssistantDelta(
-          payload as Parameters<typeof messageGateway.appendAssistantDelta>[0]
-        );
-        return NextResponse.json({ data: { ok: true } });
       }
       case "finalizeAssistantMessage": {
         const input = (payload ?? {}) as { msgId?: string };

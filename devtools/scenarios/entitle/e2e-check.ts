@@ -1,4 +1,4 @@
-import { createDevEntitleAdapters } from "../Presenter/Entitle/devAdapters";
+import { createDevEntitleAdapters } from "../../entitle/devAdapters";
 
 async function runScenario() {
   const adapters = createDevEntitleAdapters();
@@ -12,25 +12,17 @@ async function runScenario() {
 
   const assistantDraft = await adapters.messagePort.beginAssistantMessage(adapters.conversation.convId);
 
-  let streamedAnswer = "";
-  for await (const delta of adapters.llmPort.streamGenerate({
+  const assistantText = await adapters.llmPort.generate({
     prompt: {
       messages: [
         { role: "user", content: questionContent },
       ],
     },
-  })) {
-    streamedAnswer += delta.text;
-    await adapters.messagePort.appendAssistantDelta({
-      msgId: assistantDraft.msgId,
-      delta: delta.text,
-      seqNo: delta.seqNo,
-    });
-  }
+  });
 
   const assistantFinal = await adapters.messagePort.finalizeAssistantMessage({
     msgId: assistantDraft.msgId,
-    finalText: streamedAnswer,
+    finalText: assistantText,
   });
 
   const mentorFeedback = await adapters.feedbackPort.createFeedback({

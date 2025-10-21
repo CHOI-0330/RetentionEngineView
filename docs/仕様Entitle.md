@@ -38,7 +38,7 @@ Domain / Entities
 | **User**             | 行為主体（NEW_HIRE / MENTOR / ADMIN）。権限判断の基準。                       |
 | **MentorAssignment** | メンター ↔ 新入社員の担当リンク（権限の根拠、履歴管理）。                     |
 | **Conversation**     | 新入社員が所有する会話スレッド。並び替え/アーカイブ状態を保持。               |
-| **Message**          | 会話の 1 発話（NEW_HIRE / ASSISTANT）。ASSISTANT はストリーミング状態をもつ。 |
+| **Message**          | 会話の 1 発話（NEW_HIRE / ASSISTANT）。ASSISTANT は `DRAFT→DONE/CANCELLED` の状態遷移を持つ。 |
 | **Feedback**         | ASSISTANT メッセージへのコメント（主にメンター）。                            |
 | **ModelConfig**      | どのモデルをどのパラメータで使うか（既定/バージョン追跡）。                   |
 | **LLMRuntime**       | 実行環境（remote/local、アダプタ、エンドポイント）定義。                      |
@@ -143,13 +143,11 @@ export interface ModelConfig {
 ### 4.2 Message（ASSISTANT）
 
 ```
-DRAFT → PARTIAL（最初のデルタ）
-PARTIAL → PARTIAL（追加デルタ）
-PARTIAL → DONE（finalize）
-DRAFT/PARTIAL → CANCELLED（中断）
+DRAFT → DONE（finalize）
+DRAFT → CANCELLED（中断）
+DONE/CANCELLED → 不変（追記不可）
 ```
 
-- ストリーミングの順序/冪等性を担保するため、`(msgId, seqNo)` ユニークを持つ補助テーブルでデルタを保持し、最終合本は `message.content` に集約する。
 - Domain / UseCase は純粋関数で状態のみを更新。
 
 ---
@@ -170,17 +168,14 @@ DRAFT/PARTIAL → CANCELLED（中断）
 ```ts
 // @/application/ports.ts
 export interface MessagePort {
-  createUserMessage(
-    convId: string,
-    content: string
-  ): Promise<{ msgId: string }>;
-  beginAssistantMessage(convId: string): Promise<{ msgId: string }>;
-  appendAssistantDelta(
-    msgId: string,
-    delta: string,
-    seqNo: number
-  ): Promise<void>;
-  finalizeAssistantMessage(msgId: string, finalText: string): Promise<void>;
+  createUserMessage(input: {
+    convId: string;
+    authorId: string;
+    content: string;
+  }): Promise<Message>;
+  beginAssistantMessage(convId: string): Promise<Message>;
+  finalizeAssistantMessage(input: { msgId: string; finalText: string }): Promise<Message>;
+  cancelAssistantMessage(msgId: string): Promise<Message>;
   listConversationMessages(
     convId: string,
     cursor?: string,
@@ -202,11 +197,11 @@ export interface FeedbackPort {
 }
 
 export interface LLMPort {
-  streamGenerate(args: {
+  generate(args: {
     prompt: unknown;
-    model: { name: string; params?: Record<string, unknown> };
-    runtime: LLMRuntime;
-  }): AsyncIterable<string>;
+    model?: { name: string; params?: Record<string, unknown> };
+    runtime?: LLMRuntime;
+  }): Promise<string>;
 }
 
 export interface PolicyPort {
@@ -246,12 +241,15 @@ export const createUserMessageUseCase = (
   } as const;
 };
 
-export const reduceAssistantStreamUseCase = (prev: Message, delta: string) => {
-  if (prev.status === "DRAFT")
-    return { ...prev, status: "PARTIAL", content: delta };
-  if (prev.status === "PARTIAL")
-    return { ...prev, content: prev.content + delta };
- return prev; // DONE/CANCELLED は変更しない
+export const finalizeAssistantMessageUseCase = (prev: Message, finalText: string) => {
+  if (prev.status === "CANCELLED") {
+    return prev;
+  }
+  const trimmed = finalText.trim();
+  if (!trimmed) {
+    return prev;
+  }
+  return { ...prev, status: "DONE", content: trimmed };
 };
 ```
 
@@ -345,7 +343,6 @@ create table model_config (
 create unique index uq_model_default on model_config(is_default) where is_default = true;
 ```
 
-> ストリーミング・デルタの厳密追跡が必要な場合は `message_chunk(msg_id, seq_no, delta_text)` を追加し、`(msg_id, seq_no)` ユニークで冪等性を担保。
 
 ---
 
@@ -376,7 +373,6 @@ create unique index uq_model_default on model_config(is_default) where is_defaul
 5. **Controller 役割**：Use Case 呼び出し＋最小状態（副作用禁止）
 6. **UI Event Adapter**：DOM イベントの正規化に限定
 7. **Gateway 規律**：実行中フラグ、例外、リソース解放の徹底
-8. **ストリーミング信頼性**：デルタ順序/冪等性（補助テーブル＋ユニークキー）
 9. **体験最適**：`Conversation.lastActiveAt` 基準ソート
 10. **モデル切替**：`ModelConfig.runtimeId` の差し替えのみで remote ↔ local を切替
 

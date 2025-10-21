@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-import StudentChatView from "../../src/views/StudentChatView";
-import { useStudentChatController } from "../../src/interfaceAdapters/controllers/useStudentChatController";
-import { useStudentChatPresenter } from "../../src/interfaceAdapters/presenters/useStudentChatPresenter";
-import type { StudentChatControllerEffect } from "../../src/interfaceAdapters/controllers/useStudentChatController";
-import type { UseCaseFailure } from "../../src/application/entitle/models";
-import type { Conversation, Feedback, MentorAssignment, Message, User } from "../../src/type/core";
-import { createDevEntitleAdapters } from "./devAdapters";
+import StudentChatView from "../../../views/StudentChatView";
+import { useStudentChatController } from "../../controllers/useStudentChatController";
+import { useStudentChatPresenter } from "../../presenters/useStudentChatPresenter";
+import type { StudentChatControllerEffect } from "../../controllers/useStudentChatController";
+import type { UseCaseFailure } from "../../../application/entitle/models";
+import type { Conversation, Feedback, MentorAssignment, Message, User } from "../../../type/core";
+import type { LLMPort } from "../../../application/entitle/ports";
+import type { DevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
+import { createDevEntitleAdapters } from "../../../../devtools/entitle/devAdapters";
+import { GeminiLLMPort } from "../../gateways/llm/geminiClientPort";
+import { InMemoryLLMPort } from "../../../mocks/llm/inMemoryLLMPort";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
   kind: "ValidationError",
@@ -19,7 +23,6 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"
-  | "appendAssistantDelta"
   | "finalizeAssistantMessage"
   | "cancelAssistantMessage"
   | "listConversationMessages"
@@ -53,7 +56,8 @@ interface StudentChatBootstrap {
 interface StudentChatRuntimeProps {
   bootstrap: StudentChatBootstrap & { conversation: Conversation };
   supabaseEnabled: boolean;
-  devAdapters: ReturnType<typeof createDevEntitleAdapters>;
+  sandboxAdapters: DevEntitleAdapters | null;
+  llmPort: LLMPort;
   router: ReturnType<typeof useRouter>;
   conversationOptions: ConversationOption[];
   mentorOptions: MentorOption[];
@@ -65,7 +69,8 @@ interface StudentChatRuntimeProps {
 const StudentChatRuntime = ({
   bootstrap,
   supabaseEnabled,
-  devAdapters,
+  sandboxAdapters,
+  llmPort,
   router,
   conversationOptions,
   mentorOptions,
@@ -121,26 +126,17 @@ const StudentChatRuntime = ({
           controller.actions.notifyAssistantMessageCreated(message);
           break;
         }
-        case "REQUEST_STREAM_ASSISTANT_RESPONSE": {
+        case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not set.");
           }
-          let accumulated = "";
           try {
-            for await (const delta of devAdapters.llmPort.streamGenerate(effect.payload)) {
-              accumulated += delta.text;
-              controller.actions.notifyAssistantDelta(delta);
-              await callStudentChatAction("appendAssistantDelta", {
-                msgId: targetMsgId,
-                delta: delta.text,
-                seqNo: delta.seqNo,
-              });
-            }
-            controller.actions.notifyAssistantStreamCompleted(accumulated);
+            const finalText = await llmPort.generate(effect.payload);
+            controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
-            controller.actions.notifyAssistantStreamCancelled();
+            controller.actions.notifyAssistantResponseCancelled();
             await callStudentChatAction("cancelAssistantMessage", { msgId: targetMsgId });
           }
           break;
@@ -188,61 +184,55 @@ const StudentChatRuntime = ({
           break;
       }
     },
-    [callStudentChatAction, controller.actions, controller.state.activeAssistantMessageId, controller.state.feedbackByMessageId, devAdapters.llmPort]
+    [callStudentChatAction, controller.actions, controller.state.activeAssistantMessageId, controller.state.feedbackByMessageId, llmPort]
   );
 
   const processEffectDev = useCallback(
     async (effect: StudentChatControllerEffect) => {
+      if (!sandboxAdapters) {
+        throw new Error("Dev sandbox is disabled.");
+      }
       switch (effect.kind) {
         case "REQUEST_PERSIST_USER_MESSAGE": {
-          const saved = await devAdapters.messagePort.createUserMessage(effect.payload);
+          const saved = await sandboxAdapters.messagePort.createUserMessage(effect.payload);
           controller.actions.notifyUserMessagePersisted(saved);
           break;
         }
         case "REQUEST_BEGIN_ASSISTANT_MESSAGE": {
-          const assistant = await devAdapters.messagePort.beginAssistantMessage(effect.payload.convId);
+          const assistant = await sandboxAdapters.messagePort.beginAssistantMessage(effect.payload.convId);
           activeAssistantIdRef.current = assistant.msgId;
           controller.actions.notifyAssistantMessageCreated(assistant);
           break;
         }
-        case "REQUEST_STREAM_ASSISTANT_RESPONSE": {
+        case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not available.");
           }
-          let accumulated = "";
           try {
-            for await (const delta of devAdapters.llmPort.streamGenerate(effect.payload)) {
-              accumulated += delta.text;
-              controller.actions.notifyAssistantDelta(delta);
-              await devAdapters.messagePort.appendAssistantDelta({
-                msgId: targetMsgId,
-                delta: delta.text,
-                seqNo: delta.seqNo,
-              });
-            }
-            controller.actions.notifyAssistantStreamCompleted(accumulated);
+            const finalText = await sandboxAdapters.llmPort.generate(effect.payload);
+            controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
-            controller.actions.notifyAssistantStreamCancelled();
-            await devAdapters.messagePort.cancelAssistantMessage(targetMsgId);
+            controller.actions.notifyAssistantResponseCancelled();
+            await sandboxAdapters.messagePort.cancelAssistantMessage(targetMsgId);
           }
           break;
         }
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
-          const finalized = await devAdapters.messagePort.finalizeAssistantMessage(effect.payload);
+          const finalized = await sandboxAdapters.messagePort.finalizeAssistantMessage(effect.payload);
           controller.actions.syncAssistantMessage(finalized);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_CANCEL_ASSISTANT_MESSAGE": {
-          const cancelled = await devAdapters.messagePort.cancelAssistantMessage(effect.payload.msgId);
+          const cancelled = await sandboxAdapters.messagePort.cancelAssistantMessage(effect.payload.msgId);
           controller.actions.syncAssistantMessage(cancelled);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_LIST_MESSAGES": {
-          const response = await devAdapters.messagePort.listConversationMessages(effect.payload);
+          const response = await sandboxAdapters.messagePort.listConversationMessages(effect.payload);
           controller.actions.notifyMessagesLoaded({
             items: response.items,
             nextCursor: response.nextCursor,
@@ -250,10 +240,10 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_LIST_FEEDBACKS": {
-          const response = await devAdapters.feedbackPort.listFeedbacks(effect.payload);
+          const response = await sandboxAdapters.feedbackPort.listFeedbacks(effect.payload);
           const authorEntries = await Promise.all(
             response.items.map(async (item) => {
-              const displayName = await devAdapters.feedbackLookupPort.getUserDisplayName(item.authorId);
+              const displayName = await sandboxAdapters.feedbackLookupPort.getUserDisplayName(item.authorId);
               return [item.authorId, displayName ?? item.authorId] as const;
             })
           );
@@ -261,7 +251,7 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_CREATE_FEEDBACK": {
-          const created = await devAdapters.feedbackPort.createFeedback(effect.payload);
+          const created = await sandboxAdapters.feedbackPort.createFeedback(effect.payload);
           controller.actions.applyFeedbackForMessage(created.targetMsgId, [created]);
           break;
         }
@@ -269,7 +259,12 @@ const StudentChatRuntime = ({
           break;
       }
     },
-    [controller.actions, controller.state.activeAssistantMessageId, controller.state.feedbackByMessageId, devAdapters.feedbackLookupPort, devAdapters.feedbackPort, devAdapters.llmPort, devAdapters.messagePort]
+    [
+      controller.actions,
+      controller.state.activeAssistantMessageId,
+      controller.state.feedbackByMessageId,
+      sandboxAdapters,
+    ]
   );
 
   useEffect(() => {
@@ -283,7 +278,17 @@ const StudentChatRuntime = ({
 
     processingRef.current = true;
 
-    const runner = supabaseEnabled ? processEffectSupabase : processEffectDev;
+    const runner = supabaseEnabled ? processEffectSupabase : sandboxAdapters ? processEffectDev : null;
+
+    if (!runner) {
+      controller.actions.reportExternalFailure({
+        kind: "ValidationError",
+        message: "Supabase 未設定のためチャットを開始できません。開発サンドボックスを利用する場合は NEXT_PUBLIC_ENTITLE_SANDBOX=1 を設定してください。",
+      });
+      controller.actions.acknowledgeEffect(effect.id);
+      processingRef.current = false;
+      return;
+    }
 
     void runner(effect)
       .catch((error) => {
@@ -296,7 +301,15 @@ const StudentChatRuntime = ({
         controller.actions.acknowledgeEffect(effect.id);
         processingRef.current = false;
       });
-  }, [controller.actions, presenter.pendingEffects, processEffectDev, processEffectSupabase, router, supabaseEnabled]);
+  }, [
+    controller.actions,
+    presenter.pendingEffects,
+    processEffectDev,
+    processEffectSupabase,
+    router,
+    sandboxAdapters,
+    supabaseEnabled,
+  ]);
 
   useEffect(() => {
     if (!presenter.pendingEffects.length) {
@@ -376,69 +389,73 @@ const StudentChatRuntime = ({
   );
 };
 
-const StudentChatPagePresenter = () => {
-  const devAdapters = useMemo(() => createDevEntitleAdapters(), []);
+const StudentChatPage = () => {
   const supabaseEnabled = useMemo(
     () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     []
   );
+  const sandboxEnabled = useMemo(() => process.env.NEXT_PUBLIC_ENTITLE_SANDBOX === "1", []);
+  const sandboxAdapters = useMemo(() => (sandboxEnabled ? createDevEntitleAdapters() : null), [sandboxEnabled]);
+  const enableGemini = useMemo(() => process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1", []);
+  const llmPort = useMemo<LLMPort>(() => (enableGemini ? new GeminiLLMPort() : new InMemoryLLMPort()), [enableGemini]);
   const router = useRouter();
 
-  const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(() =>
-    supabaseEnabled
-      ? null
-      : {
-          conversation: devAdapters.conversation,
-          currentUser: devAdapters.newHire,
-          initialMessages: devAdapters.initialMessages,
-          initialFeedbacks: devAdapters.initialFeedbacks,
-          authorNames: {},
-          mentorAssignments: [],
-          availableConversations: [
-            {
-              convId: devAdapters.conversation.convId,
-              title: devAdapters.conversation.title,
-              lastActiveAt: devAdapters.conversation.lastActiveAt,
-            },
-          ],
-          availableMentors: [
-            {
-              mentorId: devAdapters.mentor.userId,
-              displayName: devAdapters.mentor.displayName,
-              email: devAdapters.mentor.email,
-            },
-          ],
-        }
-  );
+  const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(() => {
+    if (supabaseEnabled || !sandboxAdapters) {
+      return null;
+    }
+    return {
+      conversation: sandboxAdapters.conversation,
+      currentUser: sandboxAdapters.newHire,
+      initialMessages: sandboxAdapters.initialMessages,
+      initialFeedbacks: sandboxAdapters.initialFeedbacks,
+      authorNames: {},
+      mentorAssignments: [],
+      availableConversations: [
+        {
+          convId: sandboxAdapters.conversation.convId,
+          title: sandboxAdapters.conversation.title,
+          lastActiveAt: sandboxAdapters.conversation.lastActiveAt,
+        },
+      ],
+      availableMentors: [
+        {
+          mentorId: sandboxAdapters.mentor.userId,
+          displayName: sandboxAdapters.mentor.displayName,
+          email: sandboxAdapters.mentor.email,
+        },
+      ],
+    };
+  });
   const [conversationOptions, setConversationOptions] = useState<ConversationOption[]>(() =>
-    supabaseEnabled
+    supabaseEnabled || !sandboxAdapters
       ? []
       : [
           {
-            convId: devAdapters.conversation.convId,
-            title: devAdapters.conversation.title,
-            lastActiveAt: devAdapters.conversation.lastActiveAt,
+            convId: sandboxAdapters.conversation.convId,
+            title: sandboxAdapters.conversation.title,
+            lastActiveAt: sandboxAdapters.conversation.lastActiveAt,
           },
         ]
   );
   const [mentorOptions, setMentorOptions] = useState<MentorOption[]>(() =>
-    supabaseEnabled
+    supabaseEnabled || !sandboxAdapters
       ? []
       : [
           {
-            mentorId: devAdapters.mentor.userId,
-            displayName: devAdapters.mentor.displayName,
-            email: devAdapters.mentor.email,
+            mentorId: sandboxAdapters.mentor.userId,
+            displayName: sandboxAdapters.mentor.displayName,
+            email: sandboxAdapters.mentor.email,
           },
         ]
   );
   const [initialTitle, setInitialTitle] = useState("");
   const [initialMentorId, setInitialMentorId] = useState<string | null>(
-    supabaseEnabled ? null : devAdapters.mentor.userId
+    supabaseEnabled ? null : sandboxAdapters?.mentor.userId ?? null
   );
   const [isInitialCreating, setIsInitialCreating] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(() =>
-    supabaseEnabled ? null : devAdapters.conversation.convId
+    supabaseEnabled ? null : sandboxAdapters?.conversation.convId ?? null
   );
   const [isLoading, setIsLoading] = useState<boolean>(supabaseEnabled);
   const [loadError, setLoadError] = useState<UseCaseFailure | null>(null);
@@ -531,17 +548,25 @@ const StudentChatPagePresenter = () => {
         return;
       }
 
+      if (!sandboxAdapters) {
+        setLoadError({
+          kind: "ValidationError",
+          message: "サンドボックスが無効です。Supabase を設定するか NEXT_PUBLIC_ENTITLE_SANDBOX=1 を有効化してください。",
+        });
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       const newConversation: Conversation = {
         convId: `conv-${Date.now()}`,
-        ownerId: devAdapters.newHire.userId,
+        ownerId: sandboxAdapters.newHire.userId,
         title: normalizedTitle,
         state: "ACTIVE",
         createdAt: nowIso,
         lastActiveAt: nowIso,
       };
 
-      devAdapters.replaceConversation?.(newConversation);
+      sandboxAdapters.replaceConversation?.(newConversation);
 
       const option: ConversationOption = {
         convId: newConversation.convId,
@@ -552,7 +577,7 @@ const StudentChatPagePresenter = () => {
       setConversationOptions([option]);
       setBootstrap({
         conversation: newConversation,
-        currentUser: devAdapters.newHire,
+        currentUser: sandboxAdapters.newHire,
         initialMessages: [],
         initialFeedbacks: {},
         authorNames: {},
@@ -563,25 +588,25 @@ const StudentChatPagePresenter = () => {
             ? mentorOptions
             : [
                 {
-                  mentorId: devAdapters.mentor.userId,
-                  displayName: devAdapters.mentor.displayName,
-                  email: devAdapters.mentor.email,
+                  mentorId: sandboxAdapters.mentor.userId,
+                  displayName: sandboxAdapters.mentor.displayName,
+                  email: sandboxAdapters.mentor.email,
                 },
               ],
       });
       setActiveConversationId(newConversation.convId);
       setLoadError(null);
     },
-    [devAdapters, loadConversation, mentorOptions, supabaseEnabled]
+    [loadConversation, mentorOptions, sandboxAdapters, supabaseEnabled]
   );
 
   const handleInitialCreateSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-    if (mentorOptions.length > 0 && !initialMentorId) {
-      window.alert("メンターを選択してください。");
-      return;
-    }
+      if (mentorOptions.length > 0 && !initialMentorId) {
+        window.alert("メンターを選択してください。");
+        return;
+      }
       setIsInitialCreating(true);
       try {
         await createConversation({ title: initialTitle, mentorId: initialMentorId ?? undefined });
@@ -613,6 +638,14 @@ const StudentChatPagePresenter = () => {
     return (
       <div className="p-4 text-sm text-destructive">
         Failed to load conversation: {loadError.message}
+      </div>
+    );
+  }
+
+  if (!supabaseEnabled && !sandboxAdapters) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+        Supabase 環境変数が設定されていません。開発サンドボックスを利用する場合は `NEXT_PUBLIC_ENTITLE_SANDBOX=1` を指定してください。
       </div>
     );
   }
@@ -665,7 +698,8 @@ const StudentChatPagePresenter = () => {
       key={bootstrap.conversation.convId}
       bootstrap={bootstrap as StudentChatBootstrap & { conversation: Conversation }}
       supabaseEnabled={supabaseEnabled}
-      devAdapters={devAdapters}
+      sandboxAdapters={sandboxAdapters}
+      llmPort={llmPort}
       router={router}
       conversationOptions={conversationOptions}
       mentorOptions={mentorOptions}
@@ -676,4 +710,4 @@ const StudentChatPagePresenter = () => {
   );
 };
 
-export default StudentChatPagePresenter;
+export default StudentChatPage;
