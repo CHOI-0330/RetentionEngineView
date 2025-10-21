@@ -84,23 +84,34 @@ const MentorDashboardView = ({
         ) : null}
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-        {viewModel.students.map((student) => (
-          <MentorDashboardStudentCard
-            key={student.conversationId}
-            student={student}
-            isSelected={meta.selectedStudentId === student.id}
-            isSubmitting={Boolean(meta.qualitySubmitting[student.id])}
-            onFeedback={(isPositive) => viewModel.onFeedback(student.id, isPositive)}
-          />
-        ))}
-
-        {viewModel.students.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/20 py-16 text-center text-sm text-muted-foreground">
-            現在表示できる担当はありません。
+      {status.isLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center text-center text-lg text-muted-foreground">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <span>担当情報を読み込み中...</span>
           </div>
-        ) : null}
-      </div>
+        </div>
+      )}
+
+      {!status.isLoading && (
+        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+          {viewModel.students.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center text-center text-lg text-muted-foreground">
+              現在表示できる担当はありません。
+            </div>
+          ) : (
+            viewModel.students.map((student) => (
+              <MentorDashboardStudentCard
+                key={student.conversationId}
+                student={student}
+                isSelected={meta.selectedStudentId === student.id}
+                isSubmitting={Boolean(meta.qualitySubmitting[student.id])}
+                onFeedback={(isPositive) => viewModel.onFeedback(student.id, isPositive)}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };
