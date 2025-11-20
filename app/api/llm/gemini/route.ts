@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
   try {
     backendResponse = await fetch(backendUrl, {
       method: "POST",
+      credentials: 'include',
       headers,
       body: JSON.stringify(payload),
     });
