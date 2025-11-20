@@ -140,6 +140,7 @@ const StudentChatRuntime = ({
           try {
             const finalText = await llmPort.generate(effect.payload);
             controller.actions.notifyAssistantResponseReady(finalText);
+            console.log("[StudentChat] Assistant response generation completed.");
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
             controller.actions.notifyAssistantResponseCancelled();
@@ -203,30 +204,37 @@ const StudentChatRuntime = ({
 
   const processEffectDev = useCallback(
     async (effect: StudentChatControllerEffect) => {
+      console.log("[StudentChat][Dev] processEffectDev start", { kind: (effect as any).kind, payload: (effect as any).payload });
       if (!sandboxAdapters) {
         throw new Error("Dev sandbox is disabled.");
       }
       switch (effect.kind) {
         case "REQUEST_PERSIST_USER_MESSAGE": {
+          console.log("[StudentChat][Dev] REQUEST_PERSIST_USER_MESSAGE", effect.payload);
           const saved = await sandboxAdapters.messagePort.createUserMessage(effect.payload);
           controller.actions.notifyUserMessagePersisted(saved);
           break;
         }
         case "REQUEST_BEGIN_ASSISTANT_MESSAGE": {
+          console.log("[StudentChat][Dev] REQUEST_BEGIN_ASSISTANT_MESSAGE", effect.payload);
           const assistant = await sandboxAdapters.messagePort.beginAssistantMessage(effect.payload.convId);
           activeAssistantIdRef.current = assistant.msgId;
           controller.actions.notifyAssistantMessageCreated(assistant);
           break;
         }
         case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
+          console.log("[StudentChat][Dev] REQUEST_GENERATE_ASSISTANT_RESPONSE", effect.payload);
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not available.");
           }
           try {
+            console.log("[StudentChat][Dev] calling sandboxAdapters.llmPort.generate", { payload: effect.payload });
             const finalText = await sandboxAdapters.llmPort.generate(effect.payload);
+            console.log("[StudentChat][Dev] sandboxAdapters.llmPort.generate resolved", { textPreview: String(finalText).slice(0, 200) });
             controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
+            console.error("[StudentChat][Dev] sandboxAdapters.llmPort.generate error", streamError);
             controller.actions.reportExternalFailure(normalizeError(streamError));
             controller.actions.notifyAssistantResponseCancelled();
             await sandboxAdapters.messagePort.cancelAssistantMessage(targetMsgId);
@@ -270,6 +278,7 @@ const StudentChatRuntime = ({
           break;
         }
         default:
+          console.warn("[StudentChat][Dev] unhandled effect", effect);
           break;
       }
     },
