@@ -409,7 +409,7 @@ const StudentChatPage = () => {
     [enableGemini]
   );
   const router = useRouter();
-
+  console.log("StudentChatPage: supabaseEnabled =", supabaseEnabled, ", sandboxEnabled =", sandboxEnabled, ", enableGemini =", enableGemini);
   const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(() => {
     if (supabaseEnabled || !sandboxAdapters) {
       return null;
