@@ -276,28 +276,39 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         requester: currentUser,
       });
       if (beginResult.kind === "failure") {
+        console.warn("[StudentChat][debug] beginAssistantMessageUseCase failure", beginResult.error);
         mutateState((previous) => ({
           ...previous,
           error: beginResult.error,
         }));
         return;
       }
-      setState((previous) => ({
-        ...previous,
-        isAwaitingAssistant: true,
-        pendingEffects: [
-          ...previous.pendingEffects,
-          createEffect({ kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE", payload: { convId: conversation.convId } }),
-          createEffect({
-            kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
-            payload: {
-              prompt: promptResult.value,
-              modelId,
-              runtimeId,
-            },
-          }),
-        ],
-      }));
+      console.log("[StudentChat][debug] enqueue begin/generate effects", {
+        promptMessages: promptResult.value.messages.length,
+        modelId,
+        runtimeId,
+      });
+      setState((previous) => {
+        const beginEffect = createEffect({
+          kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE",
+          payload: { convId: conversation.convId },
+        });
+        const generateEffect = createEffect({
+          kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
+          payload: {
+            prompt: promptResult.value,
+            modelId,
+            runtimeId,
+          },
+        });
+        const nextPendingEffects = [...previous.pendingEffects, beginEffect, generateEffect];
+        console.log("[StudentChat][debug] pendingEffects ->", nextPendingEffects);
+        return {
+          ...previous,
+          isAwaitingAssistant: true,
+          pendingEffects: nextPendingEffects,
+        };
+      });
     },
     [conversation, createEffect, currentUser, historyWindow, modelId, mutateState, runtimeId]
   );
