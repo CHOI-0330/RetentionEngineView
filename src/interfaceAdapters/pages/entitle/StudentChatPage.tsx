@@ -91,6 +91,8 @@ const StudentChatRuntime = ({
   const presenter = useStudentChatPresenter(controller);
 
   const processingRef = useRef(false);
+  const effectQueueRef = useRef<StudentChatControllerEffect[]>([]);
+  const enqueuedEffectIdsRef = useRef<Set<string>>(new Set());
   const activeAssistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -301,17 +303,16 @@ const StudentChatRuntime = ({
     ]
   );
 
-  useEffect(() => {
+  const processQueuedEffects = useCallback(() => {
     if (processingRef.current) {
       return;
     }
-    const effect = presenter.pendingEffects[0];
-    if (!effect) {
+    const nextEffect = effectQueueRef.current.shift();
+    if (!nextEffect) {
       return;
     }
 
     processingRef.current = true;
-
     const runner = supabaseEnabled ? processEffectSupabase : sandboxAdapters ? processEffectDev : null;
 
     if (!runner) {
@@ -319,12 +320,14 @@ const StudentChatRuntime = ({
         kind: "ValidationError",
         message: "Supabase 未設定のためチャットを開始できません。開発サンドボックスを利用する場合は NEXT_PUBLIC_ENTITLE_SANDBOX=1 を設定してください。",
       });
-      controller.actions.acknowledgeEffect(effect.id);
+      controller.actions.acknowledgeEffect(nextEffect.id);
+      enqueuedEffectIdsRef.current.delete(nextEffect.id);
       processingRef.current = false;
+      processQueuedEffects();
       return;
     }
 
-    void runner(effect)
+    void runner(nextEffect)
       .catch((error) => {
         controller.actions.reportExternalFailure(normalizeError(error));
         if (error instanceof Error && /Unauthorized|Forbidden/i.test(error.message)) {
@@ -332,18 +335,22 @@ const StudentChatRuntime = ({
         }
       })
       .finally(() => {
-        controller.actions.acknowledgeEffect(effect.id);
+        controller.actions.acknowledgeEffect(nextEffect.id);
+        enqueuedEffectIdsRef.current.delete(nextEffect.id);
         processingRef.current = false;
+        processQueuedEffects();
       });
-  }, [
-    controller.actions,
-    presenter.pendingEffects,
-    processEffectDev,
-    processEffectSupabase,
-    router,
-    sandboxAdapters,
-    supabaseEnabled,
-  ]);
+  }, [controller.actions, processEffectDev, processEffectSupabase, router, sandboxAdapters, supabaseEnabled]);
+
+  useEffect(() => {
+    presenter.pendingEffects.forEach((effect) => {
+      if (!enqueuedEffectIdsRef.current.has(effect.id)) {
+        enqueuedEffectIdsRef.current.add(effect.id);
+        effectQueueRef.current.push(effect);
+      }
+    });
+    processQueuedEffects();
+  }, [presenter.pendingEffects, processQueuedEffects]);
 
   useEffect(() => {
     if (!presenter.pendingEffects.length) {

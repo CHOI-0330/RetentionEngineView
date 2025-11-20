@@ -3,6 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Prompt } from "../../../../src/application/entitle/models";
 
 const BACKEND_ENDPOINT = "/llm/generate";
+const REQUEST_TIMEOUT_MS = 30000;
+
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 const extractLatestQuestion = (prompt: Prompt): string => {
   const lastUserMessage = [...prompt.messages].reverse().find((message) => message.role === "user");
@@ -58,14 +69,16 @@ export async function POST(request: NextRequest) {
 
   let backendResponse: Response;
   try {
-    backendResponse = await fetch(backendUrl, {
+    backendResponse = await fetchWithTimeout(backendUrl, {
       method: "POST",
-      credentials: 'include',
       headers,
       body: JSON.stringify(payload),
     });
     console.log(`LLM backend responded with status ${backendResponse.status}`);
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json({ error: "LLM backend request timed out." }, { status: 504 });
+    }
     const message = error instanceof Error ? error.message : "Failed to reach LLM backend.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
@@ -96,3 +109,4 @@ export async function POST(request: NextRequest) {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;

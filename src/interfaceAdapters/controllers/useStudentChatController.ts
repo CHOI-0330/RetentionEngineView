@@ -198,10 +198,14 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   }, [conversation, createEffect, currentUser]);
 
   const acknowledgeEffect = useCallback((effectId: string) => {
-    mutateState((previous) => ({
-      ...previous,
-      pendingEffects: previous.pendingEffects.filter((effect) => effect.id !== effectId),
-    }));
+    mutateState((previous) => {
+      const next = previous.pendingEffects.filter((effect) => effect.id !== effectId);
+      console.log("[StudentChat][debug] acknowledgeEffect", { effectId, before: previous.pendingEffects, after: next });
+      return {
+        ...previous,
+        pendingEffects: next,
+      };
+    });
   }, [mutateState]);
 
   const requestOlderMessages = useCallback(() => {
