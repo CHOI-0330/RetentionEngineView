@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { createBrowserClient, createServerClient, type SupabaseClient } from "@supabase/ssr";
-import type { CookieOptions } from "@supabase/ssr";
+import { createBrowserClient, createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const getSupabaseUrl = (): string => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,7 +36,7 @@ export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
       persistSession: false,
     },
     cookies: {
-      get(name) {
+      get(name: string) {
         try {
           return cookies().get(name);
         } catch {
@@ -50,7 +50,7 @@ export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
           return [];
         }
       },
-      set(name, value, options) {
+      set(name: string, value: string, options?: CookieOptions) {
         try {
           const store = cookies();
           const finalOptions = withCrossSiteOptions(options);
@@ -59,7 +59,7 @@ export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
         try {
           const store = cookies();
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -70,7 +70,7 @@ export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      remove(name, options) {
+      remove(name: string, options?: CookieOptions) {
         try {
           const store = cookies();
           const finalOptions = withCrossSiteOptions(options);
@@ -79,7 +79,7 @@ export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      removeAll(cookiesToRemove) {
+      removeAll(cookiesToRemove: { name: string; options?: CookieOptions }[]) {
         try {
           const store = cookies();
           cookiesToRemove.forEach(({ name, options }) => {
@@ -102,7 +102,7 @@ const withCrossSiteOptions = (options?: CookieOptions): CookieOptions => ({
 export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
   createServerClient<T>(getSupabaseUrl(), getAnonKey(), {
     cookies: {
-      get(name) {
+      get(name: string) {
         try {
           return cookies().get(name);
         } catch {
@@ -116,7 +116,7 @@ export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
           return [];
         }
       },
-      set(name, value, options) {
+      set(name: string, value: string, options?: CookieOptions) {
         try {
           const store = cookies();
           const finalOptions = withCrossSiteOptions(options);
@@ -125,7 +125,7 @@ export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
         try {
           const store = cookies();
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -136,7 +136,7 @@ export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      remove(name, options) {
+      remove(name: string, options?: CookieOptions) {
         try {
           const store = cookies();
           const finalOptions = withCrossSiteOptions(options);
@@ -145,7 +145,7 @@ export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
           // Ignore if cookies are not writable in this context.
         }
       },
-      removeAll(cookiesToRemove) {
+      removeAll(cookiesToRemove: { name: string; options?: CookieOptions }[]) {
         try {
           const store = cookies();
           cookiesToRemove.forEach(({ name, options }) => {
