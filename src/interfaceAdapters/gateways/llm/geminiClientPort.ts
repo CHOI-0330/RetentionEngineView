@@ -26,12 +26,14 @@ export class GeminiLLMPort implements LLMPort {
     if (conversationId) {
       payload.conversationId = conversationId;
     }
+    console.log("Sending request to /api/llm/gemini with payload:", payload);
     const response = await fetch("/api/llm/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: input.signal,
     });
+    console.log(`Received response from /api/llm/gemini with status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
