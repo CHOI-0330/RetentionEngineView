@@ -4,6 +4,7 @@ import AuthPage from "../src/interfaceAdapters/pages/entitle/AuthPage";
 
 export default function Page() {
   return (
+    // Tailwind CSS を使用した基本的なレイアウト
     <main className="min-h-screen bg-background p-6">
       <section className="mx-auto  max-w-5xl space-y-6">
         <header className="space-y-2">
