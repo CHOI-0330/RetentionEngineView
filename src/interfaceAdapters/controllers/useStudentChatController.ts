@@ -252,6 +252,10 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
 
   const enqueueAssistantPreparation = useCallback(
     (messagesWithUser: Message[], userMessageContent: string) => {
+      console.log("[StudentChat][debug] owner check", {
+        conversationOwnerId: conversation.ownerId,
+        currentUserId: currentUser.userId,
+      });
       const promptResult = buildPromptForConversationUseCase({
         user: currentUser,
         conversation,
@@ -260,6 +264,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         historyWindow,
       });
       if (promptResult.kind === "failure") {
+        console.warn("[StudentChat][debug] promptResult failure", promptResult.error);
         mutateState((previous) => ({
           ...previous,
           error: promptResult.error,
