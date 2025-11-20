@@ -1,4 +1,6 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createBrowserClient, createServerClient, type SupabaseClient } from "@supabase/ssr";
+import type { CookieOptions } from "@supabase/ssr";
 
 const getSupabaseUrl = (): string => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,13 +27,137 @@ const getServiceRoleKey = (): string => {
 };
 
 export const createBrowserSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
-  createClient<T>(getSupabaseUrl(), getAnonKey());
+  createBrowserClient<T>(getSupabaseUrl(), getAnonKey());
 
-export const createServerSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
-  createClient<T>(getSupabaseUrl(), getServiceRoleKey(), {
+export const createAdminSupabaseClient = <T = unknown>(): SupabaseClient<T> =>
+  createServerClient<T>(getSupabaseUrl(), getServiceRoleKey(), {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
+    cookies: {
+      get(name) {
+        try {
+          return cookies().get(name);
+        } catch {
+          return undefined;
+        }
+      },
+      getAll() {
+        try {
+          return cookies().getAll();
+        } catch {
+          return [];
+        }
+      },
+      set(name, value, options) {
+        try {
+          const store = cookies();
+          const finalOptions = withCrossSiteOptions(options);
+          store.set({ name, value, ...finalOptions });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      setAll(cookiesToSet) {
+        try {
+          const store = cookies();
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = withCrossSiteOptions(options);
+            store.set({ name, value, ...finalOptions });
+          });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      remove(name, options) {
+        try {
+          const store = cookies();
+          const finalOptions = withCrossSiteOptions(options);
+          store.set({ name, value: "", ...finalOptions, maxAge: 0 });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      removeAll(cookiesToRemove) {
+        try {
+          const store = cookies();
+          cookiesToRemove.forEach(({ name, options }) => {
+            const finalOptions = withCrossSiteOptions(options);
+            store.set({ name, value: "", ...finalOptions, maxAge: 0 });
+          });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+    },
   });
 
+const withCrossSiteOptions = (options?: CookieOptions): CookieOptions => ({
+  ...options,
+  sameSite: "none",
+  secure: true,
+});
+
+export const createSupabaseServerClient = <T = unknown>(): SupabaseClient<T> =>
+  createServerClient<T>(getSupabaseUrl(), getAnonKey(), {
+    cookies: {
+      get(name) {
+        try {
+          return cookies().get(name);
+        } catch {
+          return undefined;
+        }
+      },
+      getAll() {
+        try {
+          return cookies().getAll();
+        } catch {
+          return [];
+        }
+      },
+      set(name, value, options) {
+        try {
+          const store = cookies();
+          const finalOptions = withCrossSiteOptions(options);
+          store.set({ name, value, ...finalOptions });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      setAll(cookiesToSet) {
+        try {
+          const store = cookies();
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = withCrossSiteOptions(options);
+            store.set({ name, value, ...finalOptions });
+          });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      remove(name, options) {
+        try {
+          const store = cookies();
+          const finalOptions = withCrossSiteOptions(options);
+          store.set({ name, value: "", ...finalOptions, maxAge: 0 });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+      removeAll(cookiesToRemove) {
+        try {
+          const store = cookies();
+          cookiesToRemove.forEach(({ name, options }) => {
+            const finalOptions = withCrossSiteOptions(options);
+            store.set({ name, value: "", ...finalOptions, maxAge: 0 });
+          });
+        } catch {
+          // Ignore if cookies are not writable in this context.
+        }
+      },
+    },
+  });
+
+// Backward compatibility: legacy name pointed to the service-role client.
+export const createServerSupabaseClient = createAdminSupabaseClient;
