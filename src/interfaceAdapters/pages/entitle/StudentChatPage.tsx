@@ -93,6 +93,17 @@ const StudentChatRuntime = ({
   const processingRef = useRef(false);
   const activeAssistantIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    const debugState = { presenter, controller };
+    if (typeof window !== "undefined") {
+      (window as unknown as { __studentChat?: typeof debugState }).__studentChat = debugState;
+    }
+  }, [controller, presenter]);
+
+  useEffect(() => {
+    console.log("[StudentChat] pendingEffects", presenter.pendingEffects);
+  }, [presenter.pendingEffects]);
+
   const callStudentChatAction = useCallback(
     async (action: StudentChatAction, payload: unknown): Promise<unknown> => {
       const response = await fetch("/api/entitle/student-chat", {
