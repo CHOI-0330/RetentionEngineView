@@ -115,19 +115,24 @@ const StudentChatRuntime = ({
 
   const processEffectSupabase = useCallback(
     async (effect: StudentChatControllerEffect) => {
+      console.log("[StudentChat] processEffectSupabase start", { kind: effect.kind, payload: effect.payload });
       switch (effect.kind) {
         case "REQUEST_PERSIST_USER_MESSAGE": {
+          console.log("[StudentChat] effect: REQUEST_PERSIST_USER_MESSAGE", effect.payload);
           const message = (await callStudentChatAction("createUserMessage", effect.payload)) as Message;
           controller.actions.notifyUserMessagePersisted(message);
           break;
         }
         case "REQUEST_BEGIN_ASSISTANT_MESSAGE": {
+          console.log("[StudentChat] effect: REQUEST_BEGIN_ASSISTANT_MESSAGE", effect.payload);
           const message = (await callStudentChatAction("beginAssistantMessage", effect.payload)) as Message;
           activeAssistantIdRef.current = message.msgId;
           controller.actions.notifyAssistantMessageCreated(message);
           break;
         }
         case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
+          console.log("[StudentChat] effect: REQUEST_GENERATE_ASSISTANT_RESPONSE", effect.payload);
+          console.log("[StudentChat] Generating assistant response with Gemini LLM Port...");
           const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not set.");
@@ -143,18 +148,21 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
+          console.log("[StudentChat] effect: REQUEST_FINALIZE_ASSISTANT_MESSAGE", effect.payload);
           const message = (await callStudentChatAction("finalizeAssistantMessage", effect.payload)) as Message;
           controller.actions.syncAssistantMessage(message);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_CANCEL_ASSISTANT_MESSAGE": {
+          console.log("[StudentChat] effect: REQUEST_CANCEL_ASSISTANT_MESSAGE", effect.payload);
           const message = (await callStudentChatAction("cancelAssistantMessage", effect.payload)) as Message;
           controller.actions.syncAssistantMessage(message);
           activeAssistantIdRef.current = null;
           break;
         }
         case "REQUEST_LIST_MESSAGES": {
+          console.log("[StudentChat] effect: REQUEST_LIST_MESSAGES", effect.payload);
           const result = (await callStudentChatAction(
             "listConversationMessages",
             effect.payload
@@ -163,6 +171,7 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_LIST_FEEDBACKS": {
+          console.log("[StudentChat] effect: REQUEST_LIST_FEEDBACKS", effect.payload);
           const result = (await callStudentChatAction("listFeedbacks", effect.payload)) as {
             items: Feedback[];
             nextCursor?: string;
@@ -172,6 +181,7 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_CREATE_FEEDBACK": {
+          console.log("[StudentChat] effect: REQUEST_CREATE_FEEDBACK", effect.payload);
           const result = (await callStudentChatAction("createFeedback", effect.payload)) as {
             feedback: Feedback;
             authorName?: string;
@@ -181,8 +191,11 @@ const StudentChatRuntime = ({
           });
           break;
         }
-        default:
+        default: {
+          const _e: any = effect;
+          console.warn("[StudentChat] processEffectSupabase: unhandled effect.kind", _e.kind, _e.payload);
           break;
+        }
       }
     },
     [callStudentChatAction, controller.actions, controller.state.activeAssistantMessageId, controller.state.feedbackByMessageId, llmPort]
