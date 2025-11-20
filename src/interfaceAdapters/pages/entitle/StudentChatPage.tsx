@@ -398,7 +398,16 @@ const StudentChatPage = () => {
   const sandboxEnabled = useMemo(() => process.env.NEXT_PUBLIC_ENTITLE_SANDBOX === "1", []);
   const sandboxAdapters = useMemo(() => (sandboxEnabled ? createDevEntitleAdapters() : null), [sandboxEnabled]);
   const enableGemini = useMemo(() => process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1", []);
-  const llmPort = useMemo<LLMPort>(() => (enableGemini ? new GeminiLLMPort() : new InMemoryLLMPort()), [enableGemini]);
+  const conversationIdRef = useRef<string | null>(null);
+  const llmPort = useMemo<LLMPort>(
+    () =>
+      enableGemini
+        ? new GeminiLLMPort({
+            getConversationId: () => conversationIdRef.current,
+          })
+        : new InMemoryLLMPort(),
+    [enableGemini]
+  );
   const router = useRouter();
 
   const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(() => {
@@ -704,6 +713,7 @@ const StudentChatPage = () => {
   }
 
   const selectedConversationId = activeConversationId ?? bootstrap.conversation.convId;
+  conversationIdRef.current = selectedConversationId ?? null;
 
   return (
     <StudentChatRuntime

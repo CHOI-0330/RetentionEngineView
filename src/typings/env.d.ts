@@ -7,5 +7,6 @@ declare namespace NodeJS {
     NEXT_PUBLIC_ENTITLE_SANDBOX?: string;
     GEMINI_API_KEY?: string;
     GEMINI_MODEL_ID?: string;
+    LLM_BACKEND_BASE_URL?: string;
   }
 }
