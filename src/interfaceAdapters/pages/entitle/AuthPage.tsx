@@ -99,7 +99,7 @@ const AuthPage = () => {
     if (session.role === "MENTOR") {
       router.push("/mentor");
     } else if (session.role === "NEW_HIRE") {
-      router.push("/student");
+      router.push("/student/dashboard");
     }
   }, [controller.state.session, router]);
 
