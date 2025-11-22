@@ -32,6 +32,23 @@ create table if not exists message (
 create index if not exists idx_message_conv_created on message(conv_id, created_at, msg_id);
 create index if not exists idx_message_role on message(role);
 
+-- Keep conversation.last_active_at in sync when messages are inserted
+create or replace function set_conversation_last_active()
+returns trigger as $$
+begin
+  update conversation
+    set last_active_at = now()
+  where conv_id = new.conv_id;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_message_set_last_active on message;
+create trigger trg_message_set_last_active
+after insert on message
+for each row
+execute function set_conversation_last_active();
+
 -- Feedback from mentors/new hires about assistant replies
 create table if not exists feedback (
   fb_id uuid primary key,
