@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+"use client";
 
-// This is a simplified session data structure based on AppUserMenu.tsx
+import { useState, useEffect, useCallback } from "react";
+import { getBrowserSupabaseClient } from "../../lib/browserSupabaseClient";
+
 interface SessionData {
   accessToken: string;
   refreshToken: string;
@@ -23,27 +25,45 @@ export interface SessionInteractions {
 export const useSessionPresenter = (): SessionViewModel & { interactions: SessionInteractions } => {
   const [session, setSession] = useState<SessionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = getBrowserSupabaseClient();
+
+  const toSessionData = (supabaseSession: any | null): SessionData | null => {
+    if (!supabaseSession) return null;
+    const user = supabaseSession.user;
+    const role = (user?.user_metadata?.role as SessionData["role"]) ?? "NEW_HIRE";
+    return {
+      accessToken: supabaseSession.access_token,
+      refreshToken: supabaseSession.refresh_token ?? "",
+      userId: user.id,
+      role,
+      displayName: user.user_metadata?.displayName ?? user.email ?? "",
+    };
+  };
 
   const fetchSession = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/auth/session", { cache: "no-store" });
-      if (res.ok) {
-        const json = (await res.json()) as { data: SessionData };
-        setSession(json.data);
-      } else {
-        setSession(null);
-      }
+      const { data } = await supabase.auth.getSession();
+      setSession(toSessionData(data.session));
     } catch {
       setSession(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [supabase.auth]);
 
   useEffect(() => {
+    // 초기 로드
     void fetchSession();
-  }, [fetchSession]);
+    // 실시간 auth 상태 구독
+    const { data: subscription } = supabase.auth.onAuthStateChange((_, newSession) => {
+      setSession(toSessionData(newSession));
+      setIsLoading(false);
+    });
+    return () => {
+      subscription?.subscription?.unsubscribe();
+    };
+  }, [fetchSession, supabase.auth]);
 
   return {
     session,

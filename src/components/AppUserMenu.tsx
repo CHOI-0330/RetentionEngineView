@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { Button } from '../components/ui/button';
 import { useSession } from './SessionProvider';
+import { getBrowserSupabaseClient } from '../lib/browserSupabaseClient';
 
 export default function AppUserMenu() {
   const { session, isLoading, interactions } = useSession();
+  const supabase = getBrowserSupabaseClient();
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
@@ -50,4 +52,3 @@ export default function AppUserMenu() {
     </div>
   );
 }
-

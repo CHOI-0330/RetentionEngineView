@@ -319,11 +319,15 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
   const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
   if (shouldUseGemini) {
-    console.info("[LLM] Gemini gateway enabled. Responses will be proxied via /api/llm/gemini.");
+    console.info("[LLM] Gemini gateway enabled. Responses will be requested via backend /llm/generate.");
   } else {
-    console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable Gemini gateway.");
+    console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable backend gateway.");
   }
-  const llmPort: LLMPort = shouldUseGemini ? new GeminiLLMPort() : new InMemoryLLMPort();
+  const llmPort: LLMPort = shouldUseGemini
+    ? new GeminiLLMPort({
+        getConversationId: () => conversation.convId,
+      })
+    : new InMemoryLLMPort();
   const dashboardPort = new InMemoryMentorDashboardPort(store);
 
   const runtimes: LLMRuntime[] = [

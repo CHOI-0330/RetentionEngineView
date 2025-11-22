@@ -2,12 +2,13 @@
 
 import type { LLMPort } from "../../../application/entitle/ports";
 import type { Prompt } from "../../../application/entitle/models";
+import { apiFetch } from "../../../lib/apiClient";
 
-const DEFAULT_MODEL_ID = "gemini-2.0-flash-exp";
 const CLIENT_TIMEOUT_MS = 30000;
 
 interface GeminiLLMPortOptions {
   getConversationId?: () => string | null | undefined;
+  getAccessToken?: () => string | null | undefined;
 }
 
 export class GeminiLLMPort implements LLMPort {
@@ -23,44 +24,37 @@ export class GeminiLLMPort implements LLMPort {
     }
 
     const questionMessage = [...input.prompt.messages].reverse().find((message) => message.role === "user");
-    const question = questionMessage?.content ?? "";
+    const question = questionMessage?.content?.trim() ?? "";
     const conversationId = this.options?.getConversationId?.() ?? undefined;
-
-    const payload: Record<string, unknown> = {
-      prompt: input.prompt,
-      modelId: input.modelId ?? DEFAULT_MODEL_ID,
-      runtimeId: input.runtimeId,
-      question,
-    };
-    if (conversationId) {
-      payload.conversationId = conversationId;
+    if (!conversationId) {
+      throw new Error("Conversation ID is required to request assistant responses.");
     }
-    console.log("Sending request to /api/llm/gemini", {
-      payload,
+    if (!question) {
+      throw new Error("Question must not be empty.");
+    }
+
+    console.log("Sending request to backend /llm/generate", {
+      questionLength: question.length,
+      conversationId,
       timeoutMs: CLIENT_TIMEOUT_MS,
     });
     try {
-      const response = await fetch("/api/llm/gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-      console.log(`Received response from /api/llm/gemini with status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        throw new Error(errorText || `Gemini request failed with status ${response.status}`);
+      const { answer } = await apiFetch<{ answer: string }>(
+        "/llm/generate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            question,
+            conversationId,
+          }),
+          signal: controller.signal,
+        },
+        this.options?.getAccessToken?.() ?? undefined
+      );
+      if (!answer) {
+        throw new Error("LLM backend response did not include answer.");
       }
-
-      const json = (await response.json()) as { text?: string; error?: string };
-      if (json.error) {
-        throw new Error(json.error);
-      }
-      if (!json.text) {
-        throw new Error("Gemini response did not include text.");
-      }
-      return json.text;
+      return answer;
     } finally {
       clearTimeout(timeoutId);
       if (abortSource) {

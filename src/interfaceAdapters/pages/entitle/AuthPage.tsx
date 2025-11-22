@@ -1,40 +1,39 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
 import { useAuthPresenter } from "../../presenters/useAuthPresenter";
-import { useSession } from "../../../components/SessionProvider";
-
-type AuthAction = "register" | "login" | "logout";
+import { getBrowserSupabaseClient } from "../../../lib/browserSupabaseClient";
 
 const AuthPage = () => {
+  const supabase = getBrowserSupabaseClient();
   const controller = useAuthController();
   const presenter = useAuthPresenter(controller);
-  const { interactions: sessionInteractions } = useSession();
   const processingRef = useRef(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const supabaseEnabled = useMemo(
     () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     []
   );
 
-  // シンプルな fetch ラッパー: payload がなければ本文を省略し、ログアウトの呼び出しを簡潔にします。
-  const callAuthAction = async (action: AuthAction, payload?: unknown) => {
-    const init: RequestInit = { method: "POST", cache: "no-store" };
-    if (payload !== undefined) {
-      init.headers = { "Content-Type": "application/json" };
-      init.body = JSON.stringify(payload);
+  const syncSessionFromSupabase = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      controller.actions.setSession(null);
+      return;
     }
-    const response = await fetch(`/api/auth/${action}`, init);
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    const json = (await response.json()) as { data?: unknown };
-    return json.data;
+    const user = data.session.user;
+    controller.actions.setSession({
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token ?? "",
+      userId: user.id,
+      role: (user.user_metadata?.role as any) ?? "NEW_HIRE",
+    });
   };
 
   useEffect(() => {
@@ -42,66 +41,24 @@ const AuthPage = () => {
       controller.actions.setSession(null);
       return;
     }
-    let cancelled = false;
-
-    const bootstrapSession = async () => {
-      try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!cancelled && response.ok) {
-          const json = (await response.json()) as {
-            data: {
-              accessToken: string;
-              refreshToken: string;
-              userId: string;
-              role: "NEW_HIRE" | "MENTOR" | "ADMIN";
-            };
-          };
-          controller.actions.setSession(json.data);
-          return;
-        }
-        if (!cancelled && response.status === 401) {
-          const refreshResponse = await fetch("/api/auth/refresh", { method: "POST", cache: "no-store" });
-          if (refreshResponse.ok) {
-            const json = (await refreshResponse.json()) as {
-              data: {
-                accessToken: string;
-                refreshToken: string;
-                userId: string;
-                role: "NEW_HIRE" | "MENTOR" | "ADMIN";
-              };
-            };
-            controller.actions.setSession(json.data);
-            return;
-          }
-        }
-        if (!cancelled) {
-          controller.actions.setSession(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error(error);
-          controller.actions.setSession(null);
-        }
-      }
-    };
-
-    // ログインページを開いた際、クッキーのみでセッションを復元できることを示す初期化です。
-    void bootstrapSession();
-    return () => {
-      cancelled = true;
-    };
+    void syncSessionFromSupabase();
   }, [controller.actions, supabaseEnabled]);
 
   // ログイン成功後、ロールに応じて自動遷移します。
+  const redirectedUserRef = useRef<string | null>(null);
   useEffect(() => {
     const session = controller.state.session;
-    if (!session) return;
-    if (session.role === "MENTOR") {
-      router.push("/mentor");
-    } else if (session.role === "NEW_HIRE") {
-      router.push("/student/dashboard");
+    if (!session) {
+      redirectedUserRef.current = null;
+      return;
     }
-  }, [controller.state.session, router]);
+    const target = session.role === "MENTOR" ? "/mentor" : "/student/dashboard";
+    const alreadyThere = pathname === target || pathname.startsWith(target);
+    if (!alreadyThere && redirectedUserRef.current !== session.userId) {
+      redirectedUserRef.current = session.userId;
+      router.replace(target);
+    }
+  }, [controller.state.session, pathname, router]);
 
   useEffect(() => {
     if (processingRef.current || !controller.state.pendingEffects.length) {
@@ -121,24 +78,54 @@ const AuthPage = () => {
       try {
         switch (effect.kind) {
           case "REQUEST_REGISTER": {
-            await callAuthAction("register", effect.payload);
+            const { data, error } = await supabase.auth.signUp({
+              email: effect.payload.email,
+              password: effect.payload.password,
+              options: {
+                data: {
+                  role: effect.payload.role,
+                  displayName: effect.payload.displayName,
+                },
+              },
+            });
+            if (error) {
+              throw error;
+            }
+            // signUp 직후 세션이 있을 때만 세션 반영
+            if (data.session) {
+              controller.actions.setSession({
+                accessToken: data.session.access_token,
+                refreshToken: data.session.refresh_token ?? "",
+                userId: data.session.user.id,
+                role: (data.session.user.user_metadata?.role as any) ?? effect.payload.role,
+              });
+            }
             break;
           }
           case "REQUEST_LOGIN": {
-            const session = (await callAuthAction("login", effect.payload)) as {
-              accessToken: string;
-              refreshToken: string;
-              userId: string;
-              role: "NEW_HIRE" | "MENTOR" | "ADMIN";
-            };
-            controller.actions.setSession(session);
-            await sessionInteractions.refetchSession();
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: effect.payload.email,
+              password: effect.payload.password,
+            });
+            if (error) throw error;
+
+            // role 메타데이터가 없으면 기본 NEW_HIRE로 한번 세팅
+            const user = data.user;
+            const role = (user.user_metadata?.role as "NEW_HIRE" | "MENTOR" | "ADMIN" | undefined) ?? "NEW_HIRE";
+            if (!user.user_metadata?.role) {
+              await supabase.auth.updateUser({ data: { role } });
+            }
+            controller.actions.setSession({
+              accessToken: data.session?.access_token ?? "",
+              refreshToken: data.session?.refresh_token ?? "",
+              userId: user.id,
+              role,
+            });
             break;
           }
           case "REQUEST_LOGOUT": {
-            await callAuthAction("logout", effect.payload);
+            await supabase.auth.signOut();
             controller.actions.setSession(null);
-            await sessionInteractions.refetchSession();
             break;
           }
           default:
@@ -155,11 +142,12 @@ const AuthPage = () => {
       } finally {
         controller.actions.acknowledgeEffect(effect.id);
         processingRef.current = false;
+        void syncSessionFromSupabase();
       }
     };
 
     void run();
-  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled, sessionInteractions]);
+  }, [controller.actions, controller.state.pendingEffects, controller.state.session, supabaseEnabled, supabase.auth]);
 
   return <AuthView viewModel={presenter.viewModel} status={presenter.status} interactions={presenter.interactions} />;
 };

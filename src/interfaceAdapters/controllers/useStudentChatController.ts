@@ -425,19 +425,23 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   const syncAssistantMessage = useCallback(
     (message: Message) => {
       mutateState((previous) => {
-        const index = previous.messages.findIndex((item) => item.msgId === message.msgId);
+        const findIndexById = (targetId?: string | null) =>
+          targetId ? previous.messages.findIndex((item) => item.msgId === targetId) : -1;
+        let index = findIndexById(message.msgId);
+        if (index < 0) {
+          index = findIndexById(previous.activeAssistantMessageId);
+        }
         if (index < 0) {
           return previous;
         }
         const updatedMessages = [...previous.messages];
         updatedMessages[index] = message;
-        const isActiveMessage = previous.activeAssistantMessageId === message.msgId;
-        const shouldClearActive = isActiveMessage && (message.status === "DONE" || message.status === "CANCELLED");
+        const isFinalized = message.status === "DONE" || message.status === "CANCELLED";
         return {
           ...previous,
           messages: updatedMessages,
-          isAwaitingAssistant: shouldClearActive ? false : previous.isAwaitingAssistant,
-          activeAssistantMessageId: shouldClearActive ? null : previous.activeAssistantMessageId,
+          isAwaitingAssistant: isFinalized ? false : previous.isAwaitingAssistant,
+          activeAssistantMessageId: isFinalized ? null : message.msgId,
         };
       });
     },

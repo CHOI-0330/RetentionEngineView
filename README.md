@@ -19,5 +19,5 @@
   ## Notes
   - Some UI-only local state (e.g., open/close in dialogs/sheets) is kept via `useState` for usability and can be lifted later.
   - Styles come from a precompiled Tailwind CSS file (`src/index.css`), so no Tailwind config is required at runtime.
-- When connecting to the standalone LLM backend, set `LLM_BACKEND_BASE_URL` in `.env.local` (e.g. `https://api.example.com`) so `/api/llm/gemini` can proxy requests to `POST /llm/generate`.
+- The UI directly calls the backend `/llm/generate` endpoint for assistant responses, so no separate `LLM_BACKEND_BASE_URL` proxy is required.
   

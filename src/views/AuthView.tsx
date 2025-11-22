@@ -35,92 +35,102 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
           <TabsTrigger value="register">新規登録</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register" className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">メールアドレス</label>
-            <Input
-              type="email"
-              value={viewModel.register.email}
-              onChange={(event) => interactions.setRegisterField("email", event.target.value)}
-              placeholder="you@example.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">パスワード</label>
-            <Input
-              type="password"
-              value={viewModel.register.password}
-              onChange={(event) => interactions.setRegisterField("password", event.target.value)}
-              placeholder="8文字以上"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">氏名</label>
-            <Input
-              value={viewModel.register.displayName}
-              onChange={(event) => interactions.setRegisterField("displayName", event.target.value)}
-              placeholder="山田太郎"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="auth-register-role">役割</Label>
-            <Select
-              value={viewModel.register.role}
-              onValueChange={(value) => interactions.setRegisterField("role", value)}
-            >
-              <SelectTrigger id="auth-register-role">
-                <SelectValue placeholder="役割を選択してください" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NEW_HIRE">新入社員</SelectItem>
-                <SelectItem value="MENTOR">メンター</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button className="w-full" onClick={interactions.submitRegistration} disabled={status.isSubmitting}>
-            {status.isSubmitting ? "処理中..." : "新規登録"}
-          </Button>
+        <TabsContent value="register" className="pt-4">
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); interactions.submitRegistration(); }}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">メールアドレス</label>
+              <Input
+                type="email"
+                autoComplete="email"
+                value={viewModel.register.email}
+                onChange={(event) => interactions.setRegisterField("email", event.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">パスワード</label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={viewModel.register.password}
+                onChange={(event) => interactions.setRegisterField("password", event.target.value)}
+                placeholder="8文字以上"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">氏名</label>
+              <Input
+                value={viewModel.register.displayName}
+                autoComplete="name"
+                onChange={(event) => interactions.setRegisterField("displayName", event.target.value)}
+                placeholder="山田太郎"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auth-register-role">役割</Label>
+              <Select
+                value={viewModel.register.role}
+                onValueChange={(value) => interactions.setRegisterField("role", value)}
+              >
+                <SelectTrigger id="auth-register-role">
+                  <SelectValue placeholder="役割を選択してください" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEW_HIRE">新入社員</SelectItem>
+                  <SelectItem value="MENTOR">メンター</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full" disabled={status.isSubmitting}>
+              {status.isSubmitting ? "処理中..." : "新規登録"}
+            </Button>
+          </form>
         </TabsContent>
 
-        <TabsContent value="login" className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">メールアドレス</label>
-            <Input
-              type="email"
-              value={viewModel.login.email}
-              onChange={(event) => interactions.setLoginField("email", event.target.value)}
-              placeholder="you@example.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">パスワード</label>
-            <Input
-              type="password"
-              value={viewModel.login.password}
-              onChange={(event) => interactions.setLoginField("password", event.target.value)}
-              placeholder="パスワード"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={interactions.submitLogin} disabled={status.isSubmitting}>
-              {status.isSubmitting ? "処理中..." : "ログイン"}
-            </Button>
-            <Button
-              className="flex-1"
-              variant="secondary"
-              onClick={interactions.submitLogout}
-              disabled={status.isSubmitting || !viewModel.session}
-            >
-              ログアウト
-            </Button>
-          </div>
-          {viewModel.session ? (
-            <div className="rounded-md border border-dashed bg-muted/30 p-3 text-xs">
-              <p className="font-medium">ログイン情報</p>
-              <p>ユーザーID: {viewModel.session.userId}</p>
-              <p>役割: {viewModel.session.role}</p>
+        <TabsContent value="login" className="pt-4">
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); interactions.submitLogin(); }}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">メールアドレス</label>
+              <Input
+                type="email"
+                autoComplete="email"
+                value={viewModel.login.email}
+                onChange={(event) => interactions.setLoginField("email", event.target.value)}
+                placeholder="you@example.com"
+              />
             </div>
-          ) : null}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">パスワード</label>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={viewModel.login.password}
+                onChange={(event) => interactions.setLoginField("password", event.target.value)}
+                placeholder="パスワード"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1" disabled={status.isSubmitting}>
+                {status.isSubmitting ? "処理中..." : "ログイン"}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                variant="secondary"
+                onClick={interactions.submitLogout}
+                disabled={status.isSubmitting || !viewModel.session}
+              >
+                ログアウト
+              </Button>
+            </div>
+            {viewModel.session ? (
+              <div className="rounded-md border border-dashed bg-muted/30 p-3 text-xs">
+                <p className="font-medium">ログイン情報</p>
+                <p>ユーザーID: {viewModel.session.userId}</p>
+                <p>役割: {viewModel.session.role}</p>
+              </div>
+            ) : null}
+          </form>
         </TabsContent>
       </Tabs>
     </div>

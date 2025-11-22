@@ -1,16 +1,8 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
-
-import { getAuthenticatedSession } from "../../src/server/authSession";
 
 export const dynamic = "force-dynamic";
 
+// 서버 사이드 인증 리다이렉트를 임시로 제거합니다. 클라이언트에서 세션을 확인합니다.
 export default async function StudentLayout({ children }: { children: ReactNode }) {
-  // 新入社員向け画面は NEW_HIRE 権限のみ許可するため、トークンまたは役割が一致しなければトップへリダイレクトします。
-  const session = await getAuthenticatedSession();
-  if (!session || session.role !== "NEW_HIRE") {
-    redirect("/?redirected=1");
-  }
-
   return children;
 }

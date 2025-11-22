@@ -1,16 +1,7 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
-
-import { getAuthenticatedSession } from "../../src/server/authSession";
-
 export const dynamic = "force-dynamic";
 
+// 서버 사이드 인증 리다이렉트를 임시로 제거합니다. 클라이언트에서 세션을 확인합니다.
 export default async function MentorLayout({ children }: { children: ReactNode }) {
-  // メンター用画面は MENTOR 権限のみ許可するため、セッションがない・ロールが異なる場合はログインページへリダイレクトします。
-  const session = await getAuthenticatedSession();
-  if (!session || session.role !== "MENTOR") {
-    redirect("/?redirected=1");
-  }
-
   return children;
 }

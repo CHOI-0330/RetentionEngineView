@@ -7,8 +7,9 @@ import { Card, CardContent } from "../../../src/components/ui/card";
 import { Badge } from "../../../src/components/ui/badge";
 import { Button } from "../../../src/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { getBrowserSupabaseClient } from "../../../src/lib/browserSupabaseClient";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { apiFetch } from "../../../src/lib/apiClient";
+import { Input } from "../../../src/components/ui/input";
+import { Label } from "../../../src/components/ui/label";
 
 interface ConversationListItem {
   conv_id: string;
@@ -26,10 +27,11 @@ const StudentDashboardPage = () => {
   const { session, isLoading: isSessionLoading } = useSession();
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const supabase = useMemo<SupabaseClient>(() => getBrowserSupabaseClient(), []);
-  const router = useRouter();
   const userId = session?.userId;
+  const router = useRouter();
 
   useEffect(() => {
     if (!userId) {
@@ -40,22 +42,18 @@ const StudentDashboardPage = () => {
       setIsFetching(true);
       setError(null);
       try {
-        const { data, error: queryError } = await supabase
-          .from("conversation")
-          .select("conv_id, title, created_at")
-          .eq("owner_id", userId)
-          .order("created_at", { ascending: false });
-        if (queryError) {
-          throw queryError;
-        }
+        const rows = await apiFetch<ConversationRow[]>(
+          `/conversations/newHire?userId=${encodeURIComponent(userId)}`,
+          undefined,
+          session?.accessToken
+        );
         if (isMounted) {
-          setConversations(
-            ((data ?? []) as ConversationRow[]).map((row) => ({
-              conv_id: row.conv_id,
-              title: row.title,
-              created_at: row.created_at,
-            }))
-          );
+          const mapped = (rows ?? []).map((row) => ({
+            conv_id: row.conv_id,
+            title: row.title,
+            created_at: row.created_at,
+          }));
+          setConversations(mapped);
         }
       } catch (loadError) {
         if (isMounted) {
@@ -71,7 +69,7 @@ const StudentDashboardPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [supabase, userId]);
+  }, [session?.accessToken, userId]);
 
   const heading = useMemo(() => {
     if (!session?.displayName) {
@@ -93,6 +91,62 @@ const StudentDashboardPage = () => {
     return <div className="text-sm text-muted-foreground">ログイン情報が確認できません。再度サインインしてください。</div>;
   }
 
+  const refetchConversations = async () => {
+    if (!userId) return;
+    setIsFetching(true);
+    try {
+      const rows = await apiFetch<ConversationRow[]>(
+        `/conversations/newHire?userId=${encodeURIComponent(userId)}`,
+        undefined,
+        session?.accessToken
+      );
+      setConversations(
+        (rows ?? []).map((row) => ({
+          conv_id: row.conv_id,
+          title: row.title,
+          created_at: row.created_at,
+        }))
+      );
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "会話の取得に失敗しました。");
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const handleCreateConversation = async (titleInput?: string) => {
+    if (!userId) {
+      setError("ログイン情報が確認できません。再度サインインしてください。");
+      return;
+    }
+    const title = `${titleInput ?? newTitle ?? ""}`.trim() || "新しい会話";
+    setIsCreating(true);
+    setError(null);
+    try {
+      await apiFetch<{ conv_id: string }>(
+        "/conversations/newHire",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            userId,
+            title,
+            role: session?.role,
+            displayName: session?.displayName ?? userId,
+            email: (session as any)?.email ?? "",
+          }),
+        },
+        session?.accessToken
+      );
+      setNewTitle("");
+      await refetchConversations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "会話の作成に失敗しました。");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
     <main className="space-y-6 p-4 sm:p-6">
       <header className="space-y-1">
@@ -106,6 +160,29 @@ const StudentDashboardPage = () => {
           {error}
         </div>
       ) : null}
+
+      <div className="rounded-md border p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex-1 space-y-2">
+            <Label className="text-sm font-medium">新しい会話タイトル</Label>
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="例: オンボーディング相談"
+              autoComplete="off"
+            />
+          </div>
+          <Button
+            className="sm:w-40"
+            disabled={isCreating}
+            onClick={() => {
+              void handleCreateConversation();
+            }}
+          >
+            {isCreating ? "作成中..." : "会話を作成"}
+          </Button>
+        </div>
+      </div>
 
       {isFetching ? (
         <div className="flex h-48 items-center justify-center text-muted-foreground">
