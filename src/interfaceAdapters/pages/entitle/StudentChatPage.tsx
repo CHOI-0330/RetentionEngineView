@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import StudentChatView from "../../../views/StudentChatView";
 import { useStudentChatController } from "../../controllers/useStudentChatController";
@@ -19,16 +19,6 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
   kind: "ValidationError",
   message: reason instanceof Error ? reason.message : String(reason),
 });
-
-type StudentChatAction =
-  | "createUserMessage"
-  | "beginAssistantMessage"
-  | "finalizeAssistantMessage"
-  | "cancelAssistantMessage"
-  | "listConversationMessages"
-  | "listFeedbacks"
-  | "createFeedback"
-  | "createConversation";
 
 interface ConversationOption {
   convId: string;
@@ -107,17 +97,6 @@ const StudentChatRuntime = ({
   const effectQueueRef = useRef<StudentChatControllerEffect[]>([]);
   const enqueuedEffectIdsRef = useRef<Set<string>>(new Set());
   const activeAssistantIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const debugState = { presenter, controller };
-    if (typeof window !== "undefined") {
-      (window as unknown as { __studentChat?: typeof debugState }).__studentChat = debugState;
-    }
-  }, [controller, presenter]);
-
-  useEffect(() => {
-    console.log("[StudentChat] pendingEffects", presenter.pendingEffects);
-  }, [presenter.pendingEffects]);
 
   const processEffectBackend = useCallback(
     async (effect: StudentChatControllerEffect) => {
@@ -361,6 +340,7 @@ const StudentChatPage = () => {
     [session?.accessToken]
   );
   const router = useRouter();
+  const searchParams = useSearchParams();
   console.log("StudentChatPage: using backend LLM gateway");
 
   const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(null);
@@ -401,7 +381,7 @@ const StudentChatPage = () => {
                 title: "新しい会話",
                 role: session.role,
                 displayName: session.displayName ?? session.userId,
-                email: session.email ?? "",
+                email: "",
               }),
             },
             session.accessToken,
@@ -430,6 +410,50 @@ const StudentChatPage = () => {
         };
 
         const messages: Message[] = (msgRes.data ?? []).map(mapMessageDto);
+        const assistantMessages = messages.filter((message) => message.role === "ASSISTANT");
+        const initialFeedbacks: Record<string, Feedback[]> = {};
+        const initialAuthorNames: Record<string, string> = {};
+
+        if (assistantMessages.length && session?.accessToken) {
+          await Promise.all(
+            assistantMessages.map(async (message) => {
+              try {
+                const response = await fetch("/api/entitle/student-chat", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.accessToken}`,
+                  },
+                  body: JSON.stringify({
+                    action: "listFeedbacks",
+                    payload: { msgId: message.msgId },
+                  }),
+                });
+                if (!response.ok) {
+                  throw new Error(await response.text());
+                }
+                const json = (await response.json()) as {
+                  data?: {
+                    items: Feedback[];
+                    authorNames?: Record<string, string>;
+                  };
+                };
+                if (json.data?.items?.length) {
+                  initialFeedbacks[message.msgId] = json.data.items;
+                }
+                if (json.data?.authorNames) {
+                  Object.assign(initialAuthorNames, json.data.authorNames);
+                }
+              } catch (feedbackError) {
+                console.warn("[StudentChat] Failed to fetch mentor feedback", {
+                  error: feedbackError,
+                  messageId: message.msgId,
+                });
+              }
+            })
+          );
+        }
 
         const currentUser: User = {
           userId: session.userId,
@@ -443,8 +467,8 @@ const StudentChatPage = () => {
           conversation,
           currentUser,
           initialMessages: messages,
-          initialFeedbacks: {},
-          authorNames: {},
+          initialFeedbacks,
+          authorNames: initialAuthorNames,
           mentorAssignments: [],
           availableConversations: conversations.map((c) => ({
             convId: c.conv_id,
@@ -475,9 +499,10 @@ const StudentChatPage = () => {
 
   useEffect(() => {
     if (session?.userId) {
-      void loadConversation();
+      const requestedConvId = searchParams?.get("convId") ?? undefined;
+      void loadConversation(requestedConvId);
     }
-  }, [loadConversation, session?.userId]);
+  }, [loadConversation, searchParams, session?.userId]);
 
   useEffect(() => {
     if (bootstrap?.conversation) {

@@ -27,7 +27,6 @@ export interface MentorDashboardPresenterViewModel {
   students: MentorDashboardStudentItem[];
   searchQuery: string;
   onChangeSearch: (value: string) => void;
-  onFeedback: (studentId: string, isGood: boolean) => void;
 }
 
 export interface MentorDashboardPresenterStatus {
@@ -104,13 +103,10 @@ export const useMentorDashboardPresenter = (
   );
 
   const handleFeedback = useCallback(
-    (studentId: string, isGood: boolean) => {
-      if (controller.state.qualitySubmitting[studentId]) {
-        return;
-      }
-      actions.requestSubmitFeedbackQuality(studentId, isGood);
+    (_studentId: string, _isGood: boolean) => {
+      // feedback quality not implemented
     },
-    [actions, controller.state.qualitySubmitting]
+    []
   );
 
   const viewModel = useMemo<MentorDashboardPresenterViewModel>(
@@ -118,9 +114,8 @@ export const useMentorDashboardPresenter = (
       students,
       searchQuery: state.searchQuery,
       onChangeSearch: handleChangeSearch,
-      onFeedback: handleFeedback,
     }),
-    [handleChangeSearch, handleFeedback, state.searchQuery, students]
+    [handleChangeSearch, state.searchQuery, students]
   );
 
   const status: MentorDashboardPresenterStatus = useMemo(

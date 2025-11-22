@@ -1,27 +1,7 @@
-import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  SupabaseFeedbackGateway,
-  SupabaseFeedbackLookupGateway,
-  SupabaseMentorAssignmentGateway,
-  SupabaseMessageGateway,
-} from "../../../../src/interfaceAdapters/gateways/supabase";
 import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
-import { createServerSupabaseClient } from "../../../../src/lib/supabaseClient";
-import {
-  mapConversationRow,
-  mapFeedbackRow,
-  mapMessageRow,
-  mapUserRow,
-  type ConversationRow,
-  type FeedbackRow,
-  type MessageRow,
-  type MentorAssignmentRow,
-  type UserRow,
-} from "../../../../src/interfaceAdapters/gateways/supabase/types";
-import { createConversationUseCase } from "../../../../src/application/entitle/useCases";
-import type { Conversation } from "../../../../src/domain/core";
+import { mapFeedbackRow, mapMessageRow, type FeedbackRow, type MessageRow } from "../../../../src/interfaceAdapters/gateways/supabase/types";
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"
@@ -43,52 +23,74 @@ class HttpError extends Error {
 }
 
 const MAX_MESSAGE_LENGTH = 4000;
+const BACKEND_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
+).replace(/\/$/, "");
 
-const listAvailableMentors = async (
-  client: ReturnType<typeof createServerSupabaseClient>,
-  newhireId: string
-) => {
-  const { data: activeAssignments, error: activeAssignmentsError } = await client
-    .from("mentor_assignment")
-    .select()
-    .eq("newhire_id", newhireId)
-    .is("revoked_at", null);
-  if (activeAssignmentsError) {
-    throw activeAssignmentsError;
+const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> => {
+  if (!BACKEND_BASE_URL) {
+    throw new Error("LLM_BACKEND_BASE_URL is not configured.");
   }
-
-  const assignmentRows = (activeAssignments as MentorAssignmentRow[]) ?? [];
-  let mentorUserRows: UserRow[] = [];
-
-  if (assignmentRows.length > 0) {
-    const mentorIds = assignmentRows.map((assignment) => assignment.mentor_id);
-    const { data: mentorUsers, error: mentorUsersError } = await client
-      .from("user")
-      .select()
-      .in("user_id", mentorIds);
-    if (mentorUsersError || !mentorUsers) {
-      throw mentorUsersError ?? new Error("Failed to load mentors.");
-    }
-    mentorUserRows = mentorUsers as UserRow[];
-  } else {
-    const { data: mentorUsers, error: mentorUsersError } = await client
-      .from("user")
-      .select()
-      .eq("role", "MENTOR");
-    if (mentorUsersError || !mentorUsers) {
-      throw mentorUsersError ?? new Error("Failed to load mentors.");
-    }
-    mentorUserRows = mentorUsers as UserRow[];
+  const response = await fetch(`${BACKEND_BASE_URL}/${path.replace(/^\//, "")}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new HttpError(response.status, body || "Backend request failed.");
   }
-
-  return mentorUserRows
-    .map((mentor) => ({
-      mentorId: mentor.user_id,
-      displayName: mentor.display_name,
-      email: mentor.email,
-    }))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  return (await response.json()) as T;
 };
+
+const mapApiMessageRow = (row: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }): MessageRow => ({
+  msg_id: row.msg_id,
+  conv_id: row.conv_id,
+  role: row.role as MessageRow["role"],
+  content: row.content,
+  status: null,
+  created_at: row.created_at,
+});
+
+const mapApiFeedbackRow = (row: {
+  fb_id: string;
+  target_msg_id: string;
+  author_id: string;
+  author_role: string;
+  content: string;
+  created_at: string;
+  updated_at?: string | null;
+}): FeedbackRow => ({
+  fb_id: row.fb_id,
+  target_msg_id: row.target_msg_id,
+  author_id: row.author_id,
+  author_role: row.author_role as FeedbackRow["author_role"],
+  content: row.content,
+  visibility: null,
+  created_at: row.created_at,
+  updated_at: row.updated_at ?? null,
+});
+
+const mapApiConversationRow = (row: { conv_id: string; title: string; created_at: string }): {
+  convId: string;
+  ownerId: string;
+  title: string;
+  state: "ACTIVE";
+  createdAt: string;
+  lastActiveAt: string;
+  archivedAt: undefined;
+} => ({
+  convId: row.conv_id,
+  ownerId: "",
+  title: row.title,
+  state: "ACTIVE",
+  createdAt: row.created_at,
+  lastActiveAt: row.created_at,
+  archivedAt: undefined,
+});
 
 export async function POST(request: NextRequest) {
   const { action, payload } = (await request.json()) as {
@@ -96,14 +98,13 @@ export async function POST(request: NextRequest) {
     payload: unknown;
   };
 
-  const messageGateway = new SupabaseMessageGateway();
-  const feedbackGateway = new SupabaseFeedbackGateway();
-  const feedbackLookupGateway = new SupabaseFeedbackLookupGateway();
-  const mentorAssignmentGateway = new SupabaseMentorAssignmentGateway();
   const authGateway = new SupabaseAuthGateway();
-  const adminClient = createServerSupabaseClient();
 
-  const accessToken = request.cookies.get("auth_access_token")?.value;
+  const headerToken = request.headers.get("authorization");
+  const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
+    ? headerToken.slice(7).trim()
+    : null;
+  const accessToken = accessTokenFromHeader ?? request.cookies.get("auth_access_token")?.value;
   if (!accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -115,44 +116,6 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Unauthorized";
     return NextResponse.json({ error: message }, { status: 401 });
   }
-
-  const ensureConversationAccess = async (convId: string) => {
-    const { data: conversationRow, error: conversationError } = await adminClient
-      .from("conversation")
-      .select()
-      .eq("conv_id", convId)
-      .single();
-    if (conversationError || !conversationRow) {
-      throw new HttpError(404, "Conversation not found.");
-    }
-
-    const conversation = mapConversationRow(conversationRow as ConversationRow);
-    const mentorAssignments = await mentorAssignmentGateway.listActiveAssignments({
-      newhireId: conversation.ownerId,
-    });
-    const isOwner = conversation.ownerId === user.userId;
-    const isMentor =
-      user.role === "MENTOR" &&
-      mentorAssignments.some((assignment) => assignment.mentorId === user.userId);
-    if (!isOwner && !isMentor) {
-      throw new HttpError(403, "Forbidden");
-    }
-    return { conversation, mentorAssignments };
-  };
-
-  const ensureMessageAccess = async (msgId: string) => {
-    const { data, error } = await adminClient
-      .from("message")
-      .select()
-      .eq("msg_id", msgId)
-      .single();
-    if (error || !data) {
-      throw new HttpError(404, "Message not found.");
-    }
-    const message = mapMessageRow(data as MessageRow);
-    const access = await ensureConversationAccess(message.convId);
-    return { message, ...access };
-  };
 
   try {
     switch (action) {
@@ -170,82 +133,89 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "Message content exceeds the allowed length.");
         }
 
-        const access = await ensureConversationAccess(input.convId);
-        if (access.conversation.ownerId !== user.userId) {
-          throw new HttpError(403, "Only the conversation owner can post messages.");
-        }
-
-        const result = await messageGateway.createUserMessage({
-          convId: access.conversation.convId,
-          authorId: user.userId,
-          content: trimmedContent,
+        const backendResult = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string } }>("/messages", {
+          method: "POST",
+          body: JSON.stringify({
+            convId: input.convId,
+            role: "NEW_HIRE",
+            content: trimmedContent,
+          }),
         });
-        return NextResponse.json({ data: result });
+        const mapped = mapMessageRow(mapApiMessageRow(backendResult.data));
+        return NextResponse.json({ data: mapped });
       }
       case "beginAssistantMessage": {
-        const input = (payload ?? {}) as { convId?: string };
-        if (!input.convId || typeof input.convId !== "string") {
-          throw new HttpError(400, "convId is required.");
-        }
-        const access = await ensureConversationAccess(input.convId);
-        if (access.conversation.ownerId !== user.userId) {
-          throw new HttpError(403, "Only the conversation owner can request an assistant response.");
-        }
-        const result = await messageGateway.beginAssistantMessage(input.convId);
-        return NextResponse.json({ data: result });
+        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       case "finalizeAssistantMessage": {
-        const input = (payload ?? {}) as { msgId?: string };
-        if (!input.msgId || typeof input.msgId !== "string") {
-          throw new HttpError(400, "msgId is required.");
-        }
-        await ensureMessageAccess(input.msgId);
-        const result = await messageGateway.finalizeAssistantMessage(
-          payload as Parameters<typeof messageGateway.finalizeAssistantMessage>[0]
-        );
-        return NextResponse.json({ data: result });
+        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       case "cancelAssistantMessage": {
-        const input = (payload ?? {}) as { msgId?: string };
-        if (!input.msgId || typeof input.msgId !== "string") {
-          throw new HttpError(400, "msgId is required.");
-        }
-        await ensureMessageAccess(input.msgId);
-        const result = await messageGateway.cancelAssistantMessage(input.msgId);
-        return NextResponse.json({ data: result });
+        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       case "listConversationMessages": {
         const input = (payload ?? {}) as { convId?: string; cursor?: string; limit?: number };
         if (!input.convId || typeof input.convId !== "string") {
           throw new HttpError(400, "convId is required.");
         }
-        await ensureConversationAccess(input.convId);
-        const result = await messageGateway.listConversationMessages(
-          input as Parameters<typeof messageGateway.listConversationMessages>[0]
+        const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
+        const backendMessages = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }[] }>(
+          `/messages?convId=${encodeURIComponent(input.convId)}`
         );
-        return NextResponse.json({ data: result });
+        const rows = (backendMessages.data ?? []).map(mapApiMessageRow).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id));
+
+        let filtered = rows;
+        if (input.cursor) {
+          const cursorIndex = rows.findIndex((row) => row.msg_id === input.cursor);
+          if (cursorIndex === -1) {
+            throw new HttpError(404, "Cursor message not found.");
+          }
+          filtered = rows.slice(0, cursorIndex);
+        }
+
+        const paged = filtered.slice(-pageSize);
+        const nextCursor = filtered.length > paged.length ? paged[0]?.msg_id : undefined;
+
+        const items = paged.map(mapMessageRow);
+        return NextResponse.json({ data: { items, nextCursor } });
       }
       case "listFeedbacks": {
         const input = (payload ?? {}) as { msgId?: string; cursor?: string; limit?: number };
         if (!input.msgId || typeof input.msgId !== "string") {
           throw new HttpError(400, "msgId is required.");
         }
-        await ensureMessageAccess(input.msgId);
-        const result = await feedbackGateway.listFeedbacks(
-          input as Parameters<typeof feedbackGateway.listFeedbacks>[0]
+        const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
+        const backendFeedbacks = await callBackend<{ data: { fb_id: string; target_msg_id: string; author_id: string; author_role: string; content: string; created_at: string; updated_at?: string | null }[] }>(
+          `/feedback?messageId=${encodeURIComponent(input.msgId)}`
         );
-        const authorIds = Array.from(new Set(result.items.map((feedback) => feedback.authorId)));
-        const authorEntries = await Promise.all(
-          authorIds.map(async (authorId) => {
-            const displayName = await feedbackLookupGateway.getUserDisplayName(authorId);
-            return [authorId, displayName ?? authorId] as const;
-          })
-        );
+        const sorted = (backendFeedbacks.data ?? [])
+          .map(mapApiFeedbackRow)
+          .sort((a, b) => {
+            if (a.created_at === b.created_at) {
+              return b.fb_id.localeCompare(a.fb_id);
+            }
+            return b.created_at.localeCompare(a.created_at);
+          });
+
+        let filtered = sorted;
+        if (input.cursor) {
+          const cursorIndex = sorted.findIndex((row) => row.fb_id === input.cursor);
+          if (cursorIndex === -1) {
+            throw new HttpError(404, "Cursor feedback not found.");
+          }
+          filtered = sorted.slice(cursorIndex + 1);
+        }
+
+        const paged = filtered.slice(0, pageSize);
+        const nextCursor = paged.length === pageSize ? paged[paged.length - 1]?.fb_id : undefined;
+
+        const items = paged.map(mapFeedbackRow);
+        const authorIds = Array.from(new Set(items.map((feedback) => feedback.authorId)));
         return NextResponse.json({
           data: {
-            items: result.items,
-            nextCursor: result.nextCursor,
-            authorNames: Object.fromEntries(authorEntries),
+            items,
+            nextCursor,
+            authorNames: Object.fromEntries(authorIds.map((id) => [id, id] as const)),
           },
         });
       }
@@ -254,76 +224,10 @@ export async function POST(request: NextRequest) {
         if (!input.targetMsgId || typeof input.targetMsgId !== "string") {
           throw new HttpError(400, "targetMsgId is required.");
         }
-        await ensureMessageAccess(input.targetMsgId);
-        const { count: existingCount, error: countError } = await adminClient
-          .from("feedback")
-          .select("fb_id", { count: "exact", head: true })
-          .eq("target_msg_id", input.targetMsgId);
-        if (countError) {
-          throw countError;
-        }
-        if ((existingCount ?? 0) > 0) {
-          throw new HttpError(400, "Feedback already exists for this message.");
-        }
-        const feedback = await feedbackGateway.createFeedback(
-          payload as Parameters<typeof feedbackGateway.createFeedback>[0]
-        );
-        const authorName = await feedbackLookupGateway.getUserDisplayName(feedback.authorId);
-        return NextResponse.json({
-          data: {
-            feedback,
-            authorName: authorName ?? undefined,
-          },
-        });
+        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       case "createConversation": {
-        if (user.role !== "NEW_HIRE") {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-        const input = (payload ?? {}) as { title?: string; mentorId?: string | null };
-        const availableMentors = await listAvailableMentors(adminClient, user.userId);
-        const validation = createConversationUseCase({
-          requester: user,
-          title: input.title ?? "",
-          mentorId: input.mentorId ?? null,
-          allowedMentorIds: availableMentors.map((mentor) => mentor.mentorId),
-        });
-        if (validation.kind === "failure") {
-          return NextResponse.json({ error: validation.error.message }, { status: 400 });
-        }
-
-        const convId = randomUUID();
-        const { data, error } = await adminClient
-          .from("conversation")
-          .insert({
-            conv_id: convId,
-            owner_id: user.userId,
-            title: validation.value.title,
-            state: "ACTIVE",
-          })
-          .select()
-          .single();
-        if (error || !data) {
-          throw error ?? new Error("Failed to create conversation.");
-        }
-
-        const mentorId = validation.value.mentorId ?? null;
-        if (mentorId) {
-          const { error: assignmentError } = await adminClient
-            .from("mentor_assignment")
-            .upsert(
-              {
-                mentor_id: mentorId,
-                newhire_id: user.userId,
-              },
-              { onConflict: "mentor_id,newhire_id", ignoreDuplicates: true }
-            );
-          if (assignmentError) {
-            throw assignmentError;
-          }
-        }
-
-        return NextResponse.json({ data: mapConversationRow(data as ConversationRow) });
+        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });
@@ -343,11 +247,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const requestedConvId = searchParams.get("convId") ?? undefined;
 
-  const client = createServerSupabaseClient();
-  const feedbackLookupGateway = new SupabaseFeedbackLookupGateway();
-  const mentorAssignmentGateway = new SupabaseMentorAssignmentGateway();
   const authGateway = new SupabaseAuthGateway();
-
   const accessToken = request.cookies.get("auth_access_token")?.value;
   if (!accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -362,33 +262,31 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: conversationRows, error: conversationListError } = await client
-      .from("conversation")
-      .select()
-      .eq("owner_id", authUser.userId)
-      .order("last_active_at", { ascending: false })
-      .order("conv_id", { ascending: false });
+    const profile = await authGateway.getUserProfile(authUser.userId);
+    const convListResponse = await callBackend<{ data: { conv_id: string; title: string; created_at: string }[] }>(
+      `/conversations/newHire?userId=${encodeURIComponent(authUser.userId)}`,
+      undefined,
+      accessToken
+    );
 
-    if (conversationListError) {
-      throw conversationListError;
-    }
+    const conversations = (convListResponse.data ?? []).map((row) => {
+      const mapped = mapApiConversationRow(row);
+      mapped.ownerId = authUser.userId;
+      return mapped;
+    });
 
-    const conversations = (conversationRows as ConversationRow[] | null)?.map(mapConversationRow) ?? [];
-    const availableMentors = await listAvailableMentors(client, authUser.userId);
-
-    if (availableMentors.length === 0) {
-      const { data: userRow, error: userError } = await client
-        .from("user")
-        .select()
-        .eq("user_id", authUser.userId)
-        .single();
-      if (userError || !userRow) {
-        throw userError ?? new Error("User not found.");
-      }
+    if (!conversations.length) {
       return NextResponse.json({
         data: {
           conversation: null,
-          currentUser: mapUserRow(userRow as UserRow),
+          currentUser: {
+            userId: authUser.userId,
+            role: profile.role,
+            displayName: profile.displayName,
+            email: "",
+            createdAt: "",
+            disabledAt: undefined,
+          },
           initialMessages: [],
           initialFeedbacks: {},
           authorNames: {},
@@ -399,116 +297,61 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (!conversations.length) {
-      const { data: userRow, error: userError } = await client
-        .from("user")
-        .select()
-        .eq("user_id", authUser.userId)
-        .single();
-      if (userError || !userRow) {
-        throw userError ?? new Error("User not found.");
-      }
-      return NextResponse.json({
-        data: {
-          conversation: null,
-          currentUser: mapUserRow(userRow as UserRow),
-          initialMessages: [],
-          initialFeedbacks: {},
-          authorNames: {},
-          mentorAssignments: [],
-          availableConversations: [],
-          availableMentors,
-        },
-      });
-    }
-
-    let selectedConversation: Conversation = conversations[0];
+    let selectedConversation = conversations[0];
     if (requestedConvId) {
-      const matched = conversations.find((entry) => entry.convId === requestedConvId);
+      const matched = conversations.find((conv) => conv.convId === requestedConvId);
       if (matched) {
         selectedConversation = matched;
       }
     }
 
-    const [{ data: conversationRow, error: conversationError }, { data: userRow, error: userError }] = await Promise.all([
-      client.from("conversation").select().eq("conv_id", selectedConversation.convId).single(),
-      client.from("user").select().eq("user_id", authUser.userId).single(),
-    ]);
-
-    if (conversationError || !conversationRow) {
-      throw conversationError ?? new Error("Conversation not found.");
-    }
-    if (userError || !userRow) {
-      throw userError ?? new Error("User not found.");
-    }
-
-    const conversation = mapConversationRow(conversationRow as ConversationRow);
-    const currentUser = mapUserRow(userRow as UserRow);
-
-    const { data: messageRows, error: messageError } = await client
-      .from("message")
-      .select()
-      .eq("conv_id", conversation.convId)
-      .order("created_at", { ascending: true })
-      .order("msg_id", { ascending: true });
-    if (messageError || !messageRows) {
-      throw messageError ?? new Error("Failed to load messages.");
-    }
-    const initialMessages = (messageRows as MessageRow[]).map(mapMessageRow);
-
-    const messageIds = initialMessages.map((message) => message.msgId);
-
-    const { data: feedbackRows, error: feedbackError } = messageIds.length
-      ? await client.from("feedback").select().in("target_msg_id", messageIds)
-      : { data: [] as unknown[], error: null };
-    if (feedbackError) {
-      throw feedbackError;
-    }
+    const messagesResponse = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }[] }>(
+      `/messages?convId=${encodeURIComponent(selectedConversation.convId)}`,
+      undefined,
+      accessToken
+    );
+    const initialMessages = (messagesResponse.data ?? [])
+      .map(mapApiMessageRow)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id))
+      .map(mapMessageRow);
 
     const feedbackByMessageId: Record<string, ReturnType<typeof mapFeedbackRow>[]> = {};
-    if (feedbackRows) {
-      for (const row of feedbackRows as FeedbackRow[]) {
-        const mapped = mapFeedbackRow(row);
-        if (!feedbackByMessageId[mapped.targetMsgId]?.length) {
-          feedbackByMessageId[mapped.targetMsgId] = [mapped];
-        }
-      }
-    }
-
     const authorIds = new Set<string>();
-    Object.values(feedbackByMessageId).forEach((list) => {
-      list.forEach((item) => authorIds.add(item.authorId));
-    });
 
-    const authorEntries = await Promise.all(
-      Array.from(authorIds).map(async (authorId) => {
-        const displayName = await feedbackLookupGateway.getUserDisplayName(authorId);
-        return [authorId, displayName ?? authorId] as const;
-      })
-    );
-
-    const mentorAssignments = await mentorAssignmentGateway.listActiveAssignments({ newhireId: conversation.ownerId });
-
-    const isOwner = conversation.ownerId === authUser.userId;
-    const isMentorUser = mentorAssignments.some((assignment) => assignment.mentorId === authUser.userId);
-    if (!isOwner && !isMentorUser) {
-      throw new HttpError(403, "Forbidden");
+    for (const msg of initialMessages) {
+      const feedbackResponse = await callBackend<{ data: { fb_id: string; target_msg_id: string; author_id: string; author_role: string; content: string; created_at: string; updated_at?: string | null }[] }>(
+        `/feedback?messageId=${encodeURIComponent(msg.msgId)}`,
+        undefined,
+        accessToken
+      );
+      const mapped = (feedbackResponse.data ?? []).map(mapApiFeedbackRow).map(mapFeedbackRow);
+      if (mapped.length) {
+        feedbackByMessageId[msg.msgId] = mapped;
+        mapped.forEach((item) => authorIds.add(item.authorId));
+      }
     }
 
     return NextResponse.json({
       data: {
-        conversation,
-        currentUser,
+        conversation: selectedConversation,
+        currentUser: {
+          userId: authUser.userId,
+          role: profile.role,
+          displayName: profile.displayName,
+          email: "",
+          createdAt: "",
+          disabledAt: undefined,
+        },
         initialMessages,
         initialFeedbacks: feedbackByMessageId,
-        authorNames: Object.fromEntries(authorEntries),
-        mentorAssignments,
-        availableConversations: conversations.map((entry) => ({
-          convId: entry.convId,
-          title: entry.title,
-          lastActiveAt: entry.lastActiveAt,
+        authorNames: Object.fromEntries(Array.from(authorIds).map((id) => [id, id] as const)),
+        mentorAssignments: [],
+        availableConversations: conversations.map((conv) => ({
+          convId: conv.convId,
+          title: conv.title,
+          lastActiveAt: conv.lastActiveAt,
         })),
-        availableMentors,
+        availableMentors: [],
       },
     });
   } catch (error) {

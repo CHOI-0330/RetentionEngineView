@@ -1,103 +1,83 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  SupabaseFeedbackGateway,
-  SupabaseFeedbackLookupGateway,
-  SupabaseMentorAssignmentGateway,
-  SupabaseMessageGateway,
-} from "../../../../../src/interfaceAdapters/gateways/supabase";
 import { SupabaseAuthGateway } from "../../../../../src/interfaceAdapters/gateways/supabase/authGateway";
-import { createServerSupabaseClient } from "../../../../../src/lib/supabaseClient";
-import {
-  mapConversationRow,
-  mapFeedbackRow,
-  mapMessageRow,
-  mapUserRow,
-  type ConversationRow,
-  type FeedbackRow,
-  type MessageRow,
-  type UserRow,
-} from "../../../../../src/interfaceAdapters/gateways/supabase/types";
-import {
-  createFeedbackUseCase,
-  validateFeedbackRulesUseCase,
-  validateFeedbackUpdateUseCase,
-} from "../../../../../src/application/entitle/useCases";
+import type { Feedback, Message, User } from "../../../../../src/domain/core";
 
-interface MentorRequestContext {
-  authUser: { userId: string; role: "NEW_HIRE" | "MENTOR" | "ADMIN" };
-  conversation: ReturnType<typeof mapConversationRow>;
-  student: ReturnType<typeof mapUserRow>;
-  mentor: ReturnType<typeof mapUserRow>;
-  assignments: Awaited<ReturnType<SupabaseMentorAssignmentGateway["listActiveAssignments"]>>;
-}
+const BACKEND_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
+).replace(/\/$/, "");
 
 const authGateway = new SupabaseAuthGateway();
-const mentorAssignmentGateway = new SupabaseMentorAssignmentGateway();
-const messageGateway = new SupabaseMessageGateway();
-const feedbackGateway = new SupabaseFeedbackGateway();
-const feedbackLookupGateway = new SupabaseFeedbackLookupGateway();
-const client = createServerSupabaseClient();
 
-const resolveMentorRequest = async (
-  request: NextRequest,
-  convId: string
-): Promise<NextResponse | MentorRequestContext> => {
-  const accessToken = request.cookies.get("auth_access_token")?.value;
+type MessageDto = { msg_id: string; conv_id: string; role: Message["role"]; content: string; created_at: string };
+type FeedbackDto = {
+  fb_id: string;
+  target_msg_id: string;
+  author_id: string;
+  author_role: Feedback["authorRole"];
+  content: string;
+  created_at: string;
+};
+
+const mapMessageDto = (row: MessageDto): Message => ({
+  msgId: row.msg_id,
+  convId: row.conv_id,
+  role: row.role,
+  content: row.content,
+  status: undefined,
+  createdAt: row.created_at,
+});
+
+const mapFeedbackDto = (row: FeedbackDto): Feedback => ({
+  fbId: row.fb_id,
+  targetMsgId: row.target_msg_id,
+  authorId: row.author_id,
+  authorRole: row.author_role,
+  content: row.content,
+  visibility: undefined,
+  createdAt: row.created_at,
+  updatedAt: undefined,
+});
+
+const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> => {
+  const response = await fetch(`${BACKEND_BASE_URL}/${path.replace(/^\//, "")}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Backend request failed with status ${response.status}`);
+  }
+  return (await response.json()) as T;
+};
+
+const ensureMentorAuth = async (request: NextRequest) => {
+  const headerToken = request.headers.get("authorization");
+  const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
+    ? headerToken.slice(7).trim()
+    : null;
+  const accessToken = accessTokenFromHeader ?? request.cookies.get("auth_access_token")?.value;
   if (!accessToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }
 
-  let authUser: { userId: string; role: "NEW_HIRE" | "MENTOR" | "ADMIN" };
+  let authUser: { userId: string; role: User["role"] };
   try {
     authUser = await authGateway.getUserFromAccessToken(accessToken);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unauthorized";
-    return NextResponse.json({ error: message }, { status: 401 });
+    return { error: NextResponse.json({ error: message }, { status: 401 }) } as const;
   }
 
   if (authUser.role !== "MENTOR") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
   }
 
-  const [{ data: conversationRow, error: conversationError }, { data: mentorRow, error: mentorError }] = await Promise.all([
-    client.from("conversation").select().eq("conv_id", convId).single(),
-    client.from("user").select().eq("user_id", authUser.userId).single(),
-  ]);
-
-  if (conversationError || !conversationRow) {
-    return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
-  }
-  if (mentorError || !mentorRow) {
-    return NextResponse.json({ error: "Mentor not found." }, { status: 404 });
-  }
-
-  const conversation = mapConversationRow(conversationRow as ConversationRow);
-
-  const assignments = await mentorAssignmentGateway.listActiveAssignments({ mentorId: authUser.userId });
-  const isAssigned = assignments.some(
-    (assignment) => assignment.newhireId === conversation.ownerId && assignment.revokedAt == null
-  );
-  if (!isAssigned) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { data: studentRow, error: studentError } = await client
-    .from("user")
-    .select()
-    .eq("user_id", conversation.ownerId)
-    .single();
-  if (studentError || !studentRow) {
-    return NextResponse.json({ error: "Student not found." }, { status: 404 });
-  }
-
-  return {
-    authUser,
-    conversation,
-    student: mapUserRow(studentRow as UserRow),
-    mentor: mapUserRow(mentorRow as UserRow),
-    assignments,
-  };
+  return { authUser, accessToken } as const;
 };
 
 export async function GET(
@@ -111,45 +91,74 @@ export async function GET(
   }
 
   try {
-    const context = await resolveMentorRequest(request, convId);
-    if (context instanceof NextResponse) {
-      return context;
+    const auth = await ensureMentorAuth(request);
+    if ("error" in auth) {
+      return auth.error;
+    }
+    const { authUser, accessToken } = auth;
+
+    const convList = await callBackend<{ conv_id: string; title: string; created_at: string; owner_name?: string }[]>(
+      `/conversations/mentor?mentorId=${encodeURIComponent(authUser.userId)}`,
+      undefined,
+      accessToken
+    );
+    const targetConv = convList.find((entry) => entry.conv_id === convId);
+    if (!targetConv) {
+      return NextResponse.json({ error: "Conversation not found or not assigned." }, { status: 404 });
     }
 
-    const { conversation, student, mentor } = context;
+    const conversation = {
+      convId: targetConv.conv_id,
+      ownerId: "",
+      title: targetConv.title,
+      state: "ACTIVE",
+      createdAt: targetConv.created_at,
+      lastActiveAt: targetConv.created_at,
+      archivedAt: undefined,
+    };
 
-    const messagesResponse = await messageGateway.listConversationMessages({ convId });
-    const messages = messagesResponse.items;
+    const messagesResponse = await callBackend<{ data: MessageDto[] }>(
+      `/messages/mentor?mentorId=${encodeURIComponent(authUser.userId)}&convId=${encodeURIComponent(convId)}`,
+      undefined,
+      accessToken
+    );
+    const messages = (messagesResponse.data ?? []).map(mapMessageDto);
 
-    const messageIds = messages.map((message) => message.msgId);
-    const { data: feedbackRows, error: feedbackError } = messageIds.length
-      ? await client.from("feedback").select().in("target_msg_id", messageIds)
-      : { data: [] as unknown[], error: null };
-    if (feedbackError) {
-      throw feedbackError;
-    }
+    const feedbackByMessageId: Record<string, Feedback[]> = {};
+    const authorNames: Record<string, string> = {};
 
-    const feedbackByMessageId: Record<string, ReturnType<typeof mapFeedbackRow>[]> = {};
-    if (feedbackRows) {
-      for (const row of feedbackRows as FeedbackRow[]) {
-        const mapped = mapFeedbackRow(row);
-        if (!feedbackByMessageId[mapped.targetMsgId]?.length) {
-          feedbackByMessageId[mapped.targetMsgId] = [mapped];
+    await Promise.all(
+      messages.map(async (message) => {
+        const fbRes = await callBackend<{ data: FeedbackDto[] }>(
+          `/feedback?messageId=${encodeURIComponent(message.msgId)}`,
+          undefined,
+          accessToken
+        );
+        const mapped = (fbRes.data ?? []).map(mapFeedbackDto);
+        if (mapped.length) {
+          feedbackByMessageId[message.msgId] = mapped;
+          mapped.forEach((item) => {
+            authorNames[item.authorId] = authorNames[item.authorId] ?? item.authorId;
+          });
         }
-      }
-    }
-
-    const authorIds = new Set<string>();
-    Object.values(feedbackByMessageId).forEach((list) => {
-      list.forEach((item) => authorIds.add(item.authorId));
-    });
-
-    const authorEntries = await Promise.all(
-      Array.from(authorIds).map(async (authorId) => {
-        const displayName = await feedbackLookupGateway.getUserDisplayName(authorId);
-        return [authorId, displayName ?? authorId] as const;
       })
     );
+
+    const mentor: User = {
+      userId: authUser.userId,
+      role: "MENTOR",
+      displayName: authUser.userId,
+      email: "",
+      createdAt: "",
+    };
+
+    const student: User = {
+      userId: "",
+      role: "NEW_HIRE",
+      displayName: targetConv.owner_name ?? "Unknown user",
+      email: "",
+      createdAt: "",
+    };
 
     return NextResponse.json({
       data: {
@@ -158,7 +167,7 @@ export async function GET(
         mentor,
         messages,
         feedbackByMessageId,
-        authorNames: Object.fromEntries(authorEntries),
+        authorNames,
       },
     });
   } catch (error) {
@@ -178,12 +187,11 @@ export async function POST(
   }
 
   try {
-    const context = await resolveMentorRequest(request, convId);
-    if (context instanceof NextResponse) {
-      return context;
+    const auth = await ensureMentorAuth(request);
+    if ("error" in auth) {
+      return auth.error;
     }
-
-    const { conversation, mentor, assignments } = context;
+    const { authUser, accessToken } = auth;
 
     let body: { messageId?: string; content?: string };
     try {
@@ -197,77 +205,48 @@ export async function POST(
     }
     const content = typeof body.content === "string" ? body.content : "";
 
-    const { data: messageRow, error: messageError } = await client
-      .from("message")
-      .select()
-      .eq("msg_id", body.messageId)
-      .single();
-    if (messageError || !messageRow) {
-      return NextResponse.json({ error: "Message not found." }, { status: 404 });
+    // 메시지가 멘토에게 접근 가능한지 확인
+    const messagesResponse = await callBackend<{ data: MessageDto[] }>(
+      `/messages/mentor?mentorId=${encodeURIComponent(authUser.userId)}&convId=${encodeURIComponent(convId)}`,
+      undefined,
+      accessToken
+    );
+    const messages = (messagesResponse.data ?? []).map(mapMessageDto);
+    const targetMessage = messages.find((m) => m.msgId === body.messageId);
+    if (!targetMessage) {
+      return NextResponse.json({ error: "Message not found or not accessible." }, { status: 404 });
     }
 
-    const message = mapMessageRow(messageRow as MessageRow);
-
-    if (message.convId !== conversation.convId) {
-      return NextResponse.json({ error: "Message does not belong to the conversation." }, { status: 400 });
-    }
-
-    const existing = await feedbackGateway.listFeedbacks({ msgId: message.msgId, limit: 1 });
-    const existingFeedback = existing.items[0] ?? null;
-
+    // 기존 멘토 피드백 존재 여부 확인 (백엔드에는 업데이트 엔드포인트가 없어 중복 작성 방지만 수행)
+    const feedbackRes = await callBackend<{ data: FeedbackDto[] }>(
+      `/feedback?messageId=${encodeURIComponent(targetMessage.msgId)}`,
+      undefined,
+      accessToken
+    );
+    const existingFeedback = (feedbackRes.data ?? []).find((fb) => fb.author_id === authUser.userId);
     if (existingFeedback) {
-      if (existingFeedback.authorId !== mentor.userId) {
-        return NextResponse.json({ error: "既存のフィードバックを更新する権限がありません。" }, { status: 403 });
-      }
-      const updateValidation = validateFeedbackUpdateUseCase({
-        requester: mentor,
-        conversation,
-        targetMessage: message,
-        existingFeedback,
-        content,
-        mentorAssignments: assignments,
-      });
-      if (updateValidation.kind === "failure") {
-        const status = updateValidation.error.kind === "Forbidden" ? 403 : 400;
-        return NextResponse.json({ error: updateValidation.error.message }, { status });
-      }
-      const updated = await feedbackGateway.updateFeedback({
-        feedbackId: updateValidation.value.feedbackId,
-        content: updateValidation.value.content,
-      });
-      return NextResponse.json({
-        data: {
-          feedback: updated,
-          authorName: mentor.displayName,
-        },
-      });
+      return NextResponse.json({ error: "既にこのメッセージへフィードバック済みです。" }, { status: 400 });
     }
 
-    const validation = validateFeedbackRulesUseCase({
-      requester: mentor,
-      conversation,
-      targetMessage: message,
-      content,
-      mentorAssignments: assignments,
-      existingFeedbackCount: existing.items.length,
-    });
-
-    if (validation.kind === "failure") {
-      const status = validation.error.kind === "Forbidden" ? 403 : 400;
-      return NextResponse.json({ error: validation.error.message }, { status });
-    }
-
-    const ready = createFeedbackUseCase({ validated: validation.value });
-
-    const feedback = await feedbackGateway.createFeedback({
-      ...ready.payload,
-    });
+    const createRes = await callBackend<{ data: FeedbackDto }>(
+      "/feedback",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          messageId: targetMessage.msgId,
+          authorId: authUser.userId,
+          content,
+        }),
+      },
+      accessToken
+    );
+    const feedback = mapFeedbackDto(createRes.data);
 
     return NextResponse.json(
       {
         data: {
           feedback,
-          authorName: mentor.displayName,
+          authorName: authUser.userId,
         },
       },
       { status: 201 }

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import MentorStudentChatView from "../../../views/MentorStudentChatView";
 import type { Conversation, Feedback, Message, User } from "../../../domain/core";
 import type { UseCaseFailure } from "../../../application/entitle/models";
+import { useSession } from "../../../components/SessionProvider";
+import { apiFetch } from "../../../lib/apiClient";
 
 interface MentorChatBootstrap {
   conversation: Conversation;
@@ -27,6 +29,7 @@ const normalizeError = (reason: unknown): UseCaseFailure => ({
 
 const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
   const router = useRouter();
+  const { session, isLoading: isSessionLoading } = useSession();
   const [bootstrap, setBootstrap] = useState<MentorChatBootstrap | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<UseCaseFailure | null>(null);
@@ -35,30 +38,52 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [editingFlags, setEditingFlags] = useState<Record<string, boolean>>({});
 
+  if (isSessionLoading) {
+    return <div className="p-4 text-sm text-muted-foreground">ログイン情報を確認中...</div>;
+  }
+
+  if (!session) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        ログインしてください。 <a className="text-primary underline" href="/entitle/auth">Auth</a>
+      </div>
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
     const fetchConversation = async () => {
+      if (!session?.accessToken) {
+        setLoadError({ kind: "ValidationError", message: "ログインしてください。" });
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/entitle/mentor-chat/${encodeURIComponent(convId)}`, {
-          cache: "no-store",
-        });
+        const response = await apiFetch<{ data: MentorChatBootstrap }>(
+          `/api/entitle/mentor-chat/${encodeURIComponent(convId)}`,
+          {
+            cache: "no-store",
+            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${session.accessToken}`,
+            },
+          }
+        );
+        if (!response?.data) {
+          throw new Error("会話データが取得できませんでした。");
+        }
         if (response.status === 401 || response.status === 403) {
           if (!cancelled) {
             router.push("/?redirected=1");
           }
           return;
         }
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-        const json = (await response.json()) as { data: MentorChatBootstrap };
         if (!cancelled) {
-          setBootstrap(json.data);
-          // 初期表示で編集モードに入らないよう、すべて false に設定
+          setBootstrap(response.data);
           setEditingFlags(() => {
             const flags: Record<string, boolean> = {};
-            json.data.messages.forEach((message) => {
+            response.data.messages.forEach((message) => {
               flags[message.msgId] = false;
             });
             return flags;
@@ -80,7 +105,7 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
     return () => {
       cancelled = true;
     };
-  }, [convId, router]);
+  }, [convId, router, session?.accessToken]);
 
   const viewData = useMemo(() => {
     if (!bootstrap) {
@@ -138,35 +163,18 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
 
       setSubmitting((previous) => ({ ...previous, [messageId]: true }));
       try {
-        const response = await fetch(`/api/entitle/mentor-chat/${encodeURIComponent(convId)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId, content: trimmed, feedbackId: existingFeedback?.fbId }),
-        });
-
-        if (!response.ok) {
-          const raw = await response.text();
-          let message = "送信に失敗しました。";
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed?.error && typeof parsed.error === "string") {
-              message = parsed.error;
-            }
-          } catch (parseError) {
-            if (raw) {
-              message = raw;
-            }
+        const response = await apiFetch<{ data: { feedback: Feedback; authorName?: string } }>(
+          `/api/entitle/mentor-chat/${encodeURIComponent(convId)}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: session.accessToken ? `Bearer ${session.accessToken}` : "",
+            },
+            credentials: "include",
+            body: JSON.stringify({ messageId, content: trimmed, feedbackId: existingFeedback?.fbId }),
           }
-          setFormErrors((previous) => ({
-            ...previous,
-            [messageId]: message,
-          }));
-          return;
-        }
-
-        const json = (await response.json()) as {
-          data: { feedback: Feedback; authorName?: string };
-        };
+        );
 
         setBootstrap((previous) => {
           if (!previous) {
@@ -174,11 +182,14 @@ const MentorStudentChatPage = ({ convId }: MentorStudentChatPageProps) => {
           }
           const nextFeedbacks = {
             ...previous.feedbackByMessageId,
-            [messageId]: [json.data.feedback],
+            [messageId]: [response.data.feedback],
           };
           const nextAuthorNames = {
             ...previous.authorNames,
-            [json.data.feedback.authorId]: json.data.authorName ?? previous.authorNames[json.data.feedback.authorId] ?? json.data.feedback.authorId,
+            [response.data.feedback.authorId]:
+              response.data.authorName ??
+              previous.authorNames[response.data.feedback.authorId] ??
+              response.data.feedback.authorId,
           };
           return {
             ...previous,

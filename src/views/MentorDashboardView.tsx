@@ -9,7 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { Loader2, Search, Clock, Bot, User as UserIcon, MessageSquare } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import Link from "next/link";
 
 export interface MentorDashboardStudentItem {
@@ -84,14 +84,12 @@ const MentorDashboardView = ({
         ) : null}
       </header>
 
-      {status.isLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center justify-center text-center text-lg text-muted-foreground">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-            <span>担当情報を読み込み中...</span>
-          </div>
+      {status.isLoading ? (
+        <div className="flex items-center gap-2 rounded-md border border-dashed bg-card/60 px-3 py-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>担当情報を読み込み中...</span>
         </div>
-      )}
+      ) : null}
 
       {!status.isLoading && (
         <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
@@ -105,8 +103,6 @@ const MentorDashboardView = ({
                 key={student.conversationId}
                 student={student}
                 isSelected={meta.selectedStudentId === student.id}
-                isSubmitting={Boolean(meta.qualitySubmitting[student.id])}
-                onFeedback={(isPositive) => viewModel.onFeedback(student.id, isPositive)}
               />
             ))
           )}
@@ -121,18 +117,14 @@ export default MentorDashboardView;
 interface MentorDashboardStudentCardProps {
   student: MentorDashboardStudentItem;
   isSelected: boolean;
-  isSubmitting: boolean;
-  onFeedback: (isPositive: boolean) => void;
 }
 
 const MentorDashboardStudentCard = ({
   student,
   isSelected,
-  isSubmitting,
-  onFeedback,
 }: MentorDashboardStudentCardProps) => {
   return (
-    <Card className={isSelected ? "border-primary" : undefined}>
+    <Card className={isSelected ? "border-primary shadow-lg" : undefined}>
       <CardContent className="flex flex-col gap-4 p-5 sm:gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:pr-8">
         <div className="flex items-start gap-4 pr-4 lg:pr-6 w-full">
           <Avatar className="h-14 w-14">
@@ -146,46 +138,33 @@ const MentorDashboardStudentCard = ({
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              最終活動: {student.lastActivity.toLocaleString()} / 総チャット数: {student.totalChats}
+              最終活動: {student.lastActivity.toLocaleString()}
             </p>
             <div className="w-full rounded-lg border bg-card p-3 sm:p-4 text-sm shadow-sm flex flex-col justify-between overflow-hidden" style={{ height: "11rem" }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-                    <MessageSquare className="h-3.5 w-3.5" /> トピック
-                  </div>
-                  <span
-                    className="mt-1 block text-base font-semibold text-foreground whitespace-nowrap overflow-hidden"
-                    title={student.recentChat.subject}
-                    style={{ textOverflow: "ellipsis" }}
-                  >
-                    {student.recentChat.subject}
-                  </span>
-                </div>
-                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                  <Clock className="h-3 w-3" />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">トピック</span>
+                <span
+                  className="block text-base font-semibold text-foreground whitespace-nowrap overflow-hidden"
+                  title={student.recentChat.subject}
+                  style={{ textOverflow: "ellipsis" }}
+                >
+                  {student.recentChat.subject}
+                </span>
+                <span className="text-xs text-muted-foreground">
                   {student.recentChat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
               <div className="mt-3 space-y-2 overflow-hidden">
-                <div className="flex items-start gap-2">
-                  <UserIcon className="mt-0.5 h-4 w-4 text-foreground/70" />
-                  <p
-                    className="font-medium text-foreground line-clamp-2"
-                    title={student.recentChat.summary || "(メッセージなし)"}
-                  >
-                    {student.recentChat.summary || "(メッセージなし)"}
+                {student.recentChat.summary ? (
+                  <p className="font-medium text-foreground line-clamp-2" title={student.recentChat.summary}>
+                    {student.recentChat.summary}
                   </p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Bot className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                  <p
-                    className="text-muted-foreground line-clamp-2"
-                    title={student.recentChat.aiResponse || "(未回答)"}
-                  >
-                    {student.recentChat.aiResponse || "(未回答)"}
+                ) : null}
+                {student.recentChat.aiResponse ? (
+                  <p className="text-muted-foreground line-clamp-2" title={student.recentChat.aiResponse}>
+                    {student.recentChat.aiResponse}
                   </p>
-                </div>
+                ) : null}
               </div>
               {student.recentChat.needsReview ? (
                 <div className="mt-3 flex justify-end">
@@ -197,12 +176,13 @@ const MentorDashboardStudentCard = ({
             </div>
           </div>
         </div>
-        <div className="w-full pr-4 lg:justify-self-end lg:pl-3">
-          <Button asChild variant="secondary" size="sm" className="w-full justify-center">
-            <Link href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}>
-              チャットを見る
-            </Link>
-          </Button>
+        <div className="w-full pr-4 lg:justify-self-end lg:pl-3 space-y-2">
+          <Link
+            className="inline-flex w-full justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition"
+            href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}
+          >
+            チャットを見る
+          </Link>
         </div>
       </CardContent>
     </Card>
