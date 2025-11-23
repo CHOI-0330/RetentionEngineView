@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Loader2, MessageCircle, ChevronLeft, Edit3 } from "lucide-react";
+import MarkdownRendererView from "../components/MarkdownRenderer";
 
 interface MentorChatMessage {
   id: string;
@@ -66,6 +67,24 @@ const MentorStudentChatView = ({
   onToggleEditing,
   onSubmitFeedback,
 }: MentorStudentChatViewProps) => {
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const anchor = bottomRef.current;
+    const viewport = scrollAreaRef.current;
+    if (!anchor || !viewport) return;
+
+    const smoothToBottom = () => {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      anchor.scrollIntoView({ behavior: "smooth", block: "end" });
+    };
+
+    smoothToBottom();
+    const timeoutId = setTimeout(smoothToBottom, 120);
+    return () => clearTimeout(timeoutId);
+  }, [messages.length]);
+
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -98,12 +117,15 @@ const MentorStudentChatView = ({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
           {messages.map((message, index) => {
             const isStudent = message.role === "NEW_HIRE";
             const hasFeedback = message.feedbacks.length > 0;
             const isEditing = editingFlags[message.id] ?? false;
+            const isAssistantDraft =
+              message.role === "ASSISTANT" &&
+              (message.status === "DRAFT" || message.status === "PARTIAL");
             const draftValue =
               feedbackDrafts[message.id] ??
               (hasFeedback ? message.feedbacks[0]?.content ?? "" : "");
@@ -137,9 +159,21 @@ const MentorStudentChatView = ({
                         isStudent
                           ? "bg-primary text-primary-foreground rounded-tr-sm"
                           : "bg-muted/50 text-foreground rounded-tl-sm hover:bg-muted/80"
-                      }`}
+                      } ${hasFeedback ? "ring-2 ring-blue-400/50 ring-offset-2" : ""}`}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {isAssistantDraft ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>生成中...</span>
+                        </div>
+                      ) : message.role === "ASSISTANT" ? (
+                        <MarkdownRendererView
+                          content={message.content}
+                          className="space-y-2 break-words [&>pre]:mt-2 [&>pre]:bg-background/60 [&>pre]:text-xs [&>pre]:text-foreground"
+                        />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )}
 
                       {!isStudent && (
                         <div className="absolute -right-10 top-0 opacity-0 transition-opacity group-hover:opacity-100">
@@ -172,21 +206,19 @@ const MentorStudentChatView = ({
                     }`}
                   >
                     <span>
-                      {message.createdAt.toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
+                      {message.createdAt.toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </span>
-                    {message.status && (
+                    {message.status && message.status !== "DONE" ? (
                       <Badge
                         variant="outline"
                         className="h-4 px-1 text-[9px] uppercase tracking-widest"
                       >
                         {message.status.toLowerCase()}
                       </Badge>
-                    )}
+                    ) : null}
                   </div>
 
                   {message.feedbacks.length > 0 && (
@@ -301,6 +333,8 @@ const MentorStudentChatView = ({
               <p>まだメッセージがありません。</p>
             </div>
           )}
+
+          <div ref={bottomRef} className="h-px" />
         </div>
       </div>
     </div>
@@ -357,21 +391,28 @@ function MentorFeedbackSection({
         id={contentId}
         className="space-y-3 pt-2 animate-in slide-in-from-top-2 fade-in duration-200"
       >
-        <div className="relative rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+        <div className="relative rounded-xl border border-blue-100 bg-blue-50/50 p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-600">
                 {feedbacks[0]?.authorName.slice(0, 1)}
               </div>
-              <span className="font-medium text-foreground">
-                {feedbacks[0]?.authorName}
-              </span>
+              <div className="leading-tight">
+                <span className="block text-foreground font-semibold text-sm">
+                  {feedbacks[0]?.authorName}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {feedbacks[0]?.createdAt.toLocaleString()}
+                </span>
+              </div>
             </div>
-            <span>{feedbacks[0]?.createdAt.toLocaleString()}</span>
+            <Badge variant="secondary" className="text-[10px]">
+              フィードバック
+            </Badge>
           </div>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-            {feedbacks[0]?.content}
-          </p>
+          <div className="prose prose-sm max-w-none text-foreground/90">
+            <MarkdownRendererView content={feedbacks[0]?.content ?? ""} className="space-y-2" />
+          </div>
         </div>
 
         {feedbacks.length > 1 ? (
@@ -381,14 +422,14 @@ function MentorFeedbackSection({
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-2 pl-4 border-l-2 border-border/50">
               {feedbacks.slice(1).map((fb) => (
-                <div key={fb.id} className="rounded-lg bg-muted/30 p-3">
+                <div key={fb.id} className="rounded-lg bg-muted/30 p-3 shadow-sm">
                   <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                     <span className="font-medium">{fb.authorName}</span>
-                    <span>{fb.createdAt.toLocaleString()}</span>
+                    <span className="text-[11px]">{fb.createdAt.toLocaleString()}</span>
                   </div>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {fb.content}
-                  </p>
+                  <div className="prose prose-sm max-w-none text-foreground/90">
+                    <MarkdownRendererView content={fb.content} className="space-y-1.5" />
+                  </div>
                 </div>
               ))}
             </CollapsibleContent>

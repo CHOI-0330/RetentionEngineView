@@ -12,6 +12,7 @@ export type StudentChatMessageSender = "student" | "ai";
 export interface StudentChatMessageView {
   id: string;
   content: string;
+  format: "markdown" | "text";
   sender: StudentChatMessageSender;
   timestamp: Date;
   status?: Message["status"];
@@ -67,6 +68,7 @@ export interface StudentChatPresenterOutput {
 const toMessageView = (message: Message): StudentChatMessageView => ({
   id: message.msgId,
   content: message.content,
+  format: message.role === "ASSISTANT" ? "markdown" : "text",
   sender: message.role === "ASSISTANT" ? "ai" : "student",
   timestamp: new Date(message.createdAt),
   status: message.status,

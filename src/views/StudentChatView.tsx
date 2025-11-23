@@ -36,6 +36,7 @@ import {
 } from "../components/ui/collapsible";
 import { Textarea } from "../components/ui/textarea";
 import { Skeleton } from "../components/ui/skeleton";
+import MarkdownRendererView from "../components/MarkdownRenderer";
 
 interface ConversationSummary {
   convId: string;
@@ -414,7 +415,16 @@ const StudentChatMessageBubble = ({
                 <span>生成中...</span>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <>
+                {message.format === "markdown" ? (
+                  <MarkdownRendererView
+                    content={message.content}
+                    className="space-y-2 break-words [&>pre]:mt-2 [&>pre]:bg-background/60 [&>pre]:text-xs [&>pre]:text-foreground"
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                )}
+              </>
             )}
           </div>
         </div>
