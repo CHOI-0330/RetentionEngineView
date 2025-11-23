@@ -52,6 +52,9 @@ const AuthPage = () => {
       redirectedUserRef.current = null;
       return;
     }
+    if (!pathname) {
+      return;
+    }
     const target = session.role === "MENTOR" ? "/mentor" : "/student/dashboard";
     const alreadyThere = pathname === target || pathname.startsWith(target);
     if (!alreadyThere && redirectedUserRef.current !== session.userId) {

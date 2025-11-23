@@ -29,7 +29,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../components/ui/collapsible";
 import { Textarea } from "../components/ui/textarea";
 import { Skeleton } from "../components/ui/skeleton";
 
@@ -81,19 +85,17 @@ const StudentChatView = ({
   meta,
   interactions,
 }: StudentChatViewProps) => {
-  const feedbackByMessageId = viewModel.mentorFeedbacks.reduce<Record<string, StudentChatViewModel["mentorFeedbacks"]>>(
-    (acc, feedback) => {
-      acc[feedback.messageId] = [...(acc[feedback.messageId] ?? []), feedback];
-      return acc;
-    },
-    {}
-  );
+  const feedbackByMessageId = viewModel.mentorFeedbacks.reduce<
+    Record<string, StudentChatViewModel["mentorFeedbacks"]>
+  >((acc, feedback) => {
+    acc[feedback.messageId] = [...(acc[feedback.messageId] ?? []), feedback];
+    return acc;
+  }, {});
 
-  const showConversationPicker = Boolean(onConversationChange) && (conversationOptions?.length ?? 0) > 1;
+  const showConversationPicker =
+    Boolean(onConversationChange) && (conversationOptions?.length ?? 0) > 1;
   const pickerValue =
-    selectedConversationId ??
-    conversationOptions?.[0]?.convId ??
-    "";
+    selectedConversationId ?? conversationOptions?.[0]?.convId ?? "";
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +104,9 @@ const StudentChatView = ({
   useEffect(() => {
     if (meta.isHistoryLoading) return;
     const anchor = bottomRef.current;
-    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]'
+    );
     if (!anchor) return;
 
     // Prefer a single smooth path to avoid jank
@@ -123,7 +127,11 @@ const StudentChatView = ({
       cancelAnimationFrame(rafId);
       clearTimeout(timeoutId);
     };
-  }, [viewModel.messages.length, status.isAwaitingAssistant, meta.isHistoryLoading]);
+  }, [
+    viewModel.messages.length,
+    status.isAwaitingAssistant,
+    meta.isHistoryLoading,
+  ]);
 
   return (
     <div className="flex min-h-[80vh] flex-col overflow-hidden rounded-2xl border bg-card">
@@ -153,11 +161,13 @@ const StudentChatView = ({
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden pl-4 pr-0 py-4 sm:pl-6 sm:pr-0 sm:py-6">
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-6 sm:py-6">
         <section className="flex h-full w-full flex-col overflow-hidden rounded-xl border bg-background/60">
           <div className="flex items-center justify-between border-b px-4 py-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="rounded-full">チャット</Badge>
+              <Badge variant="outline" className="rounded-full">
+                チャット
+              </Badge>
               {status.isAwaitingAssistant ? (
                 <span className="flex items-center gap-2 text-primary">
                   <Loader2 className="h-4 w-4 animate-spin" /> AI が回答中です…
@@ -216,7 +226,9 @@ const ConversationHeader = ({
   <header className="flex flex-col gap-4 border-b px-4 py-4 sm:px-6 md:flex-row md:items-start md:justify-between">
     <div className="flex flex-1 flex-col gap-3">
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">会話</p>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+          会話
+        </p>
         <h1 className="text-lg font-semibold">{conversationTitle}</h1>
       </div>
       {showConversationPicker ? (
@@ -224,9 +236,16 @@ const ConversationHeader = ({
           <Label htmlFor="student-conversation-picker" className="sr-only">
             会話を選択
           </Label>
-          <Select value={pickerValue} onValueChange={(value) => onConversationChange?.(value)}>
-            <SelectTrigger id="student-conversation-picker" className="md:w-auto md:min-w-[220px]" aria-label="会話を選択">
-            <SelectValue placeholder="会話を選択" />
+          <Select
+            value={pickerValue}
+            onValueChange={(value) => onConversationChange?.(value)}
+          >
+            <SelectTrigger
+              id="student-conversation-picker"
+              className="md:w-auto md:min-w-[220px]"
+              aria-label="会話を選択"
+            >
+              <SelectValue placeholder="会話を選択" />
             </SelectTrigger>
             <SelectContent>
               {conversationOptions?.map((option) => (
@@ -241,12 +260,19 @@ const ConversationHeader = ({
     </div>
     <div className="flex items-center justify-between gap-3 md:flex-col md:items-end md:justify-start">
       {createDialog ? (
-        <Dialog open={createDialog.isOpen} onOpenChange={(open) => (open ? createDialog.onOpen() : createDialog.onClose())}>
+        <Dialog
+          open={createDialog.isOpen}
+          onOpenChange={(open) =>
+            open ? createDialog.onOpen() : createDialog.onClose()
+          }
+        >
           <DialogTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              disabled={!createDialog.mentorOptions.length && !createDialog.isOpen}
+              disabled={
+                !createDialog.mentorOptions.length && !createDialog.isOpen
+              }
             >
               新しい会話を開始
             </Button>
@@ -254,7 +280,9 @@ const ConversationHeader = ({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>新しい会話を作成</DialogTitle>
-              <DialogDescription>会話タイトルとメンターを選択してください。</DialogDescription>
+              <DialogDescription>
+                会話タイトルとメンターを選択してください。
+              </DialogDescription>
             </DialogHeader>
             <form
               className="space-y-4"
@@ -264,16 +292,22 @@ const ConversationHeader = ({
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor="student-new-conversation-title">会話タイトル</Label>
+                <Label htmlFor="student-new-conversation-title">
+                  会話タイトル
+                </Label>
                 <Input
                   id="student-new-conversation-title"
                   value={createDialog.title}
-                  onChange={(event) => createDialog.onChangeTitle(event.target.value)}
+                  onChange={(event) =>
+                    createDialog.onChangeTitle(event.target.value)
+                  }
                   placeholder="例：CS 基礎トレーニング"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="student-new-conversation-mentor">メンター</Label>
+                <Label htmlFor="student-new-conversation-mentor">
+                  メンター
+                </Label>
                 <Select
                   value={createDialog.selectedMentorId ?? undefined}
                   onValueChange={(value) => createDialog.onChangeMentor(value)}
@@ -301,9 +335,13 @@ const ConversationHeader = ({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createDialog.isSubmitting || !createDialog.selectedMentorId}
+                  disabled={
+                    createDialog.isSubmitting || !createDialog.selectedMentorId
+                  }
                 >
-                  {createDialog.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {createDialog.isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
                   作成
                 </Button>
               </DialogFooter>
@@ -312,7 +350,9 @@ const ConversationHeader = ({
         </Dialog>
       ) : null}
       <Avatar className="h-9 w-9">
-        <AvatarFallback className="bg-primary/10 text-primary">NH</AvatarFallback>
+        <AvatarFallback className="bg-primary/10 text-primary">
+          NH
+        </AvatarFallback>
       </Avatar>
     </div>
   </header>
@@ -325,7 +365,12 @@ interface StudentChatMessageListProps {
   feedbackByMessageId: Record<string, StudentChatViewModel["mentorFeedbacks"]>;
 }
 
-const StudentChatMessageList = ({ containerRef, bottomRef, messages, feedbackByMessageId }: StudentChatMessageListProps) => (
+const StudentChatMessageList = ({
+  containerRef,
+  bottomRef,
+  messages,
+  feedbackByMessageId,
+}: StudentChatMessageListProps) => (
   <div ref={containerRef} className="flex-1">
     <ScrollArea className="h-full pl-2 py-3 sm:pl-4">
       <div className="flex flex-col">
@@ -353,35 +398,49 @@ interface StudentChatMessageBubbleProps {
   feedbacks: StudentChatViewModel["mentorFeedbacks"];
 }
 
-const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubbleProps) => {
+const StudentChatMessageBubble = ({
+  message,
+  feedbacks,
+}: StudentChatMessageBubbleProps) => {
   const isStudent = message.sender === "student";
   const hasFeedback = feedbacks.length > 0;
   const [isAIFeedbackOpen, setAIFeedbackOpen] = useState(false);
   return (
-    <div className={`flex items-end ${isStudent ? "gap-0" : "gap-2 sm:gap-3"} ${isStudent ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex items-end ${isStudent ? "gap-0" : "gap-2 sm:gap-3"} ${
+        isStudent ? "justify-end" : "justify-start"
+      }`}
+    >
       {!isStudent ? (
         <Avatar className="hidden h-9 w-9 sm:inline-flex">
-          <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
+          <AvatarFallback className="bg-primary text-primary-foreground">
+            AI
+          </AvatarFallback>
         </Avatar>
       ) : null}
-      <div className={`flex w-full flex-col gap-2 ${isStudent ? "items-end" : "items-start pr-4"}`}>
+      <div
+        className={`flex w-full flex-col gap-2 ${
+          isStudent ? "items-end" : "items-start pr-4"
+        }`}
+      >
         <Card
           className={`${
             isStudent
               ? `bg-primary text-primary-foreground w-fit sm:max-w-[70%] ml-auto mr-2`
               : `bg-muted/60 w-fit sm:max-w-[70%] mr-4`
           }`}
-          style={hasFeedback ? { boxShadow: "0 0 0 2px rgba(59,130,246,0.55)" } : undefined}
+          style={
+            hasFeedback
+              ? { boxShadow: "0 0 0 2px rgba(59,130,246,0.55)" }
+              : undefined
+          }
         >
           <CardContent className="space-y-2 p-4">
             {message.sender === "ai" && message.status !== "DONE" ? (
-              <div
-                className="space-y-3"
-                aria-live="polite"
-                role="status"
-              >
+              <div className="space-y-3" aria-live="polite" role="status">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> AI が回答中です… <TypingDots />
+                  <Loader2 className="h-4 w-4 animate-spin" /> AI が回答中です…{" "}
+                  <TypingDots />
                 </div>
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-[92%]" />
@@ -390,11 +449,20 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                 </div>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+              <p className="whitespace-pre-wrap leading-relaxed">
+                {message.content}
+              </p>
             )}
-            <div className={`flex items-center ${isStudent ? "justify-end" : "justify-between"} text-xs text-muted-foreground/80`}>
+            <div
+              className={`flex items-center ${
+                isStudent ? "justify-end" : "justify-between"
+              } text-xs text-muted-foreground/80`}
+            >
               <span>
-                {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {message.timestamp.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </span>
               {message.sender === "ai" && feedbacks.length ? (
                 <button
@@ -404,13 +472,14 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                   aria-expanded={isAIFeedbackOpen}
                   title="フィードバックを確認"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" /> フィードバック {feedbacks.length}件
+                  <MessageCircle className="h-3.5 w-3.5" /> フィードバック{" "}
+                  {feedbacks.length}件
                 </button>
               ) : null}
             </div>
           </CardContent>
         </Card>
-        
+
         {!isStudent && feedbacks.length ? (
           <div className="w-full">
             {isAIFeedbackOpen ? (
@@ -425,10 +494,20 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{feedbacks[0]?.authorName}</span>
-                          <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                          <span>
+                            {feedbacks[0]?.timestamp.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
                         </div>
-                        <p className="leading-relaxed">{feedbacks[0]?.content}</p>
-                        <Badge variant="secondary" className="text-xs capitalize">
+                        <p className="leading-relaxed">
+                          {feedbacks[0]?.content}
+                        </p>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs capitalize"
+                        >
                           {feedbacks[0]?.status}
                         </Badge>
                       </div>
@@ -439,13 +518,26 @@ const StudentChatMessageBubble = ({ message, feedbacks }: StudentChatMessageBubb
                           </CollapsibleTrigger>
                           <CollapsibleContent className="mt-2 space-y-2">
                             {feedbacks.slice(1).map((fb) => (
-                            <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                              <div
+                                key={`${fb.id}-${fb.timestamp.toISOString()}`}
+                                className="rounded-md border bg-background p-3"
+                              >
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                   <span>{fb.authorName}</span>
-                                  <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                  <span>
+                                    {fb.timestamp.toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
                                 </div>
-                                <p className="mt-1 leading-relaxed">{fb.content}</p>
-                                <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                                <p className="mt-1 leading-relaxed">
+                                  {fb.content}
+                                </p>
+                                <Badge
+                                  variant="secondary"
+                                  className="mt-1 text-xs capitalize"
+                                >
                                   {fb.status}
                                 </Badge>
                               </div>
@@ -484,17 +576,24 @@ interface ChatComposerProps {
   isSending: boolean;
 }
 
-const ChatComposer = ({ containerRef, value, onChange, onSend, canSend, isSending }: ChatComposerProps) => (
+const ChatComposer = ({
+  containerRef,
+  value,
+  onChange,
+  onSend,
+  canSend,
+  isSending,
+}: ChatComposerProps) => (
   <div ref={containerRef} className="border-t bg-background pl-4 py-3 sm:pl-6">
     <form
-      className="flex flex-col gap-2 items-end"
+      className="flex flex-col items-center gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSend) return;
         onSend();
       }}
     >
-      <div className="w-full sm:max-w-[70%]">
+      <div className="w-full max-w-3xl">
         <Textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -509,9 +608,15 @@ const ChatComposer = ({ containerRef, value, onChange, onSend, canSend, isSendin
           rows={2}
           disabled={isSending}
         />
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">Enterで送信、Shift+Enterで改行</p>
-          <Button type="submit" disabled={!canSend} className="rounded-full px-6">
+        <div className="mt-2 flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Enterで送信、Shift+Enterで改行
+          </p>
+          <Button
+            type="submit"
+            disabled={!canSend}
+            className="rounded-full px-6"
+          >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "送信"}
           </Button>
         </div>
@@ -527,19 +632,30 @@ function TypingDots() {
     <span className="inline-flex items-center gap-1 ml-1" aria-hidden="true">
       <span
         className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "0ms" }}
+        style={{
+          animation: "typingDot 1s ease-in-out infinite",
+          animationDelay: "0ms",
+        }}
       />
       <span
         className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "200ms" }}
+        style={{
+          animation: "typingDot 1s ease-in-out infinite",
+          animationDelay: "200ms",
+        }}
       />
       <span
         className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{ animation: "typingDot 1s ease-in-out infinite", animationDelay: "400ms" }}
+        style={{
+          animation: "typingDot 1s ease-in-out infinite",
+          animationDelay: "400ms",
+        }}
       />
       <style jsx>{`
         @keyframes typingDot {
-          0%, 60%, 100% {
+          0%,
+          60%,
+          100% {
             transform: translateY(0);
             opacity: 0.6;
           }
@@ -553,7 +669,17 @@ function TypingDots() {
   );
 }
 
-function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = false }: { feedbacks: StudentChatViewModel["mentorFeedbacks"]; inline?: boolean; iconOnly?: boolean; fullRow?: boolean }) {
+function FeedbackToggle({
+  feedbacks,
+  inline = false,
+  iconOnly = true,
+  fullRow = false,
+}: {
+  feedbacks: StudentChatViewModel["mentorFeedbacks"];
+  inline?: boolean;
+  iconOnly?: boolean;
+  fullRow?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -565,14 +691,21 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
             aria-expanded={open}
           >
             <span className="inline-flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" /> フィードバック {feedbacks.length}件
+              <MessageCircle className="h-4 w-4" /> フィードバック{" "}
+              {feedbacks.length}件
             </span>
             <Eye className="h-4 w-4" />
           </button>
         ) : iconOnly ? (
-          <Button variant="ghost" size="icon" aria-label={open ? "閉じる" : "フィードバックを確認"}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={open ? "閉じる" : "フィードバックを確認"}
+          >
             <Eye className="h-4 w-4" />
-            <span className="sr-only">{open ? "閉じる" : "フィードバックを確認"}</span>
+            <span className="sr-only">
+              {open ? "閉じる" : "フィードバックを確認"}
+            </span>
           </Button>
         ) : (
           <Button variant="ghost" size="sm" className="h-7 px-2">
@@ -586,7 +719,12 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{feedbacks[0]?.authorName}</span>
-                <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <span>
+                  {feedbacks[0]?.timestamp.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
               </div>
               <p className="leading-relaxed">{feedbacks[0]?.content}</p>
               <Badge variant="secondary" className="text-xs capitalize">
@@ -600,13 +738,24 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-2">
                   {feedbacks.slice(1).map((fb) => (
-                  <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                    <div
+                      key={`${fb.id}-${fb.timestamp.toISOString()}`}
+                      className="rounded-md border bg-background p-3"
+                    >
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{fb.authorName}</span>
-                        <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        <span>
+                          {fb.timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
                       </div>
                       <p className="mt-1 leading-relaxed">{fb.content}</p>
-                      <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                      <Badge
+                        variant="secondary"
+                        className="mt-1 text-xs capitalize"
+                      >
                         {fb.status}
                       </Badge>
                     </div>
@@ -625,7 +774,12 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{feedbacks[0]?.authorName}</span>
-                  <span>{feedbacks[0]?.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span>
+                    {feedbacks[0]?.timestamp.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
                 <p className="leading-relaxed">{feedbacks[0]?.content}</p>
                 <Badge variant="secondary" className="text-xs capitalize">
@@ -639,13 +793,24 @@ function FeedbackToggle({ feedbacks, inline = false, iconOnly = true, fullRow = 
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
                     {feedbacks.slice(1).map((fb) => (
-                      <div key={`${fb.id}-${fb.timestamp.toISOString()}`} className="rounded-md border bg-background p-3">
+                      <div
+                        key={`${fb.id}-${fb.timestamp.toISOString()}`}
+                        className="rounded-md border bg-background p-3"
+                      >
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{fb.authorName}</span>
-                          <span>{fb.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                          <span>
+                            {fb.timestamp.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
                         </div>
                         <p className="mt-1 leading-relaxed">{fb.content}</p>
-                        <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                        <Badge
+                          variant="secondary"
+                          className="mt-1 text-xs capitalize"
+                        >
                           {fb.status}
                         </Badge>
                       </div>

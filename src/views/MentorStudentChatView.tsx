@@ -5,9 +5,24 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { Loader2, MessageCircle, ChevronLeft, Edit3 } from "lucide-react";
 
 interface MentorChatMessage {
@@ -52,118 +67,206 @@ const MentorStudentChatView = ({
   onSubmitFeedback,
 }: MentorStudentChatViewProps) => {
   return (
-    <div className="flex flex-col gap-6">
-      <header className="rounded-2xl border bg-card px-4 py-3 sm:px-6 sm:py-4">
-        <div className="mb-2">
-          <Button asChild variant="ghost" size="sm" className="px-2">
+    <div className="mx-auto w-full max-w-5xl flex flex-col gap-8">
+      <header className="flex flex-col gap-4 rounded-2xl border bg-card px-6 py-6 shadow-sm sm:px-8 sm:py-8">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground"
+          >
             <Link href="/mentor" aria-label="戻る">
               <ChevronLeft className="mr-1 h-4 w-4" /> 戻る
             </Link>
           </Button>
+          <span className="text-border">/</span>
+          <span className="text-sm font-medium">チャット詳細</span>
         </div>
-        <h1 className="text-xl font-semibold">{conversationTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          学生: {studentName} / メンター: {mentorName}
-        </p>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {conversationTitle}
+          </h1>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-primary"></div>
+              <span className="font-medium text-foreground">{studentName}</span>
+            </div>
+            <span className="text-border">|</span>
+            <span>メンター: {mentorName}</span>
+          </div>
+        </div>
       </header>
 
-      <section className="rounded-2xl border bg-card p-4 sm:p-6">
-        <div className="flex flex-col">
+      <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-2">
           {messages.map((message, index) => {
             const isStudent = message.role === "NEW_HIRE";
             const hasFeedback = message.feedbacks.length > 0;
             const isEditing = editingFlags[message.id] ?? false;
-            const draftValue = feedbackDrafts[message.id] ?? (hasFeedback ? message.feedbacks[0]?.content ?? "" : "");
-            const submitLabel = hasFeedback ? "フィードバックを更新" : "フィードバックを送信";
+            const draftValue =
+              feedbackDrafts[message.id] ??
+              (hasFeedback ? message.feedbacks[0]?.content ?? "" : "");
+            const submitLabel = hasFeedback
+              ? "フィードバックを更新"
+              : "フィードバックを送信";
             const prev = index > 0 ? messages[index - 1] : null;
             const isTurnChange = !prev || prev.role !== message.role;
-            const marginClass = index === 0 ? "" : isTurnChange ? "mt-6" : "mt-3";
+            const marginClass =
+              index === 0 ? "" : isTurnChange ? "mt-8" : "mt-2";
+
             return (
               <div
                 key={message.id}
-                className={`flex w-full flex-col ${isStudent ? "items-end" : "items-start"} ${marginClass}`}
+                className={`flex w-full flex-col ${
+                  isStudent ? "items-end" : "items-start"
+                } ${marginClass}`}
               >
-                <Card className={isStudent ? "w-fit sm:max-w-[70%] bg-primary text-primary-foreground ml-auto mr-2" : "w-fit sm:max-w-[70%] bg-muted"}>
-                  <CardContent className="space-y-2 p-3 sm:p-4">
-                    <div className={`flex items-center ${isStudent ? "justify-end" : "justify-between"} text-xs uppercase tracking-wide`}>
-                      <span>{isStudent ? "New Hire" : "Assistant"}</span>
-                      <span>{message.createdAt.toLocaleString()}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                    {message.status && (
-                      <Badge variant="outline" className="text-xs">
-                        {message.status.toLowerCase()}
-                      </Badge>
-                    )}
-                    {!isStudent ? (
-                      <div className="mt-2 flex items-center justify-end pt-2">
+                <div
+                  className={`flex max-w-[85%] sm:max-w-[75%] flex-col ${
+                    isStudent ? "items-end" : "items-start"
+                  }`}
+                >
+                  <div
+                    className={`mb-1.5 flex items-center gap-2 px-1 text-xs uppercase tracking-wider text-muted-foreground ${
+                      isStudent ? "flex-row-reverse" : "flex-row"
+                    }`}
+                  >
+                    <span className="font-semibold">
+                      {isStudent ? "New Hire" : "Assistant"}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {message.createdAt.toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`group relative rounded-2xl px-5 py-4 shadow-sm transition-all ${
+                      isStudent
+                        ? "bg-primary text-primary-foreground rounded-tr-sm"
+                        : "bg-muted/50 text-foreground rounded-tl-sm hover:bg-muted/80"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
+
+                    {!isStudent && (
+                      <div className="absolute -right-12 top-0 opacity-0 transition-opacity group-hover:opacity-100">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 rounded-full bg-background shadow-sm hover:bg-accent"
                               onClick={() => onToggleEditing(message.id, true)}
-                              aria-label={hasFeedback ? "編集" : "フィードバックを書く"}
-                              aria-expanded={isEditing}
+                              aria-label={
+                                hasFeedback ? "編集" : "フィードバックを書く"
+                              }
                             >
-                              <Edit3 className="h-4 w-4" />
+                              <Edit3 className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent side="right">
                             {hasFeedback ? "編集" : "フィードバックを書く"}
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-                {message.feedbacks.length ? (
-                  <MentorFeedbackSection
-                    messageId={message.id}
-                    isAssistant={message.role === "ASSISTANT"}
-                    feedbacks={message.feedbacks}
-                    isEditing={isEditing}
-                    onToggleEditing={(next) => onToggleEditing(message.id, next)}
-                  />
-                ) : null}
-                {/* ボタンはメッセージボックス内に配置したため、下部の行は不要 */}
+                    )}
+                  </div>
+
+                  {message.status && (
+                    <Badge
+                      variant="outline"
+                      className="mt-2 text-[10px] uppercase tracking-widest"
+                    >
+                      {message.status.toLowerCase()}
+                    </Badge>
+                  )}
+                </div>
+
+                {message.feedbacks.length > 0 && (
+                  <div
+                    className={`mt-3 w-full max-w-[85%] sm:max-w-[75%] ${
+                      isStudent ? "pr-2" : "pl-2"
+                    }`}
+                  >
+                    <MentorFeedbackSection
+                      messageId={message.id}
+                      isAssistant={message.role === "ASSISTANT"}
+                      feedbacks={message.feedbacks}
+                      isEditing={isEditing}
+                      onToggleEditing={(next) =>
+                        onToggleEditing(message.id, next)
+                      }
+                    />
+                  </div>
+                )}
 
                 {message.role === "ASSISTANT" ? (
-                  <Dialog open={isEditing} onOpenChange={(open) => onToggleEditing(message.id, open)}>
-                    <DialogContent>
+                  <Dialog
+                    open={isEditing}
+                    onOpenChange={(open) => onToggleEditing(message.id, open)}
+                  >
+                    <DialogContent className="sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>学生へのフィードバック</DialogTitle>
-                        <DialogDescription>対象メッセージに対するフィードバックを入力してください。</DialogDescription>
+                        <DialogDescription>
+                          このメッセージに対する具体的なアドバイスや修正案を入力してください。
+                        </DialogDescription>
                       </DialogHeader>
                       <form
-                        className="space-y-3"
+                        className="space-y-4 mt-2"
                         onSubmit={(event) => {
                           event.preventDefault();
                           onSubmitFeedback(message.id);
                         }}
                       >
-                        <div className="space-y-1">
-                          <Label htmlFor={`mentor-feedback-${message.id}`} className="text-xs uppercase tracking-wide text-muted-foreground">
-                            学生へのフィードバック
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor={`mentor-feedback-${message.id}`}
+                            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          >
+                            フィードバック内容
                           </Label>
                           <Textarea
                             id={`mentor-feedback-${message.id}`}
                             value={draftValue}
-                            onChange={(event) => onFeedbackDraftChange(message.id, event.target.value)}
-                            rows={5}
-                            placeholder="気づきやアドバイスを入力してください"
+                            onChange={(event) =>
+                              onFeedbackDraftChange(
+                                message.id,
+                                event.target.value
+                              )
+                            }
+                            rows={6}
+                            placeholder="例: この部分はもう少し具体的に説明すると良いでしょう..."
                             autoFocus
+                            className="resize-none text-base leading-relaxed"
                             onKeyDown={(e) => {
-                              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                              if (
+                                (e.metaKey || e.ctrlKey) &&
+                                e.key === "Enter"
+                              ) {
                                 e.preventDefault();
                                 onSubmitFeedback(message.id);
                               }
                             }}
                           />
+                          <p className="text-xs text-muted-foreground text-right">
+                            Cmd/Ctrl + Enter で送信
+                          </p>
                         </div>
                         {feedbackErrors[message.id] ? (
-                          <p className="text-sm text-destructive" role="alert" aria-live="polite">{feedbackErrors[message.id]}</p>
+                          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                            {feedbackErrors[message.id]}
+                          </div>
                         ) : null}
                         <DialogFooter className="gap-2 sm:gap-0">
                           <Button
@@ -176,11 +279,12 @@ const MentorStudentChatView = ({
                           <Button
                             type="submit"
                             disabled={feedbackSubmitting[message.id] ?? false}
-                            aria-busy={feedbackSubmitting[message.id] ?? false}
+                            className="min-w-[100px]"
                           >
                             {feedbackSubmitting[message.id] ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 送信中...
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                送信中
                               </>
                             ) : (
                               submitLabel
@@ -194,9 +298,13 @@ const MentorStudentChatView = ({
               </div>
             );
           })}
-          {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">まだメッセージがありません。</p>
-          ) : null}
+
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+              <MessageCircle className="mb-4 h-12 w-12 opacity-20" />
+              <p>まだメッセージがありません。</p>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -214,7 +322,12 @@ function MentorFeedbackSection({
 }: {
   messageId: string;
   isAssistant: boolean;
-  feedbacks: { id: string; authorName: string; content: string; createdAt: Date }[];
+  feedbacks: {
+    id: string;
+    authorName: string;
+    content: string;
+    createdAt: Date;
+  }[];
   isEditing: boolean;
   onToggleEditing: (next: boolean) => void;
 }) {
@@ -227,53 +340,68 @@ function MentorFeedbackSection({
   }, [isEditing]);
 
   return (
-    <div className="mt-3 w-fit sm:max-w-[70%]">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-accent hover:text-accent-foreground"
-            onClick={() => setOpen((v) => !v)}
+    <Collapsible open={open} onOpenChange={setOpen} className="w-full">
+      <div className="flex items-center gap-2">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-2 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
             aria-controls={contentId}
             aria-expanded={open}
-            title="フィードバックを確認"
           >
-            <MessageCircle className="h-4 w-4" /> フィードバック {feedbacks.length}件
-          </button>
-          {/* 編集はメッセージボックス内ボタンに統一 */}
-        </div>
-        <CollapsibleContent id={contentId} className="mt-2 space-y-3">
-          {/* 先頭フィードバック */}
-          <Card className="border-dashed bg-muted/30">
-            <CardContent className="space-y-2 p-3 sm:p-4 text-base">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{feedbacks[0]?.authorName}</span>
-                <span>{feedbacks[0]?.createdAt.toLocaleString()}</span>
+            <MessageCircle className="h-3.5 w-3.5" />
+            フィードバック ({feedbacks.length})
+            <span className="sr-only">Toggle feedback</span>
+          </Button>
+        </CollapsibleTrigger>
+        <div className="h-px flex-1 bg-border/50"></div>
+      </div>
+
+      <CollapsibleContent
+        id={contentId}
+        className="space-y-3 pt-2 animate-in slide-in-from-top-2 fade-in duration-200"
+      >
+        {/* 先頭フィードバック */}
+        <div className="relative rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                {feedbacks[0]?.authorName.slice(0, 1)}
               </div>
-              <p className="whitespace-pre-wrap leading-relaxed">{feedbacks[0]?.content}</p>
-            </CardContent>
-          </Card>
-          {/* 残りを折りたたみ */}
-          {feedbacks.length > 1 ? (
-            <Collapsible>
-              <CollapsibleTrigger className="text-xs text-primary underline">
-                さらに表示（{feedbacks.length - 1}）
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 space-y-2">
-                {feedbacks.slice(1).map((fb) => (
-                  <div key={fb.id} className="rounded-md border bg-background p-2 sm:p-3">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{fb.authorName}</span>
-                      <span>{fb.createdAt.toLocaleString()}</span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap leading-relaxed">{fb.content}</p>
+              <span className="font-medium text-foreground">
+                {feedbacks[0]?.authorName}
+              </span>
+            </div>
+            <span>{feedbacks[0]?.createdAt.toLocaleString()}</span>
+          </div>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+            {feedbacks[0]?.content}
+          </p>
+        </div>
+
+        {/* 残りを折りたたみ */}
+        {feedbacks.length > 1 ? (
+          <Collapsible>
+            <CollapsibleTrigger className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground hover:text-foreground">
+              <span>他 {feedbacks.length - 1} 件のフィードバックを表示</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-2 pl-4 border-l-2 border-border/50">
+              {feedbacks.slice(1).map((fb) => (
+                <div key={fb.id} className="rounded-lg bg-muted/30 p-3">
+                  <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="font-medium">{fb.authorName}</span>
+                    <span>{fb.createdAt.toLocaleString()}</span>
                   </div>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
-          ) : null}
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {fb.content}
+                  </p>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

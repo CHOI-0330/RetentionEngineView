@@ -8,11 +8,20 @@ import React from "react";
 import Link from "next/link";
 import AppUserMenu from "../src/components/AppUserMenu";
 import { SessionProvider } from "../src/components/SessionProvider";
+import { cn } from "../src/components/ui/utils";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="ja">
-      <body className="min-h-screen bg-background text-foreground">
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans text-foreground antialiased"
+        )}
+      >
         <SessionProvider>
           <a
             href="#content"
@@ -20,21 +29,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           >
             コンテンツへスキップ
           </a>
-          <header className="border-b bg-card fixed inset-x-0 top-0 z-50">
-            <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
-              <div className="flex items-center justify-between">
-                <Link href="/" className="text-sm font-semibold hover:underline">
-                  Retention Engine UI
+          <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between sm:px-6">
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/"
+                  className="text-sm font-bold tracking-tight hover:text-primary transition-colors"
+                >
+                  Retention Engine
                 </Link>
-                <div className="flex items-center gap-4">
-                  <AppUserMenu />
-                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <AppUserMenu />
               </div>
             </div>
           </header>
-          {/* spacer for fixed header */}
-          <div aria-hidden className="h-12" />
-          <div id="content">{children}</div>
+          <div id="content" className="relative">
+            {children}
+          </div>
         </SessionProvider>
       </body>
     </html>

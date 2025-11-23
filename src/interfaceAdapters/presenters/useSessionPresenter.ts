@@ -1,8 +1,7 @@
 "use client";
 
-"use client";
-
 import { useState, useEffect, useCallback } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/auth-js";
 import { getBrowserSupabaseClient } from "../../lib/browserSupabaseClient";
 
 interface SessionData {
@@ -27,7 +26,7 @@ export const useSessionPresenter = (): SessionViewModel & { interactions: Sessio
   const [isLoading, setIsLoading] = useState(true);
   const supabase = getBrowserSupabaseClient();
 
-  const toSessionData = (supabaseSession: any | null): SessionData | null => {
+  const toSessionData = (supabaseSession: Session | null): SessionData | null => {
     if (!supabaseSession) return null;
     const user = supabaseSession.user;
     const role = (user?.user_metadata?.role as SessionData["role"]) ?? "NEW_HIRE";
@@ -56,10 +55,12 @@ export const useSessionPresenter = (): SessionViewModel & { interactions: Sessio
     // 초기 로드
     void fetchSession();
     // 실시간 auth 상태 구독
-    const { data: subscription } = supabase.auth.onAuthStateChange((_, newSession) => {
-      setSession(toSessionData(newSession));
-      setIsLoading(false);
-    });
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, newSession: Session | null) => {
+        setSession(toSessionData(newSession));
+        setIsLoading(false);
+      }
+    );
     return () => {
       subscription?.subscription?.unsubscribe();
     };

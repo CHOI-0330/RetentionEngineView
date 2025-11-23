@@ -43,20 +43,23 @@ const MentorDashboardView = ({
   interactions,
 }: MentorDashboardViewProps) => {
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 sm:px-6 sm:py-4">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-4 rounded-2xl border bg-card px-6 py-6 shadow-sm sm:px-8 sm:py-8">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-1">
+            <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Mentor Dashboard
             </p>
-            <h1 className="text-xl font-semibold">担当中の新入社員一覧</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              担当中の新入社員一覧
+            </h1>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={interactions.requestRefresh}
             disabled={status.isLoading}
+            className="h-9 shadow-sm transition-all hover:bg-accent hover:text-accent-foreground"
           >
             {status.isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -71,13 +74,18 @@ const MentorDashboardView = ({
             onChange={(event) => viewModel.onChangeSearch(event.target.value)}
             placeholder="新入社員や科目で検索"
             aria-label="新入社員や科目で検索"
-            className="pl-9"
+            className="h-11 pl-10 shadow-sm transition-all focus-visible:ring-primary"
           />
         </div>
         {status.error ? (
-          <div className="flex items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <span>{status.error.message}</span>
-            <Button size="sm" variant="ghost" onClick={interactions.clearError}>
+          <div className="flex items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive animate-in fade-in slide-in-from-top-2">
+            <span className="font-medium">{status.error.message}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={interactions.clearError}
+              className="h-auto p-0 hover:bg-transparent text-destructive hover:text-destructive/80"
+            >
               閉じる
             </Button>
           </div>
@@ -85,17 +93,25 @@ const MentorDashboardView = ({
       </header>
 
       {status.isLoading ? (
-        <div className="flex items-center gap-2 rounded-md border border-dashed bg-card/60 px-3 py-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>担当情報を読み込み中...</span>
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed bg-card/50 px-6 py-12 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-lg">担当情報を読み込み中...</span>
         </div>
       ) : null}
 
       {!status.isLoading && (
-        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
           {viewModel.students.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center text-center text-lg text-muted-foreground">
-              現在表示できる担当はありません。
+            <div className="col-span-full flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed bg-card/50 py-20 text-center">
+              <div className="rounded-full bg-muted p-4">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-semibold">担当が見つかりません</h3>
+                <p className="text-muted-foreground">
+                  検索条件を変更するか、担当の割り当てを確認してください。
+                </p>
+              </div>
             </div>
           ) : (
             viewModel.students.map((student) => (
@@ -124,67 +140,103 @@ const MentorDashboardStudentCard = ({
   isSelected,
 }: MentorDashboardStudentCardProps) => {
   return (
-    <Card className={isSelected ? "border-primary shadow-lg" : undefined}>
-      <CardContent className="flex flex-col gap-4 p-5 sm:gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:pr-8">
-        <div className="flex items-start gap-4 pr-4 lg:pr-6 w-full">
-          <Avatar className="h-14 w-14">
-            <AvatarFallback>{student.name.slice(0, 2)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0 space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <h2 className="text-lg font-semibold">{student.name}</h2>
-              <Badge variant="secondary" className="w-fit capitalize">
-                {student.status}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              最終活動: {student.lastActivity.toLocaleString()}
-            </p>
-            <div className="w-full rounded-lg border bg-card p-3 sm:p-4 text-sm shadow-sm flex flex-col justify-between overflow-hidden" style={{ height: "11rem" }}>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground">トピック</span>
-                <span
-                  className="block text-base font-semibold text-foreground whitespace-nowrap overflow-hidden"
-                  title={student.recentChat.subject}
-                  style={{ textOverflow: "ellipsis" }}
+    <Card
+      className={`group relative overflow-hidden transition-all hover:shadow-lg ${
+        isSelected
+          ? "border-primary ring-1 ring-primary"
+          : "hover:border-primary/50"
+      }`}
+    >
+      <CardContent className="flex flex-col gap-5 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-14 w-14 border-2 border-background shadow-sm">
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                {student.name.slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold leading-none">{student.name}</h2>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    student.status === "active" ? "default" : "secondary"
+                  }
+                  className="capitalize px-2 py-0.5 text-xs font-medium"
                 >
-                  {student.recentChat.subject}
-                </span>
+                  {student.status}
+                </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {student.recentChat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  最終: {student.lastActivity.toLocaleDateString()}
                 </span>
               </div>
-              <div className="mt-3 space-y-2 overflow-hidden">
-                {student.recentChat.summary ? (
-                  <p className="font-medium text-foreground line-clamp-2" title={student.recentChat.summary}>
-                    {student.recentChat.summary}
-                  </p>
-                ) : null}
-                {student.recentChat.aiResponse ? (
-                  <p className="text-muted-foreground line-clamp-2" title={student.recentChat.aiResponse}>
-                    {student.recentChat.aiResponse}
-                  </p>
-                ) : null}
-              </div>
-              {student.recentChat.needsReview ? (
-                <div className="mt-3 flex justify-end">
-                  <Badge variant="destructive" className="w-fit">
-                    レビューが必要
-                  </Badge>
-                </div>
-              ) : null}
             </div>
           </div>
+          {student.recentChat.needsReview && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>レビューが必要です</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        <div className="w-full pr-4 lg:justify-self-end lg:pl-3 space-y-2">
+
+        <div className="flex flex-col gap-3 rounded-xl bg-muted/50 p-4 transition-colors group-hover:bg-muted/80">
+          <div className="flex items-center justify-between border-b border-border/50 pb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {student.recentChat.subject}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono">
+              {student.recentChat.timestamp.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            {student.recentChat.summary ? (
+              <p className="font-medium text-sm leading-relaxed line-clamp-2 text-foreground/90">
+                {student.recentChat.summary}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                サマリーなし
+              </p>
+            )}
+            {student.recentChat.aiResponse && (
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                <span className="font-medium text-primary/70">AI:</span>{" "}
+                {student.recentChat.aiResponse}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-auto pt-2">
           <Link
-            className="inline-flex w-full justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition"
             href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}
+            className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            チャットを見る
+            チャット詳細を確認
           </Link>
         </div>
       </CardContent>
     </Card>
   );
 };
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
