@@ -60,7 +60,23 @@ const ensureMentorAuth = async (request: NextRequest) => {
   const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
     ? headerToken.slice(7).trim()
     : null;
-  const accessToken = accessTokenFromHeader ?? request.cookies.get("auth_access_token")?.value;
+  const cookieAccessToken = request.cookies.get("auth_access_token")?.value;
+  // Support Supabase auth cookie shape: sb-<project-ref>-auth-token
+  const supabaseCookie = request.cookies
+    .getAll()
+    .find((cookie) => cookie.name.includes("-auth-token"));
+  let supabaseAccessToken: string | null = null;
+  if (supabaseCookie) {
+    try {
+      const parsed = JSON.parse(supabaseCookie.value);
+      supabaseAccessToken =
+        typeof parsed?.access_token === "string" ? parsed.access_token : null;
+    } catch {
+      supabaseAccessToken = null;
+    }
+  }
+
+  const accessToken = accessTokenFromHeader ?? cookieAccessToken ?? supabaseAccessToken;
   if (!accessToken) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }

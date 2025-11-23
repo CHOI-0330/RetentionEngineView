@@ -15,6 +15,26 @@ export default function AppUserMenu() {
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
+      // Ensure local Supabase auth state is cleared even if signOut fails.
+      try {
+        Object.keys(localStorage)
+          .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+          .forEach((key) => localStorage.removeItem(key));
+      } catch {
+        // ignore
+      }
+      try {
+        document.cookie
+          .split(';')
+          .map((c) => c.trim())
+          .filter((c) => c.startsWith('sb-') && c.includes('auth-token'))
+          .forEach((cookie) => {
+            const name = cookie.split('=')[0];
+            document.cookie = `${name}=; path=/; max-age=0;`;
+          });
+      } catch {
+        // ignore
+      }
       // Force a session refetch and then redirect to the home page.
       await interactions.refetchSession();
       window.location.href = '/';

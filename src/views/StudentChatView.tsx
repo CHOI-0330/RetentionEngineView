@@ -9,8 +9,6 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { ScrollArea } from "../components/ui/scroll-area";
 import { AlertTriangle, Loader2, MessageCircle, Eye } from "lucide-react";
 import {
   Dialog,
@@ -21,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../components/ui/dialog";
-import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
 import {
   Select,
   SelectContent,
@@ -44,22 +42,13 @@ interface ConversationSummary {
   lastActiveAt: string;
 }
 
-interface MentorOption {
-  mentorId: string;
-  displayName: string;
-  email?: string;
-}
-
 interface CreateConversationDialogProps {
   isOpen: boolean;
   title: string;
-  mentorOptions: MentorOption[];
-  selectedMentorId: string | null;
   isSubmitting: boolean;
   onOpen: () => void;
   onClose: () => void;
   onChangeTitle: (value: string) => void;
-  onChangeMentor: (value: string | null) => void;
   onSubmit: () => void;
 }
 
@@ -165,21 +154,19 @@ const StudentChatView = ({
             <div className="flex items-center gap-2">
               {status.isAwaitingAssistant ? (
                 <span className="flex items-center gap-1.5 text-primary font-medium animate-pulse">
-                  <Loader2 className="h-3 w-3 animate-spin" /> AIが入力中...
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                  <span className="sr-only">AIが入力中...</span>
                 </span>
-              ) : (
-                <span>チャット履歴</span>
-              )}
+              ) : null}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs hover:bg-background"
+              className="h-7 px-3 text-[11px] text-muted-foreground hover:bg-background"
               onClick={interactions.requestOlderMessages}
               disabled={!meta.hasMoreHistory || meta.isHistoryLoading}
-            >
-              {meta.isHistoryLoading ? "読み込み中..." : "過去のメッセージ"}
-            </Button>
+              aria-label="過去メッセージを読み込む"
+            ></Button>
           </div>
 
           <StudentChatMessageList
@@ -223,9 +210,18 @@ const ConversationHeader = ({
   <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div className="flex items-center gap-4">
       <div className="flex flex-col">
-        <h1 className="text-lg font-bold tracking-tight text-foreground">
-          {conversationTitle}
-        </h1>
+        <div className="flex items-center gap-3">
+          <a
+            href="/student/dashboard"
+            className="inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 transition-colors"
+          >
+            <span className="text-lg leading-none">←</span>
+            <span>戻る</span>
+          </a>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">
+            {conversationTitle}
+          </h1>
+        </div>
         {showConversationPicker && (
           <div className="mt-1">
             <Select
@@ -269,7 +265,7 @@ const ConversationHeader = ({
             <DialogHeader>
               <DialogTitle>新しい会話を作成</DialogTitle>
               <DialogDescription>
-                テーマを決めて、メンターと一緒に学習を始めましょう。
+                テーマを決めて、AIと学習を始めましょう。
               </DialogDescription>
             </DialogHeader>
             <form
@@ -280,31 +276,14 @@ const ConversationHeader = ({
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor="title">会話のタイトル</Label>
+                <label className="text-sm font-medium text-foreground">
+                  会話のタイトル
+                </label>
                 <Input
-                  id="title"
                   value={createDialog.title}
                   onChange={(e) => createDialog.onChangeTitle(e.target.value)}
                   placeholder="例：Reactの基礎学習"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mentor">担当メンター</Label>
-                <Select
-                  value={createDialog.selectedMentorId ?? undefined}
-                  onValueChange={createDialog.onChangeMentor}
-                >
-                  <SelectTrigger id="mentor">
-                    <SelectValue placeholder="メンターを選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {createDialog.mentorOptions.map((m) => (
-                      <SelectItem key={m.mentorId} value={m.mentorId}>
-                        {m.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <DialogFooter>
                 <Button
@@ -314,12 +293,7 @@ const ConversationHeader = ({
                 >
                   キャンセル
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    createDialog.isSubmitting || !createDialog.selectedMentorId
-                  }
-                >
+                <Button type="submit" disabled={createDialog.isSubmitting}>
                   {createDialog.isSubmitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}

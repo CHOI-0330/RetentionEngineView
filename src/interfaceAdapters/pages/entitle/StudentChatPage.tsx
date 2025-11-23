@@ -93,6 +93,10 @@ const StudentChatRuntime = ({
 
   const presenter = useStudentChatPresenter(controller);
 
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
   const processingRef = useRef(false);
   const effectQueueRef = useRef<StudentChatControllerEffect[]>([]);
   const enqueuedEffectIdsRef = useRef<Set<string>>(new Set());
@@ -257,69 +261,33 @@ const StudentChatRuntime = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [createTitle, setCreateTitle] = useState("");
-  const [selectedMentorId, setSelectedMentorId] = useState<string | null>(
-    mentorOptions[0]?.mentorId ?? null
-  );
-  const [isCreating, setIsCreating] = useState(false);
-
-  useEffect(() => {
-    setSelectedMentorId((previous) => {
-      if (previous && mentorOptions.some((option) => option.mentorId === previous)) {
-        return previous;
-      }
-      return mentorOptions[0]?.mentorId ?? null;
-    });
-  }, [mentorOptions]);
-
-  const handleOpenCreateDialog = useCallback(() => {
-    if (!mentorOptions.length) {
-      window.alert("選択できるメンターがいません。メンターにお問い合わせください。");
-      return;
-    }
-    setCreateTitle("");
-    setSelectedMentorId(mentorOptions[0]?.mentorId ?? null);
-    setIsCreateDialogOpen(true);
-  }, [mentorOptions]);
-
-  const handleCloseCreateDialog = useCallback(() => {
-    setIsCreateDialogOpen(false);
-  }, []);
-
-  const handleSubmitCreateDialog = useCallback(async () => {
-    if (mentorOptions.length > 0 && !selectedMentorId) {
-      window.alert("メンターを選択してください。");
-      return;
-    }
-    setIsCreating(true);
-    try {
-      await onCreateConversation({ title: createTitle, mentorId: selectedMentorId ?? undefined });
-      setIsCreateDialogOpen(false);
-      setCreateTitle("");
-    } finally {
-      setIsCreating(false);
-    }
-  }, [createTitle, mentorOptions.length, onCreateConversation, selectedMentorId]);
-
   return (
     <StudentChatView
       conversationTitle={bootstrap.conversation.title}
       conversationOptions={conversationOptions}
+      selectedConversationId={selectedConversationId}
+      onConversationChange={onSelectConversation}
       createDialog={{
         isOpen: isCreateDialogOpen,
         title: createTitle,
-        mentorOptions,
-        selectedMentorId,
         isSubmitting: isCreating,
-        onOpen: handleOpenCreateDialog,
-        onClose: handleCloseCreateDialog,
+        onOpen: () => {
+          setCreateTitle("");
+          setIsCreateDialogOpen(true);
+        },
+        onClose: () => setIsCreateDialogOpen(false),
         onChangeTitle: setCreateTitle,
-        onChangeMentor: (value) => setSelectedMentorId(value ?? null),
-        onSubmit: handleSubmitCreateDialog,
+        onSubmit: async () => {
+          setIsCreating(true);
+          try {
+            await onCreateConversation({ title: createTitle });
+            setIsCreateDialogOpen(false);
+            setCreateTitle("");
+          } finally {
+            setIsCreating(false);
+          }
+        },
       }}
-      selectedConversationId={selectedConversationId}
-      onConversationChange={onSelectConversation}
       viewModel={presenter.viewModel}
       status={presenter.status}
       meta={presenter.meta}
@@ -347,7 +315,6 @@ const StudentChatPage = () => {
   const [conversationOptions, setConversationOptions] = useState<ConversationOption[]>([]);
   const [mentorOptions, setMentorOptions] = useState<MentorOption[]>([]);
   const [initialTitle, setInitialTitle] = useState("");
-  const [initialMentorId, setInitialMentorId] = useState<string | null>(null);
   const [isInitialCreating, setIsInitialCreating] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -485,7 +452,6 @@ const StudentChatPage = () => {
           }))
         );
         setMentorOptions([]);
-        setInitialMentorId(null);
         setActiveConversationId(targetConv.conv_id);
         setLoadError(null);
       } catch (error) {
@@ -504,30 +470,15 @@ const StudentChatPage = () => {
     }
   }, [loadConversation, searchParams, session?.userId]);
 
-  useEffect(() => {
-    if (bootstrap?.conversation) {
-      return;
-    }
-    setInitialMentorId((previous) => {
-      if (previous && mentorOptions.some((option) => option.mentorId === previous)) {
-        return previous;
-      }
-      return mentorOptions[0]?.mentorId ?? null;
-    });
-  }, [bootstrap?.conversation, mentorOptions]);
-
   const createConversation = useCallback(
-    async ({ title, mentorId }: { title: string; mentorId?: string | null }) => {
+    async ({ title }: { title: string; mentorId?: string | null }) => {
       const normalizedTitle = title.trim() || "新しい会話";
-      const normalizedMentorId = mentorId ?? undefined;
-
       try {
         const created = await apiFetch<{ conv_id: string; title: string; created_at: string }>("/conversations/newHire", {
           method: "POST",
           body: JSON.stringify({
             userId: session?.userId,
             title: normalizedTitle,
-            mentorId: normalizedMentorId,
           }),
         }, session?.accessToken);
         setLoadError(null);
@@ -542,19 +493,15 @@ const StudentChatPage = () => {
   const handleInitialCreateSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (mentorOptions.length > 0 && !initialMentorId) {
-        window.alert("メンターを選択してください。");
-        return;
-      }
       setIsInitialCreating(true);
       try {
-        await createConversation({ title: initialTitle, mentorId: initialMentorId ?? undefined });
+        await createConversation({ title: initialTitle });
         setInitialTitle("");
       } finally {
         setIsInitialCreating(false);
       }
     },
-    [createConversation, initialMentorId, initialTitle, mentorOptions.length]
+    [createConversation, initialTitle]
   );
 
   const handleConversationChange = useCallback(
