@@ -18,10 +18,15 @@ const DEFAULT_HISTORY_WINDOW = 6;
 
 const sortMessagesAscending = (entries: Message[]) =>
   entries.sort((a, b) => {
-    if (a.createdAt === b.createdAt) {
-      return a.msgId.localeCompare(b.msgId);
+    const timeA = new Date(a.createdAt).getTime();
+    const timeB = new Date(b.createdAt).getTime();
+    if (!Number.isNaN(timeA) && !Number.isNaN(timeB) && timeA !== timeB) {
+      return timeA - timeB;
     }
-    return a.createdAt < b.createdAt ? -1 : 1;
+    if (a.createdAt !== b.createdAt) {
+      return a.createdAt < b.createdAt ? -1 : 1;
+    }
+    return 0;
   });
 
 export type StudentChatControllerEffect =
@@ -347,11 +352,26 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       }
       mutateState((previous) => {
         const updated = [...previous.messages];
+        const lastMessage = updated[updated.length - 1];
+        const lastTimestamp = lastMessage ? new Date(lastMessage.createdAt).getTime() : null;
+        const incomingTimestamp = new Date(message.createdAt).getTime();
+        let normalizedCreatedAt = message.createdAt;
+        if (
+          lastTimestamp != null &&
+          !Number.isNaN(lastTimestamp) &&
+          (Number.isNaN(incomingTimestamp) || incomingTimestamp <= lastTimestamp)
+        ) {
+          normalizedCreatedAt = new Date(lastTimestamp + 1).toISOString();
+        }
+        const assistantMessage: Message = {
+          ...message,
+          createdAt: normalizedCreatedAt,
+        };
         const index = updated.findIndex((item) => item.msgId === message.msgId);
         if (index >= 0) {
-          updated[index] = message;
+          updated[index] = assistantMessage;
         } else {
-          updated.push(message);
+          updated.push(assistantMessage);
         }
         sortMessagesAscending(updated);
         return {
