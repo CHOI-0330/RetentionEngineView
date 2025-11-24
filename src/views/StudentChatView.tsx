@@ -64,6 +64,8 @@ interface StudentChatViewProps {
   interactions: StudentChatPresenterInteractions;
 }
 
+const LONG_WAIT_THRESHOLD_MS = 30000;
+
 const StudentChatView = ({
   conversationTitle,
   conversationOptions,
@@ -90,6 +92,7 @@ const StudentChatView = ({
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
+  const [isAssistantThinkingLong, setIsAssistantThinkingLong] = useState(false);
 
   useEffect(() => {
     if (meta.isHistoryLoading) return;
@@ -115,6 +118,15 @@ const StudentChatView = ({
     status.isAwaitingAssistant,
     meta.isHistoryLoading,
   ]);
+
+  useEffect(() => {
+    if (!status.isAwaitingAssistant) {
+      setIsAssistantThinkingLong(false);
+      return;
+    }
+    const timerId = window.setTimeout(() => setIsAssistantThinkingLong(true), LONG_WAIT_THRESHOLD_MS);
+    return () => clearTimeout(timerId);
+  }, [status.isAwaitingAssistant]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
@@ -153,10 +165,17 @@ const StudentChatView = ({
           <div className="flex items-center justify-between border-b bg-muted/20 px-6 py-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               {status.isAwaitingAssistant ? (
-                <span className="flex items-center gap-1.5 text-primary font-medium animate-pulse">
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                  <span className="sr-only">AIが入力中...</span>
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="flex items-center gap-1.5 text-primary text-sm font-medium">
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    AIが回答を準備しています...
+                  </span>
+                  {isAssistantThinkingLong ? (
+                    <span className="text-[11px] text-muted-foreground">
+                      AIが頑張って考察してます。長文を準備中ですので、もう少しお待ちください。
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
             </div>
             <Button
