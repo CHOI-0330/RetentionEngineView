@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "../../../src/components/SessionProvider";
 import { Card, CardContent } from "../../../src/components/ui/card";
@@ -13,18 +13,11 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
-import { apiFetch } from "../../../src/lib/apiClient";
 import { Input } from "../../../src/components/ui/input";
 import { Label } from "../../../src/components/ui/label";
 import { cn } from "../../../src/components/ui/utils";
 
 interface ConversationListItem {
-  conv_id: string;
-  title: string;
-  created_at: string;
-}
-
-interface ConversationRow {
   conv_id: string;
   title: string;
   created_at: string;
@@ -42,6 +35,66 @@ const StudentDashboardPage = () => {
   const userId = session?.userId;
   const router = useRouter();
 
+  const parseApiResponse = useCallback(async (response: Response) => {
+    const raw = await response.text();
+    let json: any = null;
+    if (raw) {
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        json = null;
+      }
+    }
+    if (!response.ok) {
+      throw new Error(json?.error ?? json?.message ?? raw ?? "Unexpected error");
+    }
+    return json;
+  }, []);
+
+  const fetchConversationList = useCallback(async (): Promise<ConversationListItem[]> => {
+    if (!userId) {
+      throw new Error("ログインしてください。");
+    }
+    const response = await fetch("/api/entitle/student-chat", {
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      },
+    });
+    const payload = await parseApiResponse(response);
+    const available = (payload?.data?.availableConversations ?? []) as {
+      convId: string;
+      title: string;
+      lastActiveAt: string;
+    }[];
+    return available.map((conv) => ({
+      conv_id: conv.convId,
+      title: conv.title,
+      created_at: conv.lastActiveAt,
+    }));
+  }, [parseApiResponse, session?.accessToken, userId]);
+
+  const createConversationRequest = useCallback(
+    async (title: string) => {
+      const response = await fetch("/api/entitle/student-chat", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          action: "createConversation",
+          payload: { title },
+        }),
+      });
+      await parseApiResponse(response);
+    },
+    [parseApiResponse, session?.accessToken]
+  );
+
   useEffect(() => {
     if (!userId) {
       return;
@@ -51,18 +104,9 @@ const StudentDashboardPage = () => {
       setIsFetching(true);
       setError(null);
       try {
-        const rows = await apiFetch<ConversationRow[]>(
-          `/conversations/newHire?userId=${encodeURIComponent(userId)}`,
-          undefined,
-          session?.accessToken
-        );
+        const rows = await fetchConversationList();
         if (isMounted) {
-          const mapped = (rows ?? []).map((row) => ({
-            conv_id: row.conv_id,
-            title: row.title,
-            created_at: row.created_at,
-          }));
-          setConversations(mapped);
+          setConversations(rows);
         }
       } catch (loadError) {
         if (isMounted) {
@@ -82,7 +126,7 @@ const StudentDashboardPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [session?.accessToken, userId]);
+  }, [fetchConversationList, userId]);
 
   const heading = useMemo(() => {
     if (!session?.displayName) {
@@ -126,18 +170,8 @@ const StudentDashboardPage = () => {
     if (!userId) return;
     setIsFetching(true);
     try {
-      const rows = await apiFetch<ConversationRow[]>(
-        `/conversations/newHire?userId=${encodeURIComponent(userId)}`,
-        undefined,
-        session?.accessToken
-      );
-      setConversations(
-        (rows ?? []).map((row) => ({
-          conv_id: row.conv_id,
-          title: row.title,
-          created_at: row.created_at,
-        }))
-      );
+      const rows = await fetchConversationList();
+      setConversations(rows);
       setError(null);
     } catch (err) {
       setError(
@@ -157,20 +191,7 @@ const StudentDashboardPage = () => {
     setIsCreating(true);
     setError(null);
     try {
-      await apiFetch<{ conv_id: string }>(
-        "/conversations/newHire",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            userId,
-            title,
-            role: session?.role,
-            displayName: session?.displayName ?? userId,
-            email: (session as any)?.email ?? "",
-          }),
-        },
-        session?.accessToken
-      );
+      await createConversationRequest(title);
       setNewTitle("");
       await refetchConversations();
     } catch (err) {

@@ -2,7 +2,6 @@
 
 import type { LLMPort } from "../../../application/entitle/ports";
 import type { Prompt } from "../../../application/entitle/models";
-import { apiFetch } from "../../../lib/apiClient";
 
 interface GeminiLLMPortOptions {
   getConversationId?: () => string | null | undefined;
@@ -27,19 +26,38 @@ export class GeminiLLMPort implements LLMPort {
       questionLength: question.length,
       conversationId,
     });
-    const { answer } = await apiFetch<{ answer: string }>(
-      "/llm/generate",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          question,
-          conversationId,
-        }),
-        signal: input.signal,
+    const accessToken = this.options?.getAccessToken?.() ?? undefined;
+    const response = await fetch("/api/llm/generate", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      this.options?.getAccessToken?.() ?? undefined
-    );
-    if (!answer) {
+      body: JSON.stringify({
+        question,
+        conversationId,
+        modelId: input.modelId,
+        runtimeId: input.runtimeId,
+      }),
+      signal: input.signal,
+    });
+    const raw = await response.text();
+    let payload: any = null;
+    if (raw) {
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        payload = null;
+      }
+    }
+    if (!response.ok) {
+      const message = payload?.error ?? raw ?? "LLM backend request failed.";
+      throw new Error(message);
+    }
+    const answer = payload?.answer;
+    if (!answer || typeof answer !== "string") {
       throw new Error("LLM backend response did not include answer.");
     }
     return answer;

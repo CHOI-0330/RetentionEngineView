@@ -10,10 +10,8 @@ import type { MentorDashboardControllerEffect } from "../../controllers/useMento
 import type { UseCaseFailure } from "../../../application/entitle/models";
 import type { StudentSummary } from "../../../application/entitle/ports";
 import { useSession } from "../../../components/SessionProvider";
-import { apiFetch } from "../../../lib/apiClient";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
-import type { Message } from "../../../domain/core";
 import { Skeleton } from "../../../components/ui/skeleton";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
@@ -33,17 +31,42 @@ const MentorDashboardPage = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
+  const callMentorApi = useCallback(
+    async <T,>(init?: RequestInit): Promise<T> => {
+      const response = await fetch("/api/entitle/mentor", {
+        cache: init?.cache ?? "no-store",
+        credentials: "include",
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+      const raw = await response.text();
+      let payload: any = null;
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = null;
+        }
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error ?? raw ?? "Unexpected error");
+      }
+      return payload as T;
+    },
+    [session?.accessToken]
+  );
+
   const processEffectBackend = useCallback(
     async (effect: MentorDashboardControllerEffect) => {
       if (!session) throw new Error("Login required");
       switch (effect.kind) {
         case "REQUEST_REFRESH_SUMMARIES": {
-          const result = await apiFetch<{ conv_id: string; title: string; created_at: string; owner_name?: string }[]>(
-            `/conversations/mentor?mentorId=${encodeURIComponent(session.userId)}`,
-            undefined,
-            session.accessToken
-          );
-          const summaries: StudentSummary[] = (result ?? []).map((c) => ({
+          const result = await callMentorApi<{ data?: { conv_id: string; title: string; created_at: string; owner_name?: string }[] }>();
+          const summaries: StudentSummary[] = (result.data ?? []).map((c) => ({
             newhire: {
               userId: "", // owner_id 미반환: 서버 개선 시 채움
               role: "NEW_HIRE",
@@ -75,7 +98,7 @@ const MentorDashboardPage = () => {
           break;
       }
     },
-    [controller.actions, session]
+    [callMentorApi, controller.actions, session]
   );
 
   useEffect(() => {
@@ -129,17 +152,12 @@ const MentorDashboardPage = () => {
     setIsAssigning(true);
     setAssignmentError(null);
     try {
-      await apiFetch(
-        "/mentor-assignments",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            mentorId: session.userId,
-            newhireId: trimmed,
-          }),
-        },
-        session.accessToken
-      );
+      await callMentorApi({
+        method: "POST",
+        body: JSON.stringify({
+          newhireId: trimmed,
+        }),
+      });
       setAssignmentNewhireId("");
       controller.actions.requestRefresh();
     } catch (error) {

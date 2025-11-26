@@ -27,6 +27,45 @@ const BACKEND_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
 ).replace(/\/$/, "");
 
+const authGateway = new SupabaseAuthGateway();
+
+const resolveAccessToken = (request: NextRequest): string | null => {
+  const headerToken = request.headers.get("authorization");
+  const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
+    ? headerToken.slice(7).trim()
+    : null;
+  const cookieAccessToken = request.cookies.get("auth_access_token")?.value ?? null;
+  const supabaseCookie = request.cookies.getAll().find((cookie) => cookie.name.includes("-auth-token"));
+  let supabaseAccessToken: string | null = null;
+  if (supabaseCookie) {
+    try {
+      const parsed = JSON.parse(supabaseCookie.value);
+      supabaseAccessToken = typeof parsed?.access_token === "string" ? parsed.access_token : null;
+    } catch {
+      supabaseAccessToken = null;
+    }
+  }
+  return accessTokenFromHeader ?? cookieAccessToken ?? supabaseAccessToken;
+};
+
+const requireAuth = async (request: NextRequest) => {
+  const accessToken = resolveAccessToken(request);
+  if (!accessToken) {
+    throw new HttpError(401, "Unauthorized");
+  }
+  try {
+    const user = await authGateway.getUserFromAccessToken(accessToken);
+    return { accessToken, user };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unauthorized";
+    throw new HttpError(401, message);
+  }
+};
+
+const logRequest = (label: string, payload: unknown) => {
+  console.log(`[student-chat][${label}]`, payload);
+};
+
 const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> => {
   if (!BACKEND_BASE_URL) {
     throw new Error("LLM_BACKEND_BASE_URL is not configured.");
@@ -51,7 +90,7 @@ const mapApiMessageRow = (row: { msg_id: string; conv_id: string; role: string; 
   conv_id: row.conv_id,
   role: row.role as MessageRow["role"],
   content: row.content,
-  status: null,
+  status: (row.role as MessageRow["role"]) === "ASSISTANT" ? "DONE" : null,
   created_at: row.created_at,
 });
 
@@ -98,26 +137,9 @@ export async function POST(request: NextRequest) {
     payload: unknown;
   };
 
-  const authGateway = new SupabaseAuthGateway();
-
-  const headerToken = request.headers.get("authorization");
-  const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
-    ? headerToken.slice(7).trim()
-    : null;
-  const accessToken = accessTokenFromHeader ?? request.cookies.get("auth_access_token")?.value;
-  if (!accessToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  let user;
   try {
-    user = await authGateway.getUserFromAccessToken(accessToken);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unauthorized";
-    return NextResponse.json({ error: message }, { status: 401 });
-  }
-
-  try {
+    const { accessToken, user } = await requireAuth(request);
+    logRequest("POST", { action, userId: user.userId });
     switch (action) {
       case "createUserMessage": {
         const input = (payload ?? {}) as { convId?: string; content?: string };
@@ -140,7 +162,7 @@ export async function POST(request: NextRequest) {
             role: "NEW_HIRE",
             content: trimmedContent,
           }),
-        });
+        }, accessToken);
         const mapped = mapMessageRow(mapApiMessageRow(backendResult.data));
         return NextResponse.json({ data: mapped });
       }
@@ -148,7 +170,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
       }
       case "finalizeAssistantMessage": {
-        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
+        const input = (payload ?? {}) as { convId?: string; content?: string };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
+        }
+        const content = typeof input.content === "string" ? input.content : "";
+        const trimmedContent = content.trim();
+        if (!trimmedContent) {
+          throw new HttpError(400, "Message content must not be empty.");
+        }
+        if (trimmedContent.length > MAX_MESSAGE_LENGTH) {
+          throw new HttpError(400, "Message content exceeds the allowed length.");
+        }
+
+        const backendResult = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string } }>("/messages", {
+          method: "POST",
+          body: JSON.stringify({
+            convId: input.convId,
+            role: "ASSISTANT",
+            content: trimmedContent,
+          }),
+        }, accessToken);
+        const mapped = mapMessageRow(mapApiMessageRow(backendResult.data));
+        return NextResponse.json({ data: mapped });
       }
       case "cancelAssistantMessage": {
         return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
@@ -160,7 +204,9 @@ export async function POST(request: NextRequest) {
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
         const backendMessages = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }[] }>(
-          `/messages?convId=${encodeURIComponent(input.convId)}`
+          `/messages?convId=${encodeURIComponent(input.convId)}`,
+          undefined,
+          accessToken
         );
         const rows = (backendMessages.data ?? []).map(mapApiMessageRow).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id));
 
@@ -186,7 +232,9 @@ export async function POST(request: NextRequest) {
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
         const backendFeedbacks = await callBackend<{ data: { fb_id: string; target_msg_id: string; author_id: string; author_role: string; content: string; created_at: string; updated_at?: string | null }[] }>(
-          `/feedback?messageId=${encodeURIComponent(input.msgId)}`
+          `/feedback?messageId=${encodeURIComponent(input.msgId)}`,
+          undefined,
+          accessToken
         );
         const sorted = (backendFeedbacks.data ?? [])
           .map(mapApiFeedbackRow)
@@ -220,19 +268,67 @@ export async function POST(request: NextRequest) {
         });
       }
       case "createFeedback": {
-        const input = (payload ?? {}) as { targetMsgId?: string };
+        const input = (payload ?? {}) as { targetMsgId?: string; content?: string };
         if (!input.targetMsgId || typeof input.targetMsgId !== "string") {
           throw new HttpError(400, "targetMsgId is required.");
         }
-        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
+        const content = typeof input.content === "string" ? input.content : "";
+        if (!content.trim()) {
+          throw new HttpError(400, "Feedback content must not be empty.");
+        }
+        const response = await callBackend<{
+          data: {
+            fb_id: string;
+            target_msg_id: string;
+            author_id: string;
+            author_role: string;
+            content: string;
+            created_at: string;
+            updated_at?: string | null;
+          };
+        }>(
+          "/feedback",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              messageId: input.targetMsgId,
+              authorId: user.userId,
+              content,
+            }),
+          },
+          accessToken
+        );
+        const mapped = mapFeedbackRow(mapApiFeedbackRow(response.data));
+        return NextResponse.json({ data: mapped });
       }
       case "createConversation": {
-        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
+        const input = (payload ?? {}) as { title?: string };
+        const title = (input.title ?? "").trim() || "新しい会話";
+        const profile = await authGateway.getUserProfile(user.userId);
+        const created = await callBackend<{ data?: { conv_id: string; title: string; created_at: string } } | { conv_id: string; title: string; created_at: string }>(
+          "/conversations/newHire",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              userId: user.userId,
+              title,
+              role: profile.role,
+              displayName: profile.displayName,
+              email: "",
+            }),
+          },
+          accessToken
+        );
+        const createdRow = (created as any)?.data ?? created;
+        const mapped = mapApiConversationRow(createdRow as { conv_id: string; title: string; created_at: string });
+        mapped.ownerId = user.userId;
+        return NextResponse.json({ data: mapped });
       }
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });
     }
   } catch (error) {
+    console.error("[student-chat][POST][error]", error);
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
@@ -247,29 +343,23 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const requestedConvId = searchParams.get("convId") ?? undefined;
 
-  const authGateway = new SupabaseAuthGateway();
-  const accessToken = request.cookies.get("auth_access_token")?.value;
-  if (!accessToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  let authUser;
   try {
-    authUser = await authGateway.getUserFromAccessToken(accessToken);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unauthorized";
-    return NextResponse.json({ error: message }, { status: 401 });
-  }
-
-  try {
+    const { accessToken, user: authUser } = await requireAuth(request);
+    logRequest("GET", { convId: requestedConvId, userId: authUser.userId });
     const profile = await authGateway.getUserProfile(authUser.userId);
-    const convListResponse = await callBackend<{ data: { conv_id: string; title: string; created_at: string }[] }>(
+    const convListResponse = await callBackend<{ data?: { conv_id: string; title: string; created_at: string }[] } | { conv_id: string; title: string; created_at: string }[]>(
       `/conversations/newHire?userId=${encodeURIComponent(authUser.userId)}`,
       undefined,
       accessToken
     );
 
-    const conversations = (convListResponse.data ?? []).map((row) => {
+    const convRows = Array.isArray((convListResponse as any)?.data)
+      ? (convListResponse as any).data
+      : Array.isArray(convListResponse)
+        ? (convListResponse as any)
+        : [];
+
+    const conversations = convRows.map((row) => {
       const mapped = mapApiConversationRow(row);
       mapped.ownerId = authUser.userId;
       return mapped;
@@ -355,6 +445,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error("[student-chat][GET][error]", error);
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
