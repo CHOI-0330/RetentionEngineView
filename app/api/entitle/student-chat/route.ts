@@ -353,13 +353,14 @@ export async function GET(request: NextRequest) {
       accessToken
     );
 
-    const convRows = Array.isArray((convListResponse as any)?.data)
-      ? (convListResponse as any).data
+    type ConversationRow = { conv_id: string; title: string; created_at: string };
+    const convRows: ConversationRow[] = Array.isArray((convListResponse as any)?.data)
+      ? ((convListResponse as any).data as ConversationRow[])
       : Array.isArray(convListResponse)
-        ? (convListResponse as any)
+        ? (convListResponse as ConversationRow[])
         : [];
 
-    const conversations = convRows.map((row) => {
+    const conversations = convRows.map((row: ConversationRow) => {
       const mapped = mapApiConversationRow(row);
       mapped.ownerId = authUser.userId;
       return mapped;
