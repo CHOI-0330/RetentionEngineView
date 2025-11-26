@@ -71,7 +71,7 @@ const toMessageView = (message: Message): StudentChatMessageView => ({
   format: message.role === "ASSISTANT" ? "markdown" : "text",
   sender: message.role === "ASSISTANT" ? "ai" : "student",
   timestamp: new Date(message.createdAt),
-  status: message.status,
+  status: message.role === "ASSISTANT" ? message.status ?? "DONE" : message.status,
 });
 
 const toFeedbackView = (
