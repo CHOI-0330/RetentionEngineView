@@ -12,7 +12,6 @@ import type { Conversation, Feedback, MentorAssignment, Message, User } from "..
 import type { LLMPort } from "../../../application/entitle/ports";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { GeminiLLMPort } from "../../gateways/llm/geminiClientPort";
-import { apiFetch } from "../../../lib/apiClient";
 import { useSession } from "../../../components/SessionProvider";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
@@ -43,6 +42,14 @@ interface StudentChatBootstrap {
   availableMentors: MentorOption[];
 }
 
+type StudentChatApiAction =
+  | "createUserMessage"
+  | "finalizeAssistantMessage"
+  | "listConversationMessages"
+  | "listFeedbacks"
+  | "createFeedback"
+  | "createConversation";
+
 interface StudentChatRuntimeProps {
   bootstrap: StudentChatBootstrap & { conversation: Conversation };
   llmPort: LLMPort;
@@ -52,25 +59,8 @@ interface StudentChatRuntimeProps {
   selectedConversationId: string;
   onSelectConversation: (convId: string) => void;
   onCreateConversation: (input: { title: string; mentorId?: string | null }) => Promise<void>;
+  callStudentChatApi: <T>(action: StudentChatApiAction, payload?: unknown) => Promise<T>;
 }
-
-type MessageDto = {
-  msg_id: string;
-  conv_id: string;
-  role: Message["role"];
-  content: string;
-  status?: Message["status"] | null;
-  created_at: string;
-};
-
-const mapMessageDto = (dto: MessageDto): Message => ({
-  msgId: dto.msg_id,
-  convId: dto.conv_id,
-  role: dto.role,
-  content: dto.content,
-  status: dto.status ?? undefined,
-  createdAt: dto.created_at,
-});
 
 const StudentChatRuntime = ({
   bootstrap,
@@ -81,6 +71,7 @@ const StudentChatRuntime = ({
   selectedConversationId,
   onSelectConversation,
   onCreateConversation,
+  callStudentChatApi,
 }: StudentChatRuntimeProps) => {
   const controller = useStudentChatController({
     conversation: bootstrap.conversation,
@@ -113,15 +104,11 @@ const StudentChatRuntime = ({
         case "REQUEST_PERSIST_USER_MESSAGE": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await apiFetch<{ data: MessageDto }>("/messages", {
-            method: "POST",
-            body: JSON.stringify({
-              convId,
-              role: "NEW_HIRE",
-              content: effect.payload.content,
-            }),
+          const result = await callStudentChatApi<{ data: Message }>("createUserMessage", {
+            convId,
+            content: effect.payload.content,
           });
-          controller.actions.notifyUserMessagePersisted(mapMessageDto(result.data));
+          controller.actions.notifyUserMessagePersisted(result.data);
           break;
         }
         case "REQUEST_BEGIN_ASSISTANT_MESSAGE": {
@@ -160,18 +147,17 @@ const StudentChatRuntime = ({
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await apiFetch<{ data: MessageDto }>("/messages", {
-            method: "POST",
-            body: JSON.stringify({
-              convId,
-              role: "ASSISTANT",
-              content:
-                (effect.payload as any).content ??
-                (effect.payload as any).finalText ??
-                "",
-            }),
+          const result = await callStudentChatApi<{ data: Message }>("finalizeAssistantMessage", {
+            convId,
+            content:
+              (effect.payload as any).content ??
+              (effect.payload as any).finalText ??
+              "",
           });
-          controller.actions.syncAssistantMessage(mapMessageDto(result.data));
+          controller.actions.syncAssistantMessage({
+            ...result.data,
+            status: result.data.status ?? "DONE",
+          });
           activeAssistantIdRef.current = null;
           break;
         }
@@ -182,26 +168,25 @@ const StudentChatRuntime = ({
         case "REQUEST_LIST_MESSAGES": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await apiFetch<{ data: MessageDto[] }>(`/messages?convId=${encodeURIComponent(convId)}`);
-          controller.actions.notifyMessagesLoaded({
-            items: (result.data ?? []).map(mapMessageDto),
-            nextCursor: undefined,
+          const result = await callStudentChatApi<{ data: { items: Message[]; nextCursor?: string } }>("listConversationMessages", {
+            convId,
           });
+          controller.actions.notifyMessagesLoaded(result.data);
           break;
         }
         case "REQUEST_LIST_FEEDBACKS": {
-          const result = await apiFetch<{ data: Feedback[] }>(`/feedback?messageId=${encodeURIComponent(effect.payload.msgId)}`);
-          controller.actions.applyFeedbackForMessage(effect.payload.msgId, result.data, {});
+          const result = await callStudentChatApi<{
+            data: { items: Feedback[]; authorNames?: Record<string, string> };
+          }>("listFeedbacks", {
+            msgId: effect.payload.msgId,
+          });
+          controller.actions.applyFeedbackForMessage(effect.payload.msgId, result.data.items, result.data.authorNames ?? {});
           break;
         }
         case "REQUEST_CREATE_FEEDBACK": {
-          const result = await apiFetch<{ data: Feedback }>(`/feedback`, {
-            method: "POST",
-            body: JSON.stringify({
-              messageId: effect.payload.targetMsgId,
-              authorId: effect.payload.authorId,
-              content: effect.payload.content,
-            }),
+          const result = await callStudentChatApi<{ data: Feedback }>("createFeedback", {
+            targetMsgId: effect.payload.targetMsgId,
+            content: effect.payload.content,
           });
           controller.actions.applyFeedbackForMessage(result.data.targetMsgId, [result.data], {
             [result.data.authorId]: result.data.authorId,
@@ -215,7 +200,7 @@ const StudentChatRuntime = ({
         }
       }
     },
-    [controller.actions, controller.state.activeAssistantMessageId, llmPort, selectedConversationId]
+    [callStudentChatApi, controller.actions, controller.state.activeAssistantMessageId, llmPort, selectedConversationId]
   );
 
   const processQueuedEffects = useCallback(() => {
@@ -320,6 +305,67 @@ const StudentChatPage = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<UseCaseFailure | null>(null);
 
+  const callStudentChatApi = useCallback(
+    async <T,>(action: StudentChatApiAction, payload?: unknown): Promise<T> => {
+      const response = await fetch("/api/entitle/student-chat", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+        },
+        body: JSON.stringify({ action, payload }),
+      });
+      const raw = await response.text();
+      let json: any = null;
+      if (raw) {
+        try {
+          json = JSON.parse(raw);
+        } catch {
+          json = null;
+        }
+      }
+      if (!response.ok) {
+        const message = json?.error ?? json?.message ?? raw ?? "Unexpected error";
+        throw new Error(message);
+      }
+      return json as T;
+    },
+    [session?.accessToken]
+  );
+
+  const fetchBootstrap = useCallback(
+    async (convId?: string) => {
+      const params = new URLSearchParams();
+      if (convId) {
+        params.set("convId", convId);
+      }
+      const response = await fetch(`/api/entitle/student-chat${params.toString() ? `?${params.toString()}` : ""}`, {
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+        },
+      });
+      const raw = await response.text();
+      let json: any = null;
+      if (raw) {
+        try {
+          json = JSON.parse(raw);
+        } catch {
+          json = null;
+        }
+      }
+      if (!response.ok) {
+        const message = json?.error ?? raw ?? "Unexpected error";
+        throw new Error(message);
+      }
+      return json as { data?: StudentChatBootstrap };
+    },
+    [session?.accessToken]
+  );
+
   const loadConversation = useCallback(
     async (targetConvId?: string) => {
       if (!session) {
@@ -329,130 +375,28 @@ const StudentChatPage = () => {
       }
       setIsLoading(true);
       try {
-        // 1) 대화 목록 조회
-        const convList = await apiFetch<{ conv_id: string; title: string; created_at: string }[]>(
-          `/conversations/newHire?userId=${encodeURIComponent(session.userId)}`,
-          undefined,
-          session.accessToken,
-        );
-        let conversations = convList ?? [];
-
-        // 없으면 새 대화 생성
-        if (!conversations.length) {
-          const created = await apiFetch<{ conv_id: string; title: string; created_at: string }>(
-            "/conversations/newHire",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                userId: session.userId,
-                title: "新しい会話",
-                role: session.role,
-                displayName: session.displayName ?? session.userId,
-                email: "",
-              }),
-            },
-            session.accessToken,
-          );
-          conversations = [created];
+        let bootstrapResponse = await fetchBootstrap(targetConvId);
+        let data = bootstrapResponse.data;
+        if (!data) {
+          throw new Error("会話データが取得できませんでした。");
         }
 
-        const targetConv = targetConvId
-          ? conversations.find((c) => c.conv_id === targetConvId) ?? conversations[0]
-          : conversations[0];
-
-        // 2) 메시지 조회
-        const msgRes = await apiFetch<{ data: MessageDto[] }>(
-          `/messages?convId=${encodeURIComponent(targetConv.conv_id)}`,
-          undefined,
-          session.accessToken,
-        );
-
-        const conversation: Conversation = {
-          convId: targetConv.conv_id,
-          ownerId: session.userId,
-          title: targetConv.title,
-          state: "ACTIVE",
-          createdAt: targetConv.created_at,
-          lastActiveAt: targetConv.created_at,
-        };
-
-        const messages: Message[] = (msgRes.data ?? []).map(mapMessageDto);
-        const assistantMessages = messages.filter((message) => message.role === "ASSISTANT");
-        const initialFeedbacks: Record<string, Feedback[]> = {};
-        const initialAuthorNames: Record<string, string> = {};
-
-        if (assistantMessages.length && session?.accessToken) {
-          await Promise.all(
-            assistantMessages.map(async (message) => {
-              try {
-                const response = await fetch("/api/entitle/student-chat", {
-                  method: "POST",
-                  credentials: "include",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session.accessToken}`,
-                  },
-                  body: JSON.stringify({
-                    action: "listFeedbacks",
-                    payload: { msgId: message.msgId },
-                  }),
-                });
-                if (!response.ok) {
-                  throw new Error(await response.text());
-                }
-                const json = (await response.json()) as {
-                  data?: {
-                    items: Feedback[];
-                    authorNames?: Record<string, string>;
-                  };
-                };
-                if (json.data?.items?.length) {
-                  initialFeedbacks[message.msgId] = json.data.items;
-                }
-                if (json.data?.authorNames) {
-                  Object.assign(initialAuthorNames, json.data.authorNames);
-                }
-              } catch (feedbackError) {
-                console.warn("[StudentChat] Failed to fetch mentor feedback", {
-                  error: feedbackError,
-                  messageId: message.msgId,
-                });
-              }
-            })
-          );
+        if (!data.conversation) {
+          const created = await callStudentChatApi<{ data: Conversation }>("createConversation", {
+            title: "新しい会話",
+          });
+          bootstrapResponse = await fetchBootstrap(created.data.convId);
+          data = bootstrapResponse.data;
         }
 
-        const currentUser: User = {
-          userId: session.userId,
-          role: session.role,
-          displayName: session.displayName ?? session.userId,
-          email: "",
-          createdAt: "",
-        };
+        if (!data?.conversation) {
+          throw new Error("会話データが取得できませんでした。");
+        }
 
-        setBootstrap({
-          conversation,
-          currentUser,
-          initialMessages: messages,
-          initialFeedbacks,
-          authorNames: initialAuthorNames,
-          mentorAssignments: [],
-          availableConversations: conversations.map((c) => ({
-            convId: c.conv_id,
-            title: c.title,
-            lastActiveAt: c.created_at,
-          })),
-          availableMentors: [],
-        });
-        setConversationOptions(
-          conversations.map((c) => ({
-            convId: c.conv_id,
-            title: c.title,
-            lastActiveAt: c.created_at,
-          }))
-        );
-        setMentorOptions([]);
-        setActiveConversationId(targetConv.conv_id);
+        setBootstrap(data);
+        setConversationOptions(data.availableConversations);
+        setMentorOptions(data.availableMentors);
+        setActiveConversationId(data.conversation.convId);
         setLoadError(null);
       } catch (error) {
         setLoadError(normalizeError(error));
@@ -460,7 +404,7 @@ const StudentChatPage = () => {
         setIsLoading(false);
       }
     },
-    [session]
+    [callStudentChatApi, fetchBootstrap, session]
   );
 
   useEffect(() => {
@@ -474,20 +418,16 @@ const StudentChatPage = () => {
     async ({ title }: { title: string; mentorId?: string | null }) => {
       const normalizedTitle = title.trim() || "新しい会話";
       try {
-        const created = await apiFetch<{ conv_id: string; title: string; created_at: string }>("/conversations/newHire", {
-          method: "POST",
-          body: JSON.stringify({
-            userId: session?.userId,
-            title: normalizedTitle,
-          }),
-        }, session?.accessToken);
+        const created = await callStudentChatApi<{ data: Conversation }>("createConversation", {
+          title: normalizedTitle,
+        });
         setLoadError(null);
-        await loadConversation(created.conv_id);
+        await loadConversation(created.data.convId);
       } catch (error) {
         setLoadError(normalizeError(error));
       }
     },
-    [loadConversation, session?.userId, session?.accessToken]
+    [callStudentChatApi, loadConversation]
   );
 
   const handleInitialCreateSubmit = useCallback(
@@ -581,6 +521,7 @@ const StudentChatPage = () => {
       selectedConversationId={selectedConversationId}
       onSelectConversation={handleConversationChange}
       onCreateConversation={createConversation}
+      callStudentChatApi={callStudentChatApi}
     />
   );
 };
