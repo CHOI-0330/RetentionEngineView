@@ -1,7 +1,7 @@
-import type { LLMPort } from "../../application/entitle/ports";
 import type { Prompt } from "../../application/entitle/models";
 
-export class InMemoryLLMPort implements LLMPort {
+// Legacy mock kept for potential dev usage; no longer wired into runtime.
+export class InMemoryLLMPort {
   async generate(_input: {
     prompt: Prompt;
     modelId?: string;

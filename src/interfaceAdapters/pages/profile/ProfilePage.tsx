@@ -5,7 +5,58 @@ import { useMbtiController } from "../../controllers/useMbtiController";
 import { useMbtiPresenter } from "../../presenters/useMbtiPresenter";
 import { useSessionPresenter } from "../../presenters/useSessionPresenter";
 import ProfileView from "../../../views/ProfileView";
-import * as mbtiGateway from "../../gateways/api/mbtiGateway";
+import type { MbtiType } from "../../../domain/mbti.types";
+
+const fetchMbtiFromApi = async (userId: string, accessToken?: string): Promise<MbtiType | null> => {
+  const params = new URLSearchParams({ userId });
+  const response = await fetch(`/api/mbti?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+  const raw = await response.text();
+  let payload: any = null;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = null;
+    }
+  }
+  if (!response.ok) {
+    throw new Error(payload?.error ?? raw ?? "Failed to fetch MBTI.");
+  }
+  return (payload?.data?.mbti ?? null) as MbtiType | null;
+};
+
+const updateMbtiViaApi = async (userId: string, mbti: MbtiType, accessToken?: string): Promise<void> => {
+  const response = await fetch("/api/mbti", {
+    method: "PUT",
+    cache: "no-store",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ userId, mbti }),
+  });
+  const raw = await response.text();
+  let payload: any = null;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = null;
+    }
+  }
+  if (!response.ok) {
+    throw new Error(payload?.error ?? raw ?? "Failed to update MBTI.");
+  }
+};
 
 const ProfilePage = () => {
   const sessionPresenter = useSessionPresenter();
@@ -30,24 +81,15 @@ const ProfilePage = () => {
       for (const effect of state.pendingEffects) {
         try {
           if (effect.kind === "FETCH_MBTI") {
-            const mbti = await mbtiGateway.getMbti(
-              effect.payload.userId,
-              effect.payload.accessToken
-            );
+            const mbti = await fetchMbtiFromApi(effect.payload.userId, effect.payload.accessToken);
             actions.setCurrentMbti(mbti);
           } else if (effect.kind === "UPDATE_MBTI") {
-            await mbtiGateway.updateMbti(
-              effect.payload.userId,
-              effect.payload.mbti,
-              effect.payload.accessToken
-            );
+            await updateMbtiViaApi(effect.payload.userId, effect.payload.mbti, effect.payload.accessToken);
             actions.setCurrentMbti(effect.payload.mbti);
           }
           actions.acknowledgeEffect(effect.id);
         } catch (error) {
-          actions.setError(
-            error instanceof Error ? error.message : "エラーが発生しました"
-          );
+          actions.setError(error instanceof Error ? error.message : "エラーが発生しました");
           actions.acknowledgeEffect(effect.id);
         }
       }

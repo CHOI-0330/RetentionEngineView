@@ -1,15 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../../src/interfaceAdapters/gateways/supabase/authGateway";
 import type { Feedback, Message, User } from "../../../../../src/domain/core";
+import { createAdminSupabaseClient } from "../../../../../src/lib/supabaseClient";
 
-const BACKEND_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "");
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
-const authGateway = new SupabaseAuthGateway();
+// DTOs for backend REST responses
+type MentorConversationDto = {
+  conv_id: string;
+  title: string;
+  created_at: string;
+  owner_name?: string;
+};
 
-type MessageDto = { msg_id: string; conv_id: string; role: Message["role"]; content: string; created_at: string };
+type MessageDto = {
+  msg_id: string;
+  conv_id: string;
+  role: Message["role"];
+  content: string;
+  created_at: string;
+};
+
 type FeedbackDto = {
   fb_id: string;
   target_msg_id: string;
@@ -18,6 +37,10 @@ type FeedbackDto = {
   content: string;
   created_at: string;
 };
+
+const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+const getAdminClient = createAdminSupabaseClient;
 
 const mapMessageDto = (row: MessageDto): Message => ({
   msgId: row.msg_id,
@@ -50,12 +73,48 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Backend request failed with status ${response.status}`);
+    throw new HttpError(response.status, text || "Backend request failed.");
   }
   return (await response.json()) as T;
 };
 
-const ensureMentorAuth = async (request: NextRequest) => {
+// Match NestJS controller method names for clarity.
+const getMentorConversationList = (mentorId: string, accessToken: string) =>
+  callBackend<MentorConversationDto[]>(
+    `/conversations/mentor?mentorId=${encodeURIComponent(mentorId)}`,
+    undefined,
+    accessToken
+  );
+
+const getMessagesForMentor = (mentorId: string, convId: string, accessToken: string) =>
+  callBackend<{ data: MessageDto[] }>(
+    `/messages/mentor?mentorId=${encodeURIComponent(mentorId)}&convId=${encodeURIComponent(convId)}`,
+    undefined,
+    accessToken
+  );
+
+const getFeedbackByMessage = (messageId: string, accessToken: string) =>
+  callBackend<{ data: FeedbackDto[] }>(
+    `/feedback?messageId=${encodeURIComponent(messageId)}`,
+    undefined,
+    accessToken
+  );
+
+const createFeedback = (input: { messageId: string; authorId: string; content: string }, accessToken: string) =>
+  callBackend<{ data: FeedbackDto }>(
+    "/feedback",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        messageId: input.messageId,
+        authorId: input.authorId,
+        content: input.content,
+      }),
+    },
+    accessToken
+  );
+
+const resolveAccessToken = (request: NextRequest): string | null => {
   const headerToken = request.headers.get("authorization");
   const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
     ? headerToken.slice(7).trim()
@@ -78,19 +137,45 @@ const ensureMentorAuth = async (request: NextRequest) => {
 
   const accessToken = accessTokenFromHeader ?? cookieAccessToken ?? supabaseAccessToken;
   if (!accessToken) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
+    return null;
+  }
+  return accessToken;
+};
+
+const requireMentorAuth = async (request: NextRequest) => {
+  const accessToken = resolveAccessToken(request);
+  if (!accessToken) {
+    throw new HttpError(401, "Unauthorized");
   }
 
-  let authUser: { userId: string; role: User["role"] };
+  let authUser: { userId: string; role: User["role"]; displayName?: string };
   try {
-    authUser = await authGateway.getUserFromAccessToken(accessToken);
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw error ?? new Error("Unauthorized");
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      throw profileError ?? new HttpError(401, "User profile not found.");
+    }
+    authUser = {
+      userId,
+      role: (profile as { role: User["role"] }).role,
+      displayName: (profile as { display_name?: string }).display_name ?? "",
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unauthorized";
-    return { error: NextResponse.json({ error: message }, { status: 401 }) } as const;
+    throw new HttpError(401, message);
   }
 
   if (authUser.role !== "MENTOR") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
+    throw new HttpError(403, "Forbidden");
   }
 
   return { authUser, accessToken } as const;
@@ -107,17 +192,9 @@ export async function GET(
   }
 
   try {
-    const auth = await ensureMentorAuth(request);
-    if ("error" in auth) {
-      return auth.error;
-    }
-    const { authUser, accessToken } = auth;
+    const { authUser, accessToken } = await requireMentorAuth(request);
 
-    const convList = await callBackend<{ conv_id: string; title: string; created_at: string; owner_name?: string }[]>(
-      `/conversations/mentor?mentorId=${encodeURIComponent(authUser.userId)}`,
-      undefined,
-      accessToken
-    );
+    const convList = await getMentorConversationList(authUser.userId, accessToken);
     const targetConv = convList.find((entry) => entry.conv_id === convId);
     if (!targetConv) {
       return NextResponse.json({ error: "Conversation not found or not assigned." }, { status: 404 });
@@ -133,11 +210,7 @@ export async function GET(
       archivedAt: undefined,
     };
 
-    const messagesResponse = await callBackend<{ data: MessageDto[] }>(
-      `/messages/mentor?mentorId=${encodeURIComponent(authUser.userId)}&convId=${encodeURIComponent(convId)}`,
-      undefined,
-      accessToken
-    );
+    const messagesResponse = await getMessagesForMentor(authUser.userId, convId, accessToken);
     const messages = (messagesResponse.data ?? []).map(mapMessageDto);
 
     const feedbackByMessageId: Record<string, Feedback[]> = {};
@@ -145,11 +218,7 @@ export async function GET(
 
     await Promise.all(
       messages.map(async (message) => {
-        const fbRes = await callBackend<{ data: FeedbackDto[] }>(
-          `/feedback?messageId=${encodeURIComponent(message.msgId)}`,
-          undefined,
-          accessToken
-        );
+        const fbRes = await getFeedbackByMessage(message.msgId, accessToken);
         const mapped = (fbRes.data ?? []).map(mapFeedbackDto);
         if (mapped.length) {
           feedbackByMessageId[message.msgId] = mapped;
@@ -187,6 +256,9 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -203,11 +275,7 @@ export async function POST(
   }
 
   try {
-    const auth = await ensureMentorAuth(request);
-    if ("error" in auth) {
-      return auth.error;
-    }
-    const { authUser, accessToken } = auth;
+    const { authUser, accessToken } = await requireMentorAuth(request);
 
     let body: { messageId?: string; content?: string };
     try {
@@ -244,15 +312,11 @@ export async function POST(
       return NextResponse.json({ error: "既にこのメッセージへフィードバック済みです。" }, { status: 400 });
     }
 
-    const createRes = await callBackend<{ data: FeedbackDto }>(
-      "/feedback",
+    const createRes = await createFeedback(
       {
-        method: "POST",
-        body: JSON.stringify({
-          messageId: targetMessage.msgId,
-          authorId: authUser.userId,
-          content,
-        }),
+        messageId: targetMessage.msgId,
+        authorId: authUser.userId,
+        content,
       },
       accessToken
     );
@@ -268,7 +332,12 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const runtime = "nodejs";

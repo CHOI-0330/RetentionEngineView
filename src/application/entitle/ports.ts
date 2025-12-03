@@ -67,15 +67,6 @@ export interface MentorAssignmentPort {
   listActiveAssignments(input: { mentorId?: string; newhireId?: string }): Promise<MentorAssignment[]>;
 }
 
-export interface LLMPort {
-  generate(input: {
-    prompt: Prompt;
-    modelId?: string;
-    runtimeId?: string;
-    signal?: AbortSignal;
-  }): Promise<string>;
-}
-
 export interface ModelConfigPort {
   listModelConfigs(): Promise<ModelConfig[]>;
   listRuntimes(): Promise<LLMRuntime[]>;

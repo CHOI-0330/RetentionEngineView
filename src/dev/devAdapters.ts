@@ -2,14 +2,11 @@ import type { ValidatedFeedback } from "../../src/application/entitle/models";
 import type {
   FeedbackLookupPort,
   FeedbackPort,
-  LLMPort,
   MentorAssignmentPort,
   MentorDashboardPort,
   MessagePort,
   StudentSummary,
 } from "../../src/application/entitle/ports";
-import { GeminiLLMPort } from "../../src/interfaceAdapters/gateways/llm/geminiClientPort";
-import { InMemoryLLMPort } from "../../src/mocks/llm/inMemoryLLMPort";
 import type {
   Conversation,
   Feedback,
@@ -228,7 +225,6 @@ export interface DevEntitleAdapters {
   feedbackPort: FeedbackPort;
   mentorAssignmentPort: MentorAssignmentPort;
   feedbackLookupPort: FeedbackLookupPort;
-  llmPort: LLMPort;
   dashboardPort: MentorDashboardPort;
   initialMessages: Message[];
   initialFeedbacks: Record<string, Feedback[]>;
@@ -317,17 +313,6 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
   const feedbackPort = new InMemoryFeedbackPort(store);
   const mentorAssignmentPort = new StaticMentorAssignmentPort(store);
   const feedbackLookupPort = new StaticFeedbackLookupPort(store);
-  const shouldUseGemini = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_GEMINI === "1";
-  if (shouldUseGemini) {
-    console.info("[LLM] Gemini gateway enabled. Responses will be requested via backend /llm/generate.");
-  } else {
-    console.info("[LLM] Using in-memory LLM mock. Set NEXT_PUBLIC_ENABLE_GEMINI=1 to enable backend gateway.");
-  }
-  const llmPort: LLMPort = shouldUseGemini
-    ? new GeminiLLMPort({
-        getConversationId: () => conversation.convId,
-      })
-    : new InMemoryLLMPort();
   const dashboardPort = new InMemoryMentorDashboardPort(store);
 
   const runtimes: LLMRuntime[] = [
@@ -359,7 +344,6 @@ export const createDevEntitleAdapters = (): DevEntitleAdapters => {
     feedbackPort,
     mentorAssignmentPort,
     feedbackLookupPort,
-    llmPort,
     dashboardPort,
     initialMessages: [...messages],
     initialFeedbacks: { ...feedbacks },

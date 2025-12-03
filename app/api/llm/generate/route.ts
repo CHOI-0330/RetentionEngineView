@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
+import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
+import type { User } from "../../../../src/domain/core";
 
 class HttpError extends Error {
   constructor(
@@ -12,11 +13,17 @@ class HttpError extends Error {
   }
 }
 
-const BACKEND_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "");
+// DTOs for backend REST responses
+type GenerateAnswerResponseDto = {
+  answer?: string;
+  data?: {
+    answer?: string;
+  };
+};
 
-const authGateway = new SupabaseAuthGateway();
+const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+const getAdminClient = createAdminSupabaseClient;
 
 const resolveAccessToken = (request: NextRequest): string | null => {
   const headerToken = request.headers.get("authorization");
@@ -47,8 +54,22 @@ const requireAuth = async (request: NextRequest) => {
     throw new HttpError(401, "Unauthorized");
   }
   try {
-    const user = await authGateway.getUserFromAccessToken(accessToken);
-    return { accessToken, user };
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw error ?? new Error("Unauthorized");
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      throw profileError ?? new Error("User profile not found.");
+    }
+    const role = (profile as { role: User["role"] }).role;
+    return { accessToken, user: { userId, role, displayName: (profile as { display_name?: string }).display_name ?? "" } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unauthorized";
     throw new HttpError(401, message);
@@ -70,6 +91,17 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   }
   return (await response.json()) as T;
 };
+
+// Align with backend controller intent.
+const generateAnswer = (payload: { question: string; conversationId: string; modelId?: string; runtimeId?: string }, accessToken: string) =>
+  callBackend<GenerateAnswerResponseDto>(
+    "/llm/generate",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    accessToken
+  );
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,10 +129,7 @@ export async function POST(request: NextRequest) {
       modelId: body.modelId,
       runtimeId: body.runtimeId,
     };
-    const backendResponse = await callBackend<{ answer?: string; data?: { answer?: string } }>("/llm/generate", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }, accessToken);
+    const backendResponse = await generateAnswer(payload, accessToken);
     const answer = backendResponse.answer ?? backendResponse.data?.answer;
     if (!answer || typeof answer !== "string") {
       throw new HttpError(502, "LLM backend response did not include answer.");

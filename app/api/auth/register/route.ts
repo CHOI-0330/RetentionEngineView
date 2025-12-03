@@ -1,9 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
 import { registerUserUseCase } from "../../../../src/application/entitle/authUseCases";
+import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 
-const authGateway = new SupabaseAuthGateway();
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+const getAdminClient = createAdminSupabaseClient;
 
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as {
@@ -25,10 +35,33 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const data = await authGateway.registerUser(result.value);
-    return NextResponse.json({ data });
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.auth.admin.createUser({
+      email: result.value.email,
+      password: result.value.password,
+      email_confirm: true,
+    });
+    if (error || !data.user) {
+      throw new HttpError(500, error?.message ?? "Failed to create user.");
+    }
+    const userId = data.user.id;
+    const { error: insertError } = await adminClient.from("user").insert({
+      user_id: userId,
+      display_name: result.value.displayName,
+      email: result.value.email,
+      role: result.value.role,
+    });
+    if (insertError) {
+      throw new HttpError(500, insertError.message ?? "Failed to persist user profile.");
+    }
+    return NextResponse.json({ data: { userId } });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const runtime = "nodejs";

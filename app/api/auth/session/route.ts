@@ -1,8 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
+import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 
-const authGateway = new SupabaseAuthGateway();
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
 export async function GET(request: NextRequest) {
   // We rely on the httpOnly cookies that Next.js hands to this API route.
@@ -14,19 +22,36 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { userId } = await authGateway.getUserFromAccessToken(accessToken);
-    const profile = await authGateway.getUserProfile(userId);
+    const adminClient = createAdminSupabaseClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw new HttpError(401, error?.message ?? "Unauthorized");
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      throw new HttpError(401, profileError?.message ?? "User profile not found.");
+    }
     return NextResponse.json({
       data: {
         accessToken,
         refreshToken,
         userId,
-        role: profile.role,
-        displayName: profile.displayName,
+        role: (profile as { role: string }).role,
+        displayName: (profile as { display_name?: string }).display_name ?? "",
       },
     });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : "Unauthorized";
     return NextResponse.json({ error: message }, { status: 401 });
   }
 }
+
+export const runtime = "nodejs";

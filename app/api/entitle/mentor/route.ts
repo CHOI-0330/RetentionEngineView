@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
+import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
+import type { User } from "../../../../src/domain/core";
 
 class HttpError extends Error {
   constructor(
@@ -12,11 +13,17 @@ class HttpError extends Error {
   }
 }
 
-const BACKEND_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "");
+// DTOs for backend REST responses
+type MentorConversationDto = {
+  conv_id: string;
+  title: string;
+  created_at: string;
+  owner_name?: string;
+};
 
-const authGateway = new SupabaseAuthGateway();
+const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+const getAdminClient = createAdminSupabaseClient;
 
 const resolveAccessToken = (request: NextRequest): string | null => {
   const headerToken = request.headers.get("authorization");
@@ -43,11 +50,32 @@ const requireMentorAuth = async (request: NextRequest) => {
     throw new HttpError(401, "Unauthorized");
   }
   try {
-    const user = await authGateway.getUserFromAccessToken(accessToken);
-    if (user.role !== "MENTOR") {
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw error ?? new Error("Unauthorized");
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      throw profileError ?? new Error("User profile not found.");
+    }
+    const role = (profile as { role: User["role"] }).role;
+    if (role !== "MENTOR") {
       throw new HttpError(403, "Forbidden");
     }
-    return { accessToken, user };
+    return {
+      accessToken,
+      user: {
+        userId,
+        role,
+        displayName: (profile as { display_name?: string }).display_name ?? "",
+      },
+    };
   } catch (error) {
     if (error instanceof HttpError) {
       throw error;
@@ -77,15 +105,32 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   return (await response.json()) as T;
 };
 
+// Match NestJS controller method names for clarity.
+const getMentorConversationList = (mentorId: string, accessToken: string) =>
+  callBackend<MentorConversationDto[]>(
+    `/conversations/mentor?mentorId=${encodeURIComponent(mentorId)}`,
+    undefined,
+    accessToken
+  );
+
+const createMentorAssignment = (input: { mentorId: string; newhireId: string }, accessToken: string) =>
+  callBackend(
+    "/mentor-assignments",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        mentorId: input.mentorId,
+        newhireId: input.newhireId,
+      }),
+    },
+    accessToken
+  );
+
 export async function GET(request: NextRequest) {
   try {
     const { accessToken, user } = await requireMentorAuth(request);
     logRequest("GET", { userId: user.userId });
-    const conversations = await callBackend<{ conv_id: string; title: string; created_at: string; owner_name?: string }[]>(
-      `/conversations/mentor?mentorId=${encodeURIComponent(user.userId)}`,
-      undefined,
-      accessToken
-    );
+    const conversations = await getMentorConversationList(user.userId, accessToken);
     return NextResponse.json({ data: conversations });
   } catch (error) {
     if (error instanceof HttpError) {
@@ -107,18 +152,8 @@ export async function POST(request: NextRequest) {
     if (!newhireId) {
       throw new HttpError(400, "newhireId is required.");
     }
-    await callBackend(
-      "/mentor-assignments",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          mentorId: user.userId,
-          newhireId,
-        }),
-      },
-      accessToken
-    );
-    return NextResponse.json({ ok: true });
+    await createMentorAssignment({ mentorId: user.userId, newhireId }, accessToken);
+    return NextResponse.json({ data: { ok: true } });
   } catch (error) {
     console.error("[mentor-api][POST][error]", error);
     if (error instanceof HttpError) {

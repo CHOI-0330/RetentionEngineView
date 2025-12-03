@@ -3,38 +3,35 @@
 import Link from "next/link";
 import { Button } from "../components/ui/button";
 import { useSession } from "./SessionProvider";
-import { getBrowserSupabaseClient } from "../lib/browserSupabaseClient";
 
 export default function AppUserMenu() {
   const { session, isLoading, interactions } = useSession();
-  const supabase = getBrowserSupabaseClient();
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const raw = await response.text();
+      let payload: any = null;
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = null;
+        }
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error ?? raw ?? "Logout failed.");
+      }
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      // Ensure local Supabase auth state is cleared even if signOut fails.
-      try {
-        Object.keys(localStorage)
-          .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
-          .forEach((key) => localStorage.removeItem(key));
-      } catch {
-        // ignore
-      }
-      try {
-        document.cookie
-          .split(";")
-          .map((c) => c.trim())
-          .filter((c) => c.startsWith("sb-") && c.includes("auth-token"))
-          .forEach((cookie) => {
-            const name = cookie.split("=")[0];
-            document.cookie = `${name}=; path=/; max-age=0;`;
-          });
-      } catch {
-        // ignore
-      }
       // Force a session refetch and then redirect to the home page.
       await interactions.refetchSession();
       window.location.href = "/";

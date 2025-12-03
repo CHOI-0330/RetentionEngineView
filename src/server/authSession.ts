@@ -2,8 +2,8 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-import { SupabaseAuthGateway } from "../interfaceAdapters/gateways/supabase/authGateway";
 import type { User } from "../domain/core";
+import { createAdminSupabaseClient } from "../lib/supabaseClient";
 
 // Supabase の環境変数が揃っていない場合は認証を検証できないため、そのまま null を返します。
 const isSupabaseConfigured =
@@ -15,15 +15,6 @@ export interface AuthenticatedSession {
   userId: string;
   role: User["role"];
 }
-
-let cachedGateway: SupabaseAuthGateway | null = null;
-
-const getGateway = () => {
-  if (!cachedGateway) {
-    cachedGateway = new SupabaseAuthGateway();
-  }
-  return cachedGateway;
-};
 
 export const getAuthenticatedSession = async (): Promise<AuthenticatedSession | null> => {
   // クッキーはサーバーコンポーネントやルートハンドラーでのみ読み取れるため、ここで一度だけ取得します。
@@ -39,9 +30,21 @@ export const getAuthenticatedSession = async (): Promise<AuthenticatedSession | 
   }
 
   try {
-    // アクセストークンが実際に有効かを Supabase Admin API で再検証します。
-    const { userId, role } = await getGateway().getUserFromAccessToken(accessToken);
-    return { userId, role };
+    const adminClient = createAdminSupabaseClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      return null;
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      return null;
+    }
+    return { userId, role: (profile as { role: User["role"] }).role };
   } catch {
     return null;
   }

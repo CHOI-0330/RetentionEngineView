@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import StudentChatView from "../../../views/StudentChatView";
@@ -8,10 +14,14 @@ import { useStudentChatController } from "../../controllers/useStudentChatContro
 import { useStudentChatPresenter } from "../../presenters/useStudentChatPresenter";
 import type { StudentChatControllerEffect } from "../../controllers/useStudentChatController";
 import type { UseCaseFailure } from "../../../application/entitle/models";
-import type { Conversation, Feedback, MentorAssignment, Message, User } from "../../../domain/core";
-import type { LLMPort } from "../../../application/entitle/ports";
+import type {
+  Conversation,
+  Feedback,
+  MentorAssignment,
+  Message,
+  User,
+} from "../../../domain/core";
 import { Skeleton } from "../../../components/ui/skeleton";
-import { GeminiLLMPort } from "../../gateways/llm/geminiClientPort";
 import { useSession } from "../../../components/SessionProvider";
 
 const normalizeError = (reason: unknown): UseCaseFailure => ({
@@ -52,19 +62,25 @@ type StudentChatApiAction =
 
 interface StudentChatRuntimeProps {
   bootstrap: StudentChatBootstrap & { conversation: Conversation };
-  llmPort: LLMPort;
+  accessToken?: string | null;
   router: ReturnType<typeof useRouter>;
   conversationOptions: ConversationOption[];
   mentorOptions: MentorOption[];
   selectedConversationId: string;
   onSelectConversation: (convId: string) => void;
-  onCreateConversation: (input: { title: string; mentorId?: string | null }) => Promise<void>;
-  callStudentChatApi: <T>(action: StudentChatApiAction, payload?: unknown) => Promise<T>;
+  onCreateConversation: (input: {
+    title: string;
+    mentorId?: string | null;
+  }) => Promise<void>;
+  callStudentChatApi: <T>(
+    action: StudentChatApiAction,
+    payload?: unknown
+  ) => Promise<T>;
 }
 
 const StudentChatRuntime = ({
   bootstrap,
-  llmPort,
+  accessToken,
   router,
   conversationOptions,
   mentorOptions,
@@ -96,18 +112,19 @@ const StudentChatRuntime = ({
   const processEffectBackend = useCallback(
     async (effect: StudentChatControllerEffect) => {
       const resolveConvId = () =>
-        (effect.payload as any).convId ??
-        selectedConversationId ??
-        null;
+        (effect.payload as any).convId ?? selectedConversationId ?? null;
 
       switch (effect.kind) {
         case "REQUEST_PERSIST_USER_MESSAGE": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await callStudentChatApi<{ data: Message }>("createUserMessage", {
-            convId,
-            content: effect.payload.content,
-          });
+          const result = await callStudentChatApi<{ data: Message }>(
+            "createUserMessage",
+            {
+              convId,
+              content: effect.payload.content,
+            }
+          );
           controller.actions.notifyUserMessagePersisted(result.data);
           break;
         }
@@ -115,7 +132,8 @@ const StudentChatRuntime = ({
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
           const tempId =
-            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            typeof crypto !== "undefined" &&
+            typeof crypto.randomUUID === "function"
               ? crypto.randomUUID()
               : `assistant-${Date.now()}`;
           const tempMessage: Message = {
@@ -131,15 +149,72 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
-          const targetMsgId = controller.state.activeAssistantMessageId ?? activeAssistantIdRef.current;
+          const targetMsgId =
+            controller.state.activeAssistantMessageId ??
+            activeAssistantIdRef.current;
           if (!targetMsgId) {
             throw new Error("Assistant message id is not set.");
           }
           try {
-            const finalText = await llmPort.generate(effect.payload);
+            const convId = resolveConvId();
+            if (!convId) {
+              throw new Error("convId is required");
+            }
+            const payload = effect.payload as {
+              prompt: { messages: { role: string; content: string }[] };
+              modelId?: string;
+              runtimeId?: string;
+              signal?: AbortSignal;
+            };
+            const questionMessage = [...(payload.prompt?.messages ?? [])]
+              .reverse()
+              .find((message) => message.role === "user");
+            const question = questionMessage?.content?.trim() ?? "";
+            if (!question) {
+              throw new Error("Question must not be empty.");
+            }
+
+            const response = await fetch("/api/llm/generate", {
+              method: "POST",
+              cache: "no-store",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+                ...(accessToken
+                  ? { Authorization: `Bearer ${accessToken}` }
+                  : {}),
+              },
+              body: JSON.stringify({
+                question,
+                conversationId: convId,
+                modelId: payload.modelId,
+                runtimeId: payload.runtimeId,
+              }),
+              signal: payload.signal,
+            });
+            const raw = await response.text();
+            let json: any = null;
+            if (raw) {
+              try {
+                json = JSON.parse(raw);
+              } catch {
+                json = null;
+              }
+            }
+            if (!response.ok) {
+              const message =
+                json?.error ?? raw ?? "LLM backend request failed.";
+              throw new Error(message);
+            }
+            const finalText = json?.answer;
+            if (!finalText || typeof finalText !== "string") {
+              throw new Error("LLM backend response did not include answer.");
+            }
             controller.actions.notifyAssistantResponseReady(finalText);
           } catch (streamError) {
-            controller.actions.reportExternalFailure(normalizeError(streamError));
+            controller.actions.reportExternalFailure(
+              normalizeError(streamError)
+            );
             controller.actions.notifyAssistantResponseCancelled();
           }
           break;
@@ -147,13 +222,16 @@ const StudentChatRuntime = ({
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await callStudentChatApi<{ data: Message }>("finalizeAssistantMessage", {
-            convId,
-            content:
-              (effect.payload as any).content ??
-              (effect.payload as any).finalText ??
-              "",
-          });
+          const result = await callStudentChatApi<{ data: Message }>(
+            "finalizeAssistantMessage",
+            {
+              convId,
+              content:
+                (effect.payload as any).content ??
+                (effect.payload as any).finalText ??
+                "",
+            }
+          );
           controller.actions.syncAssistantMessage({
             ...result.data,
             status: result.data.status ?? "DONE",
@@ -168,7 +246,9 @@ const StudentChatRuntime = ({
         case "REQUEST_LIST_MESSAGES": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const result = await callStudentChatApi<{ data: { items: Message[]; nextCursor?: string } }>("listConversationMessages", {
+          const result = await callStudentChatApi<{
+            data: { items: Message[]; nextCursor?: string };
+          }>("listConversationMessages", {
             convId,
           });
           controller.actions.notifyMessagesLoaded(result.data);
@@ -180,27 +260,48 @@ const StudentChatRuntime = ({
           }>("listFeedbacks", {
             msgId: effect.payload.msgId,
           });
-          controller.actions.applyFeedbackForMessage(effect.payload.msgId, result.data.items, result.data.authorNames ?? {});
+          controller.actions.applyFeedbackForMessage(
+            effect.payload.msgId,
+            result.data.items,
+            result.data.authorNames ?? {}
+          );
           break;
         }
         case "REQUEST_CREATE_FEEDBACK": {
-          const result = await callStudentChatApi<{ data: Feedback }>("createFeedback", {
-            targetMsgId: effect.payload.targetMsgId,
-            content: effect.payload.content,
-          });
-          controller.actions.applyFeedbackForMessage(result.data.targetMsgId, [result.data], {
-            [result.data.authorId]: result.data.authorId,
-          });
+          const result = await callStudentChatApi<{ data: Feedback }>(
+            "createFeedback",
+            {
+              targetMsgId: effect.payload.targetMsgId,
+              content: effect.payload.content,
+            }
+          );
+          controller.actions.applyFeedbackForMessage(
+            result.data.targetMsgId,
+            [result.data],
+            {
+              [result.data.authorId]: result.data.authorId,
+            }
+          );
           break;
         }
         default: {
           const _e: any = effect;
-          console.warn("[StudentChat] processEffectBackend: unhandled effect.kind", _e.kind, _e.payload);
+          console.warn(
+            "[StudentChat] processEffectBackend: unhandled effect.kind",
+            _e.kind,
+            _e.payload
+          );
           break;
         }
       }
     },
-    [callStudentChatApi, controller.actions, controller.state.activeAssistantMessageId, llmPort, selectedConversationId]
+    [
+      accessToken,
+      callStudentChatApi,
+      controller.actions,
+      controller.state.activeAssistantMessageId,
+      selectedConversationId,
+    ]
   );
 
   const processQueuedEffects = useCallback(() => {
@@ -217,7 +318,10 @@ const StudentChatRuntime = ({
     void processEffectBackend(nextEffect)
       .catch((error) => {
         controller.actions.reportExternalFailure(normalizeError(error));
-        if (error instanceof Error && /Unauthorized|Forbidden/i.test(error.message)) {
+        if (
+          error instanceof Error &&
+          /Unauthorized|Forbidden/i.test(error.message)
+        ) {
           router.push("/?redirected=1");
         }
       })
@@ -284,24 +388,20 @@ const StudentChatRuntime = ({
 const StudentChatPage = () => {
   const conversationIdRef = useRef<string | null>(null);
   const { session, isLoading: isSessionLoading } = useSession();
-  const llmPort = useMemo<LLMPort>(
-    () =>
-      new GeminiLLMPort({
-        getConversationId: () => conversationIdRef.current,
-        getAccessToken: () => session?.accessToken ?? null,
-      }),
-    [session?.accessToken]
-  );
   const router = useRouter();
   const searchParams = useSearchParams();
   console.log("StudentChatPage: using backend LLM gateway");
 
   const [bootstrap, setBootstrap] = useState<StudentChatBootstrap | null>(null);
-  const [conversationOptions, setConversationOptions] = useState<ConversationOption[]>([]);
+  const [conversationOptions, setConversationOptions] = useState<
+    ConversationOption[]
+  >([]);
   const [mentorOptions, setMentorOptions] = useState<MentorOption[]>([]);
   const [initialTitle, setInitialTitle] = useState("");
   const [isInitialCreating, setIsInitialCreating] = useState(false);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<UseCaseFailure | null>(null);
 
@@ -313,7 +413,9 @@ const StudentChatPage = () => {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+          ...(session?.accessToken
+            ? { Authorization: `Bearer ${session.accessToken}` }
+            : {}),
         },
         body: JSON.stringify({ action, payload }),
       });
@@ -327,7 +429,8 @@ const StudentChatPage = () => {
         }
       }
       if (!response.ok) {
-        const message = json?.error ?? json?.message ?? raw ?? "Unexpected error";
+        const message =
+          json?.error ?? json?.message ?? raw ?? "Unexpected error";
         throw new Error(message);
       }
       return json as T;
@@ -341,13 +444,20 @@ const StudentChatPage = () => {
       if (convId) {
         params.set("convId", convId);
       }
-      const response = await fetch(`/api/entitle/student-chat${params.toString() ? `?${params.toString()}` : ""}`, {
-        cache: "no-store",
-        credentials: "include",
-        headers: {
-          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
-        },
-      });
+      const response = await fetch(
+        `/api/entitle/student-chat${
+          params.toString() ? `?${params.toString()}` : ""
+        }`,
+        {
+          cache: "no-store",
+          credentials: "include",
+          headers: {
+            ...(session?.accessToken
+              ? { Authorization: `Bearer ${session.accessToken}` }
+              : {}),
+          },
+        }
+      );
       const raw = await response.text();
       let json: any = null;
       if (raw) {
@@ -369,7 +479,10 @@ const StudentChatPage = () => {
   const loadConversation = useCallback(
     async (targetConvId?: string) => {
       if (!session) {
-        setLoadError({ kind: "ValidationError", message: "ログインしてください。" });
+        setLoadError({
+          kind: "ValidationError",
+          message: "ログインしてください。",
+        });
         setIsLoading(false);
         return;
       }
@@ -382,9 +495,12 @@ const StudentChatPage = () => {
         }
 
         if (!data.conversation) {
-          const created = await callStudentChatApi<{ data: Conversation }>("createConversation", {
-            title: "新しい会話",
-          });
+          const created = await callStudentChatApi<{ data: Conversation }>(
+            "createConversation",
+            {
+              title: "新しい会話",
+            }
+          );
           bootstrapResponse = await fetchBootstrap(created.data.convId);
           data = bootstrapResponse.data;
         }
@@ -418,9 +534,12 @@ const StudentChatPage = () => {
     async ({ title }: { title: string; mentorId?: string | null }) => {
       const normalizedTitle = title.trim() || "新しい会話";
       try {
-        const created = await callStudentChatApi<{ data: Conversation }>("createConversation", {
-          title: normalizedTitle,
-        });
+        const created = await callStudentChatApi<{ data: Conversation }>(
+          "createConversation",
+          {
+            title: normalizedTitle,
+          }
+        );
         setLoadError(null);
         await loadConversation(created.data.convId);
       } catch (error) {
@@ -463,7 +582,10 @@ const StudentChatPage = () => {
   if (!session) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
-        ログインしてください。 <a className="text-primary underline" href="/entitle/auth">Auth</a>
+        ログインしてください。{" "}
+        <a className="text-primary underline" href="/entitle/auth">
+          Auth
+        </a>
       </div>
     );
   }
@@ -493,7 +615,11 @@ const StudentChatPage = () => {
 
   if (loadError) {
     return (
-      <div className="p-4 text-sm text-destructive" role="alert" aria-live="polite">
+      <div
+        className="p-4 text-sm text-destructive"
+        role="alert"
+        aria-live="polite"
+      >
         会話の読み込みに失敗しました: {loadError.message}
       </div>
     );
@@ -507,14 +633,17 @@ const StudentChatPage = () => {
     );
   }
 
-  const selectedConversationId = activeConversationId ?? bootstrap.conversation.convId;
+  const selectedConversationId =
+    activeConversationId ?? bootstrap.conversation.convId;
   conversationIdRef.current = selectedConversationId ?? null;
 
   return (
     <StudentChatRuntime
       key={bootstrap.conversation.convId}
-      bootstrap={bootstrap as StudentChatBootstrap & { conversation: Conversation }}
-      llmPort={llmPort}
+      bootstrap={
+        bootstrap as StudentChatBootstrap & { conversation: Conversation }
+      }
+      accessToken={session.accessToken}
       router={router}
       conversationOptions={conversationOptions}
       mentorOptions={mentorOptions}

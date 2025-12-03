@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SupabaseAuthGateway } from "../../../../src/interfaceAdapters/gateways/supabase/authGateway";
 import { mapFeedbackRow, mapMessageRow, type FeedbackRow, type MessageRow } from "../../../../src/interfaceAdapters/gateways/supabase/types";
+import type { User } from "../../../../src/domain/core";
+import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 type StudentChatAction =
   | "createUserMessage"
   | "beginAssistantMessage"
@@ -11,6 +12,31 @@ type StudentChatAction =
   | "listFeedbacks"
   | "createFeedback"
   | "createConversation";
+
+// DTOs for backend REST responses
+type ConversationDto = {
+  conv_id: string;
+  title: string;
+  created_at: string;
+};
+
+type MessageDto = {
+  msg_id: string;
+  conv_id: string;
+  role: string;
+  content: string;
+  created_at: string;
+};
+
+type FeedbackDto = {
+  fb_id: string;
+  target_msg_id: string;
+  author_id: string;
+  author_role: string;
+  content: string;
+  created_at: string;
+  updated_at?: string | null;
+};
 
 class HttpError extends Error {
   constructor(
@@ -23,11 +49,9 @@ class HttpError extends Error {
 }
 
 const MAX_MESSAGE_LENGTH = 4000;
-const BACKEND_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.LLM_BACKEND_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "");
+const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
-const authGateway = new SupabaseAuthGateway();
+const getAdminClient = createAdminSupabaseClient;
 
 const resolveAccessToken = (request: NextRequest): string | null => {
   const headerToken = request.headers.get("authorization");
@@ -54,8 +78,28 @@ const requireAuth = async (request: NextRequest) => {
     throw new HttpError(401, "Unauthorized");
   }
   try {
-    const user = await authGateway.getUserFromAccessToken(accessToken);
-    return { accessToken, user };
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw error ?? new Error("Unauthorized");
+    }
+    const userId = data.user.id;
+    const { data: profile, error: profileError } = await adminClient
+      .from("user")
+      .select("role, display_name")
+      .eq("user_id", userId)
+      .single();
+    if (profileError || !profile) {
+      throw profileError ?? new Error("User profile not found.");
+    }
+    return {
+      accessToken,
+      user: {
+        userId,
+        role: (profile as { role: User["role"] }).role,
+        displayName: (profile as { display_name?: string }).display_name ?? "",
+      },
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unauthorized";
     throw new HttpError(401, message);
@@ -68,7 +112,7 @@ const logRequest = (label: string, payload: unknown) => {
 
 const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> => {
   if (!BACKEND_BASE_URL) {
-    throw new Error("LLM_BACKEND_BASE_URL is not configured.");
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   }
   const response = await fetch(`${BACKEND_BASE_URL}/${path.replace(/^\//, "")}`, {
     ...init,
@@ -85,7 +129,7 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   return (await response.json()) as T;
 };
 
-const mapApiMessageRow = (row: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }): MessageRow => ({
+const mapApiMessageRow = (row: MessageDto): MessageRow => ({
   msg_id: row.msg_id,
   conv_id: row.conv_id,
   role: row.role as MessageRow["role"],
@@ -94,15 +138,7 @@ const mapApiMessageRow = (row: { msg_id: string; conv_id: string; role: string; 
   created_at: row.created_at,
 });
 
-const mapApiFeedbackRow = (row: {
-  fb_id: string;
-  target_msg_id: string;
-  author_id: string;
-  author_role: string;
-  content: string;
-  created_at: string;
-  updated_at?: string | null;
-}): FeedbackRow => ({
+const mapApiFeedbackRow = (row: FeedbackDto): FeedbackRow => ({
   fb_id: row.fb_id,
   target_msg_id: row.target_msg_id,
   author_id: row.author_id,
@@ -113,7 +149,7 @@ const mapApiFeedbackRow = (row: {
   updated_at: row.updated_at ?? null,
 });
 
-const mapApiConversationRow = (row: { conv_id: string; title: string; created_at: string }): {
+const mapApiConversationRow = (row: ConversationDto): {
   convId: string;
   ownerId: string;
   title: string;
@@ -130,6 +166,66 @@ const mapApiConversationRow = (row: { conv_id: string; title: string; created_at
   lastActiveAt: row.created_at,
   archivedAt: undefined,
 });
+
+// Backend calls aligned with NestJS controller method names for readability.
+const getConversationListByNewHire = (userId: string, accessToken: string) =>
+  callBackend<{ data?: ConversationDto[] } | ConversationDto[]>(
+    `/conversations/newHire?userId=${encodeURIComponent(userId)}`,
+    undefined,
+    accessToken
+  );
+
+const createConversationForNewHire = (input: { userId: string; title: string; role: User["role"]; displayName: string }, accessToken: string) =>
+  callBackend<{ data?: { conv_id: string; title: string; created_at: string } } | { conv_id: string; title: string; created_at: string }>(
+    "/conversations/newHire",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: input.userId,
+        title: input.title,
+        role: input.role,
+        displayName: input.displayName,
+        email: "",
+      }),
+    },
+    accessToken
+  );
+
+const getMessages = (convId: string, accessToken: string) =>
+  callBackend<{ data: MessageDto[] }>(
+    `/messages?convId=${encodeURIComponent(convId)}`,
+    undefined,
+    accessToken
+  );
+
+const createMessage = (input: { convId: string; role: string; content: string }, accessToken: string) =>
+  callBackend<{ data: MessageDto }>(
+    "/messages",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    accessToken
+  );
+
+const getFeedbackByMessage = (messageId: string, accessToken: string) =>
+  callBackend<{ data: FeedbackDto[] }>(
+    `/feedback?messageId=${encodeURIComponent(messageId)}`,
+    undefined,
+    accessToken
+  );
+
+const createFeedback = (input: { messageId: string; authorId: string; content: string }, accessToken: string) =>
+  callBackend<{
+    data: FeedbackDto;
+  }>(
+    "/feedback",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    accessToken
+  );
 
 export async function POST(request: NextRequest) {
   const { action, payload } = (await request.json()) as {
@@ -155,14 +251,14 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "Message content exceeds the allowed length.");
         }
 
-        const backendResult = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string } }>("/messages", {
-          method: "POST",
-          body: JSON.stringify({
+        const backendResult = await createMessage(
+          {
             convId: input.convId,
             role: "NEW_HIRE",
             content: trimmedContent,
-          }),
-        }, accessToken);
+          },
+          accessToken
+        );
         const mapped = mapMessageRow(mapApiMessageRow(backendResult.data));
         return NextResponse.json({ data: mapped });
       }
@@ -183,14 +279,14 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "Message content exceeds the allowed length.");
         }
 
-        const backendResult = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string } }>("/messages", {
-          method: "POST",
-          body: JSON.stringify({
+        const backendResult = await createMessage(
+          {
             convId: input.convId,
             role: "ASSISTANT",
             content: trimmedContent,
-          }),
-        }, accessToken);
+          },
+          accessToken
+        );
         const mapped = mapMessageRow(mapApiMessageRow(backendResult.data));
         return NextResponse.json({ data: mapped });
       }
@@ -203,11 +299,7 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "convId is required.");
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
-        const backendMessages = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }[] }>(
-          `/messages?convId=${encodeURIComponent(input.convId)}`,
-          undefined,
-          accessToken
-        );
+        const backendMessages = await getMessages(input.convId, accessToken);
         const rows = (backendMessages.data ?? []).map(mapApiMessageRow).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id));
 
         let filtered = rows;
@@ -231,11 +323,7 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "msgId is required.");
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
-        const backendFeedbacks = await callBackend<{ data: { fb_id: string; target_msg_id: string; author_id: string; author_role: string; content: string; created_at: string; updated_at?: string | null }[] }>(
-          `/feedback?messageId=${encodeURIComponent(input.msgId)}`,
-          undefined,
-          accessToken
-        );
+        const backendFeedbacks = await getFeedbackByMessage(input.msgId, accessToken);
         const sorted = (backendFeedbacks.data ?? [])
           .map(mapApiFeedbackRow)
           .sort((a, b) => {
@@ -276,25 +364,11 @@ export async function POST(request: NextRequest) {
         if (!content.trim()) {
           throw new HttpError(400, "Feedback content must not be empty.");
         }
-        const response = await callBackend<{
-          data: {
-            fb_id: string;
-            target_msg_id: string;
-            author_id: string;
-            author_role: string;
-            content: string;
-            created_at: string;
-            updated_at?: string | null;
-          };
-        }>(
-          "/feedback",
+        const response = await createFeedback(
           {
-            method: "POST",
-            body: JSON.stringify({
-              messageId: input.targetMsgId,
-              authorId: user.userId,
-              content,
-            }),
+            messageId: input.targetMsgId,
+            authorId: user.userId,
+            content,
           },
           accessToken
         );
@@ -304,18 +378,12 @@ export async function POST(request: NextRequest) {
       case "createConversation": {
         const input = (payload ?? {}) as { title?: string };
         const title = (input.title ?? "").trim() || "新しい会話";
-        const profile = await authGateway.getUserProfile(user.userId);
-        const created = await callBackend<{ data?: { conv_id: string; title: string; created_at: string } } | { conv_id: string; title: string; created_at: string }>(
-          "/conversations/newHire",
+        const created = await createConversationForNewHire(
           {
-            method: "POST",
-            body: JSON.stringify({
-              userId: user.userId,
-              title,
-              role: profile.role,
-              displayName: profile.displayName,
-              email: "",
-            }),
+            userId: user.userId,
+            title,
+            role: user.role,
+            displayName: user.displayName,
           },
           accessToken
         );
@@ -346,12 +414,7 @@ export async function GET(request: NextRequest) {
   try {
     const { accessToken, user: authUser } = await requireAuth(request);
     logRequest("GET", { convId: requestedConvId, userId: authUser.userId });
-    const profile = await authGateway.getUserProfile(authUser.userId);
-    const convListResponse = await callBackend<{ data?: { conv_id: string; title: string; created_at: string }[] } | { conv_id: string; title: string; created_at: string }[]>(
-      `/conversations/newHire?userId=${encodeURIComponent(authUser.userId)}`,
-      undefined,
-      accessToken
-    );
+    const convListResponse = await getConversationListByNewHire(authUser.userId, accessToken);
 
     type ConversationRow = { conv_id: string; title: string; created_at: string };
     const convRows: ConversationRow[] = Array.isArray((convListResponse as any)?.data)
@@ -372,8 +435,8 @@ export async function GET(request: NextRequest) {
           conversation: null,
           currentUser: {
             userId: authUser.userId,
-            role: profile.role,
-            displayName: profile.displayName,
+            role: authUser.role,
+            displayName: authUser.displayName,
             email: "",
             createdAt: "",
             disabledAt: undefined,
@@ -396,11 +459,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const messagesResponse = await callBackend<{ data: { msg_id: string; conv_id: string; role: string; content: string; created_at: string }[] }>(
-      `/messages?convId=${encodeURIComponent(selectedConversation.convId)}`,
-      undefined,
-      accessToken
-    );
+    const messagesResponse = await getMessages(selectedConversation.convId, accessToken);
     const initialMessages = (messagesResponse.data ?? [])
       .map(mapApiMessageRow)
       .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id))
@@ -410,11 +469,7 @@ export async function GET(request: NextRequest) {
     const authorIds = new Set<string>();
 
     for (const msg of initialMessages) {
-      const feedbackResponse = await callBackend<{ data: { fb_id: string; target_msg_id: string; author_id: string; author_role: string; content: string; created_at: string; updated_at?: string | null }[] }>(
-        `/feedback?messageId=${encodeURIComponent(msg.msgId)}`,
-        undefined,
-        accessToken
-      );
+      const feedbackResponse = await getFeedbackByMessage(msg.msgId, accessToken);
       const mapped = (feedbackResponse.data ?? []).map(mapApiFeedbackRow).map(mapFeedbackRow);
       if (mapped.length) {
         feedbackByMessageId[msg.msgId] = mapped;
@@ -427,8 +482,8 @@ export async function GET(request: NextRequest) {
         conversation: selectedConversation,
         currentUser: {
           userId: authUser.userId,
-          role: profile.role,
-          displayName: profile.displayName,
+          role: authUser.role,
+          displayName: authUser.displayName,
           email: "",
           createdAt: "",
           disabledAt: undefined,
@@ -456,3 +511,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }
 }
+
+export const runtime = "nodejs";

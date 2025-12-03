@@ -19,5 +19,5 @@
   ## Notes
   - Some UI-only local state (e.g., open/close in dialogs/sheets) is kept via `useState` for usability and can be lifted later.
   - Styles come from a precompiled Tailwind CSS file (`src/index.css`), so no Tailwind config is required at runtime.
-- The UI directly calls the backend `/llm/generate` endpoint for assistant responses, so no separate `LLM_BACKEND_BASE_URL` proxy is required.
+  - The UI calls the backend via `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:3000`); `LLM_BACKEND_BASE_URL` is not used.
   
