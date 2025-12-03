@@ -149,6 +149,7 @@ const StudentChatRuntime = ({
           break;
         }
         case "REQUEST_GENERATE_ASSISTANT_RESPONSE": {
+          console.log("[LLM debug] effect payload", effect.payload);
           const targetMsgId =
             controller.state.activeAssistantMessageId ??
             activeAssistantIdRef.current;
@@ -157,6 +158,7 @@ const StudentChatRuntime = ({
           }
           try {
             const convId = resolveConvId();
+            console.log("[LLM debug] convId", convId);
             if (!convId) {
               throw new Error("convId is required");
             }
@@ -170,6 +172,7 @@ const StudentChatRuntime = ({
               .reverse()
               .find((message) => message.role === "user");
             const question = questionMessage?.content?.trim() ?? "";
+            console.log("[LLM debug] question", question);
             if (!question) {
               throw new Error("Question must not be empty.");
             }
