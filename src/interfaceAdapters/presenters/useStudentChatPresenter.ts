@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import type { Feedback, Message } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
@@ -93,7 +93,7 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
 
   const mentorFeedbacks = useMemo(() => {
     const items: StudentChatFeedbackView[] = [];
-    for (const [msgId, feedbacks] of Object.entries(state.feedbackByMessageId)) {
+    for (const [, feedbacks] of Object.entries(state.feedbackByMessageId)) {
       for (const feedback of feedbacks) {
         const authorName = state.authorNames[feedback.authorId] ?? feedback.authorId;
         items.push(toFeedbackView(feedback, authorName));
@@ -102,50 +102,31 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
     return items;
   }, [state.authorNames, state.feedbackByMessageId]);
 
-  const handleChangeNewMessage = useCallback(
-    (value: string) => {
-      actions.setNewMessage(value);
-    },
-    [actions]
-  );
-
-  const handleSend = useCallback(() => {
-    actions.sendMessage();
-  }, [actions]);
-
-  const viewModel = useMemo<StudentChatViewModel>(
-    () => ({
-      messages,
-      mentorFeedbacks,
-      newMessage: state.newMessage,
-      onChangeNewMessage: handleChangeNewMessage,
-      onSend: handleSend,
-    }),
-    [handleChangeNewMessage, handleSend, mentorFeedbacks, messages, state.newMessage]
-  );
-
-  const status = useMemo<StudentChatPresenterStatus>(
-    () => ({
-      isSending: state.isSending,
-      isAwaitingAssistant: state.isAwaitingAssistant,
-      error: state.error,
-    }),
-    [state.error, state.isAwaitingAssistant, state.isSending]
-  );
-
+  // meta 계산 (조건 로직이 있어 useMemo 유지)
   const meta = useMemo<StudentChatPresenterMeta>(() => {
     const hasMoreHistory = Boolean(state.nextCursor);
     const isHistoryLoading = state.pendingEffects.some((effect) => effect.kind === "REQUEST_LIST_MESSAGES");
     const canSend = state.newMessage.trim().length > 0 && !state.isSending && !state.isAwaitingAssistant;
-    return {
-      canSend,
-      hasMoreHistory,
-      isHistoryLoading,
-    };
+    return { canSend, hasMoreHistory, isHistoryLoading };
   }, [state.nextCursor, state.pendingEffects, state.newMessage, state.isAwaitingAssistant, state.isSending]);
 
-  const interactions = useMemo<StudentChatPresenterInteractions>(
-    () => ({
+  // 단순 객체들은 직접 반환
+  return {
+    viewModel: {
+      messages,
+      mentorFeedbacks,
+      newMessage: state.newMessage,
+      onChangeNewMessage: actions.setNewMessage,
+      onSend: actions.sendMessage,
+    },
+    pendingEffects: state.pendingEffects,
+    status: {
+      isSending: state.isSending,
+      isAwaitingAssistant: state.isAwaitingAssistant,
+      error: state.error,
+    },
+    meta,
+    interactions: {
       acknowledgeEffect: actions.acknowledgeEffect,
       requestOlderMessages: actions.requestOlderMessages,
       requestFeedbackForMessage: actions.requestFeedbackForMessage,
@@ -153,23 +134,6 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       requestCreateFeedback: actions.requestCreateFeedback,
       clearError: actions.clearError,
       reportExternalFailure: actions.reportExternalFailure,
-    }),
-    [
-      actions.acknowledgeEffect,
-      actions.applyFeedbackForMessage,
-      actions.clearError,
-      actions.reportExternalFailure,
-      actions.requestCreateFeedback,
-      actions.requestFeedbackForMessage,
-      actions.requestOlderMessages,
-    ]
-  );
-
-  return {
-    viewModel,
-    pendingEffects: state.pendingEffects,
-    status,
-    meta,
-    interactions,
+    },
   };
 };

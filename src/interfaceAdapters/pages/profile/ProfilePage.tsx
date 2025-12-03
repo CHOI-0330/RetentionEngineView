@@ -3,68 +3,43 @@
 import { useEffect } from "react";
 import { useMbtiController } from "../../controllers/useMbtiController";
 import { useMbtiPresenter } from "../../presenters/useMbtiPresenter";
-import { useSessionPresenter } from "../../presenters/useSessionPresenter";
+import { useSession } from "../../../components/SessionProvider";
 import ProfileView from "../../../views/ProfileView";
 import type { MbtiType } from "../../../domain/mbti.types";
+import { apiFetch } from "../../../lib/api";
 
 const fetchMbtiFromApi = async (userId: string, accessToken?: string): Promise<MbtiType | null> => {
   const params = new URLSearchParams({ userId });
-  const response = await fetch(`/api/mbti?${params.toString()}`, {
+  const result = await apiFetch<{ mbti: MbtiType | null }>(`/api/mbti?${params.toString()}`, {
     method: "GET",
-    cache: "no-store",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
+    accessToken,
+    cacheTtl: 60 * 1000, // MBTI는 자주 변경되지 않으므로 1분 캐시
   });
-  const raw = await response.text();
-  let payload: any = null;
-  if (raw) {
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      payload = null;
-    }
+  if (!result.ok) {
+    throw new Error(result.error);
   }
-  if (!response.ok) {
-    throw new Error(payload?.error ?? raw ?? "Failed to fetch MBTI.");
-  }
-  return (payload?.data?.mbti ?? null) as MbtiType | null;
+  return result.data?.mbti ?? null;
 };
 
 const updateMbtiViaApi = async (userId: string, mbti: MbtiType, accessToken?: string): Promise<void> => {
-  const response = await fetch("/api/mbti", {
+  const result = await apiFetch("/api/mbti", {
     method: "PUT",
-    cache: "no-store",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify({ userId, mbti }),
+    body: { userId, mbti },
+    accessToken,
   });
-  const raw = await response.text();
-  let payload: any = null;
-  if (raw) {
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      payload = null;
-    }
-  }
-  if (!response.ok) {
-    throw new Error(payload?.error ?? raw ?? "Failed to update MBTI.");
+  if (!result.ok) {
+    throw new Error(result.error);
   }
 };
 
 const ProfilePage = () => {
-  const sessionPresenter = useSessionPresenter();
+  // SessionProvider의 세션 사용 (중복 fetch 방지)
+  const { session } = useSession();
   const controller = useMbtiController();
   const { state, actions } = controller;
 
-  const userId = sessionPresenter.session?.userId;
-  const accessToken = sessionPresenter.session?.accessToken;
+  const userId = session?.userId;
+  const accessToken = session?.accessToken;
 
   const presenter = useMbtiPresenter(controller, userId ?? "", accessToken);
 

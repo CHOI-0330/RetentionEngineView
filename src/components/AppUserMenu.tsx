@@ -3,37 +3,22 @@
 import Link from "next/link";
 import { Button } from "../components/ui/button";
 import { useSession } from "./SessionProvider";
+import { apiFetch, invalidateSessionCache } from "../lib/api";
 
 export default function AppUserMenu() {
   const { session, isLoading, interactions } = useSession();
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const raw = await response.text();
-      let payload: any = null;
-      if (raw) {
-        try {
-          payload = JSON.parse(raw);
-        } catch {
-          payload = null;
-        }
-      }
-      if (!response.ok) {
-        throw new Error(payload?.error ?? raw ?? "Logout failed.");
+      const result = await apiFetch("/api/auth/logout", { method: "POST" });
+      if (!result.ok) {
+        throw new Error(result.error);
       }
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      // Force a session refetch and then redirect to the home page.
-      await interactions.refetchSession();
+      // 세션 캐시 무효화 후 홈으로 이동
+      invalidateSessionCache();
       window.location.href = "/";
     }
   };

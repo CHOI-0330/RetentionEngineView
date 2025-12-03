@@ -7,138 +7,94 @@ import MentorDashboardView from "../../../views/MentorDashboardView";
 import { useMentorDashboardController } from "../../controllers/useMentorDashboardController";
 import { useMentorDashboardPresenter } from "../../presenters/useMentorDashboardPresenter";
 import type { MentorDashboardControllerEffect } from "../../controllers/useMentorDashboardController";
-import type { UseCaseFailure } from "../../../application/entitle/models";
-import type { StudentSummary } from "../../../application/entitle/ports";
-import { useSession } from "../../../components/SessionProvider";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
-import { Skeleton } from "../../../components/ui/skeleton";
 
-const normalizeError = (reason: unknown): UseCaseFailure => ({
-  kind: "ValidationError",
-  message: reason instanceof Error ? reason.message : String(reason),
-});
+// 공통 훅 & 유틸리티 사용
+import { useEffectQueue, useSessionGuard, useMentorDashboardGateway } from "../../hooks";
+import { normalizeError, isAuthError } from "../../utils/errors";
 
 const MentorDashboardPage = () => {
   const controller = useMentorDashboardController();
   const presenter = useMentorDashboardPresenter(controller);
-
-  const processingRef = useRef(false);
-  const hasRequestedInitial = useRef(false);
   const router = useRouter();
-  const { session, isLoading: isSessionLoading } = useSession();
+
+  // 세션 가드 (MENTOR 역할 필요)
+  const { state: sessionState, session } = useSessionGuard({
+    requiredRole: "MENTOR",
+  });
+
+  // Gateway 인스턴스 생성
+  const { gateway } = useMentorDashboardGateway({
+    accessToken: session?.accessToken,
+  });
+
+  const hasRequestedInitial = useRef(false);
   const [assignmentNewhireId, setAssignmentNewhireId] = useState("");
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
-  const callMentorApi = useCallback(
-    async <T,>(init?: RequestInit): Promise<T> => {
-      const response = await fetch("/api/entitle/mentor", {
-        cache: init?.cache ?? "no-store",
-        credentials: "include",
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
-          ...(init?.headers ?? {}),
-        },
-      });
-      const raw = await response.text();
-      let payload: any = null;
-      if (raw) {
-        try {
-          payload = JSON.parse(raw);
-        } catch {
-          payload = null;
-        }
-      }
-      if (!response.ok) {
-        throw new Error(payload?.error ?? raw ?? "Unexpected error");
-      }
-      return payload as T;
-    },
-    [session?.accessToken]
-  );
-
-  const processEffectBackend = useCallback(
+  // Effect 처리 함수 - Gateway를 통해 API 호출
+  const processEffect = useCallback(
     async (effect: MentorDashboardControllerEffect) => {
       if (!session) throw new Error("Login required");
+
       switch (effect.kind) {
         case "REQUEST_REFRESH_SUMMARIES": {
-          const result = await callMentorApi<{ data?: { conv_id: string; title: string; created_at: string; owner_name?: string }[] }>();
-          const summaries: StudentSummary[] = (result.data ?? []).map((c) => ({
-            newhire: {
-              userId: "", // owner_id 미반환: 서버 개선 시 채움
-              role: "NEW_HIRE",
-              displayName: c.owner_name ?? "新入社員",
-              email: "",
-              createdAt: c.created_at,
-            },
-            conversation: {
-              convId: c.conv_id,
-              ownerId: "",
-              title: c.title,
-              state: "ACTIVE",
-              createdAt: c.created_at,
-              lastActiveAt: c.created_at,
-            },
-            recentMessage: undefined,
-            needsReview: false,
-            totalChats: 0,
-            lastActivityAt: c.created_at,
-          }));
+          const summaries = await gateway.listStudentSummaries({
+            mentorId: session.userId,
+          });
           controller.actions.applySummaries(summaries);
           break;
         }
         case "REQUEST_SUBMIT_FEEDBACK_QUALITY": {
-          controller.actions.finalizeSubmitFeedbackQuality(effect.payload.studentId);
+          await gateway.submitFeedbackQuality({
+            mentorId: session.userId,
+            studentId: effect.payload.studentId,
+            isPositive: true,
+          });
+          controller.actions.finalizeSubmitFeedbackQuality(
+            effect.payload.studentId
+          );
           break;
         }
         default:
           break;
       }
     },
-    [callMentorApi, controller.actions, session]
+    [gateway, controller.actions, session]
   );
 
+  // Effect 큐 처리 (공통 훅 사용)
+  useEffectQueue({
+    pendingEffects: presenter.pendingEffects,
+    processEffect,
+    onEffectComplete: (effect) => {
+      controller.actions.acknowledgeEffect(effect.id);
+    },
+    onEffectKindComplete: (effect) => {
+      if (effect.kind === "REQUEST_REFRESH_SUMMARIES") {
+        controller.actions.finalizeRefresh();
+      }
+    },
+    onError: (error) => {
+      controller.actions.reportExternalFailure(normalizeError(error));
+      if (isAuthError(error)) {
+        router.push("/");
+      }
+    },
+  });
+
+  // 초기 데이터 로드
   useEffect(() => {
-    if (processingRef.current) {
-      return;
-    }
-    const effect = presenter.pendingEffects[0];
-    if (!effect) {
-      return;
-    }
+    if (hasRequestedInitial.current) return;
+    if (sessionState !== "authenticated") return;
 
-    processingRef.current = true;
-
-    void processEffectBackend(effect)
-      .catch((error) => {
-        controller.actions.reportExternalFailure(normalizeError(error));
-        if (error instanceof Error && /Unauthorized|Forbidden/i.test(error.message)) {
-          router.push("/entitle/auth");
-        }
-      })
-      .finally(() => {
-        if (effect.kind === "REQUEST_REFRESH_SUMMARIES") {
-          controller.actions.finalizeRefresh();
-        }
-        controller.actions.acknowledgeEffect(effect.id);
-        processingRef.current = false;
-      });
-  }, [controller.actions, presenter.pendingEffects, processEffectBackend, router]);
-
-  useEffect(() => {
-    if (hasRequestedInitial.current) {
-      return;
-    }
-    if (!session || session.role !== "MENTOR") {
-      return;
-    }
     hasRequestedInitial.current = true;
     controller.actions.requestRefresh();
-  }, [controller.actions, session]);
+  }, [controller.actions, sessionState]);
 
+  // 멘토 할당 생성 - Gateway 사용
   const handleCreateAssignment = async () => {
     if (!session) {
       setAssignmentError("ログインしてください。");
@@ -152,37 +108,44 @@ const MentorDashboardPage = () => {
     setIsAssigning(true);
     setAssignmentError(null);
     try {
-      await callMentorApi({
-        method: "POST",
-        body: JSON.stringify({
-          newhireId: trimmed,
-        }),
-      });
+      await gateway.createAssignment(trimmed);
       setAssignmentNewhireId("");
       controller.actions.requestRefresh();
     } catch (error) {
-      setAssignmentError(error instanceof Error ? error.message : "メンターアサインの作成に失敗しました。");
+      setAssignmentError(
+        error instanceof Error
+          ? error.message
+          : "メンターアサインの作成に失敗しました。"
+      );
     } finally {
       setIsAssigning(false);
     }
   };
 
-  if (isSessionLoading) {
-    return <div className="p-4 text-sm text-muted-foreground">ログイン情報を確認中...</div>;
-  }
-
-  if (!session) {
+  // 세션 가드 UI
+  if (sessionState === "loading") {
     return (
-      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        ログインしてください。 <a className="text-primary underline" href="/entitle/auth">Auth</a>
+      <div className="p-4 text-sm text-muted-foreground">
+        ログイン情報を確認中...
       </div>
     );
   }
 
-  if (session.role !== "MENTOR") {
+  if (sessionState === "unauthenticated") {
     return (
       <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        メンター権限が必要です。現在のロール: {session.role}
+        ログインしてください。{" "}
+        <a className="text-primary underline" href="/">
+          ログイン
+        </a>
+      </div>
+    );
+  }
+
+  if (sessionState === "unauthorized") {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+        メンター権限が必要です。現在のロール: {session?.role}
       </div>
     );
   }
@@ -192,19 +155,31 @@ const MentorDashboardPage = () => {
       <div className="rounded-lg border p-4 space-y-3">
         <div>
           <p className="text-sm font-semibold">メンターアサイン作成</p>
-          <p className="text-xs text-muted-foreground">新入社員IDを入力して自身にアサインできます。</p>
+          <p className="text-xs text-muted-foreground">
+            新入社員IDを入力して自身にアサインできます。
+          </p>
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">新入社員IDを入力</label>
+          <label className="text-xs font-medium text-muted-foreground">
+            新入社員IDを入力
+          </label>
           <Input
             value={assignmentNewhireId}
             onChange={(event) => setAssignmentNewhireId(event.target.value)}
             placeholder="newhire-user-id"
           />
         </div>
-        {assignmentError ? <p className="text-sm text-destructive">{assignmentError}</p> : null}
-        <p className="text-xs text-muted-foreground">ユーザー一覧は表示しません。IDを直接入力してください。</p>
-        <Button onClick={handleCreateAssignment} disabled={isAssigning} className="w-full sm:w-auto">
+        {assignmentError ? (
+          <p className="text-sm text-destructive">{assignmentError}</p>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          ユーザー一覧は表示しません。IDを直接入力してください。
+        </p>
+        <Button
+          onClick={handleCreateAssignment}
+          disabled={isAssigning}
+          className="w-full sm:w-auto"
+        >
           {isAssigning ? "作成中..." : "アサインを追加"}
         </Button>
       </div>

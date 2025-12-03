@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  fetchSession as fetchSessionApi,
+  invalidateSessionCache,
+  type SessionData,
+} from "../../lib/api";
 
-interface SessionData {
-  accessToken: string;
-  refreshToken: string;
-  userId: string;
-  role: "NEW_HIRE" | "MENTOR" | "ADMIN";
-  displayName?: string;
-}
+export type { SessionData };
 
 export interface SessionViewModel {
   session: SessionData | null;
@@ -17,61 +16,55 @@ export interface SessionViewModel {
 
 export interface SessionInteractions {
   refetchSession: () => Promise<void>;
+  /**
+   * 세션 캐시를 무효화하고 다시 fetch (로그인/로그아웃 후 사용)
+   */
+  invalidateAndRefetch: () => Promise<void>;
 }
 
 export const useSessionPresenter = (): SessionViewModel & { interactions: SessionInteractions } => {
   const [session, setSession] = useState<SessionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const fetchSession = useCallback(async () => {
+  const isMountedRef = useRef(true);
+
+  const loadSession = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/session", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",
-      });
-      const raw = await response.text();
-      let json: any = null;
-      if (raw) {
-        try {
-          json = JSON.parse(raw);
-        } catch {
-          json = null;
-        }
+      const data = await fetchSessionApi();
+      if (isMountedRef.current) {
+        setSession(data);
       }
-      if (!response.ok) {
-        setSession(null);
-        return;
-      }
-      const data = json?.data;
-      if (!data) {
-        setSession(null);
-        return;
-      }
-      setSession({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        userId: data.userId,
-        role: data.role,
-        displayName: data.displayName ?? "",
-      });
     } catch {
-      setSession(null);
+      if (isMountedRef.current) {
+        setSession(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
+  const invalidateAndRefetch = useCallback(async () => {
+    invalidateSessionCache();
+    await loadSession();
+  }, [loadSession]);
+
   useEffect(() => {
-    // 초기 로드
-    void fetchSession();
-  }, [fetchSession]);
+    isMountedRef.current = true;
+    void loadSession();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [loadSession]);
 
   return {
     session,
     isLoading,
     interactions: {
-      refetchSession: fetchSession,
+      refetchSession: loadSession,
+      invalidateAndRefetch,
     },
   };
 };

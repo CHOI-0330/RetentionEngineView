@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
 import { useAuthPresenter } from "../../presenters/useAuthPresenter";
 import { useSession } from "../../../components/SessionProvider";
+import { apiFetch, invalidateSessionCache } from "../../../lib/api";
 
 const AuthPage = () => {
   const controller = useAuthController();
@@ -14,51 +15,21 @@ const AuthPage = () => {
   const processingRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { interactions } = useSession();
+  const { session: globalSession, interactions } = useSession();
 
-  const syncSessionFromApi = useMemo(
-    () =>
-      async () => {
-        try {
-          const response = await fetch("/api/auth/session", {
-            method: "GET",
-            cache: "no-store",
-            credentials: "include",
-          });
-          const raw = await response.text();
-          let json: any = null;
-          if (raw) {
-            try {
-              json = JSON.parse(raw);
-            } catch {
-              json = null;
-            }
-          }
-          if (!response.ok) {
-            controller.actions.setSession(null);
-            return;
-          }
-          const data = json?.data;
-          if (!data) {
-            controller.actions.setSession(null);
-            return;
-          }
-          controller.actions.setSession({
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-            userId: data.userId,
-            role: data.role,
-          });
-        } catch {
-          controller.actions.setSession(null);
-        }
-      },
-    [controller.actions]
-  );
-
+  // SessionProvider의 세션을 컨트롤러에 동기화
   useEffect(() => {
-    void syncSessionFromApi();
-  }, [syncSessionFromApi]);
+    if (globalSession) {
+      controller.actions.setSession({
+        accessToken: globalSession.accessToken,
+        refreshToken: globalSession.refreshToken,
+        userId: globalSession.userId,
+        role: globalSession.role,
+      });
+    } else {
+      controller.actions.setSession(null);
+    }
+  }, [globalSession, controller.actions]);
 
   // ログイン成功後、ロールに応じて自動遷移します。
   const redirectedUserRef = useRef<string | null>(null);
@@ -75,12 +46,9 @@ const AuthPage = () => {
     const alreadyThere = pathname === target || pathname.startsWith(target);
     if (!alreadyThere && redirectedUserRef.current !== session.userId) {
       redirectedUserRef.current = session.userId;
-      void (async () => {
-        await interactions.refetchSession();
-        router.replace(target);
-      })();
+      router.replace(target);
     }
-  }, [controller.state.session, interactions, pathname, router]);
+  }, [controller.state.session, pathname, router]);
 
   useEffect(() => {
     if (processingRef.current || !controller.state.pendingEffects.length) {
@@ -94,98 +62,50 @@ const AuthPage = () => {
       try {
         switch (effect.kind) {
           case "REQUEST_REGISTER": {
-            const response = await fetch("/api/auth/register", {
+            const result = await apiFetch("/api/auth/register", {
               method: "POST",
-              cache: "no-store",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              credentials: "include",
-              body: JSON.stringify({
+              body: {
                 email: effect.payload.email,
                 password: effect.payload.password,
                 displayName: effect.payload.displayName,
                 role: effect.payload.role,
-              }),
+              },
             });
-            const raw = await response.text();
-            let json: any = null;
-            if (raw) {
-              try {
-                json = JSON.parse(raw);
-              } catch {
-                json = null;
-              }
-            }
-            if (!response.ok) {
-              throw new Error(json?.error ?? raw ?? "Unexpected auth error");
+            if (!result.ok) {
+              throw new Error(result.error);
             }
             break;
           }
           case "REQUEST_LOGIN": {
-            const response = await fetch("/api/auth/login", {
+            const result = await apiFetch<{
+              accessToken: string;
+              refreshToken: string;
+              userId: string;
+              role: "NEW_HIRE" | "MENTOR" | "ADMIN";
+            }>("/api/auth/login", {
               method: "POST",
-              cache: "no-store",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
+              body: {
                 email: effect.payload.email,
                 password: effect.payload.password,
-              }),
+              },
             });
-            const raw = await response.text();
-            let json: any = null;
-            if (raw) {
-              try {
-                json = JSON.parse(raw);
-              } catch {
-                json = null;
-              }
-            }
-            if (!response.ok) {
-              throw new Error(json?.error ?? raw ?? "Unexpected auth error");
-            }
-            const data = json?.data as
-              | {
-                  accessToken: string;
-                  refreshToken: string;
-                  userId: string;
-                  role: "NEW_HIRE" | "MENTOR" | "ADMIN";
-                }
-              | undefined;
-            if (!data) {
-              throw new Error("Invalid auth response.");
+            if (!result.ok) {
+              throw new Error(result.error);
             }
             controller.actions.setSession({
-              accessToken: data.accessToken,
-              refreshToken: data.refreshToken,
-              userId: data.userId,
-              role: data.role,
+              accessToken: result.data.accessToken,
+              refreshToken: result.data.refreshToken,
+              userId: result.data.userId,
+              role: result.data.role,
             });
             break;
           }
           case "REQUEST_LOGOUT": {
-            const response = await fetch("/api/auth/logout", {
+            const result = await apiFetch("/api/auth/logout", {
               method: "POST",
-              cache: "no-store",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
             });
-            const raw = await response.text();
-            let json: any = null;
-            if (raw) {
-              try {
-                json = JSON.parse(raw);
-              } catch {
-                json = null;
-              }
-            }
-            if (!response.ok) {
-              throw new Error(json?.error ?? raw ?? "Unexpected auth error");
+            if (!result.ok) {
+              throw new Error(result.error);
             }
             controller.actions.setSession(null);
             break;
@@ -204,12 +124,14 @@ const AuthPage = () => {
       } finally {
         controller.actions.acknowledgeEffect(effect.id);
         processingRef.current = false;
-        void syncSessionFromApi();
+        // 로그인/로그아웃 후 세션 캐시 무효화하고 갱신
+        invalidateSessionCache();
+        await interactions.refetchSession();
       }
     };
 
     void run();
-  }, [controller.actions, controller.state.pendingEffects, controller.state.session, syncSessionFromApi]);
+  }, [controller.actions, controller.state.pendingEffects, interactions]);
 
   return <AuthView viewModel={presenter.viewModel} status={presenter.status} interactions={presenter.interactions} />;
 };

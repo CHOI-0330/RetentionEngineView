@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type { StudentSummary } from "../../application/entitle/ports";
@@ -95,60 +95,27 @@ export const useMentorDashboardPresenter = (
     });
   }, [filteredSummaries]);
 
-  const handleChangeSearch = useCallback(
-    (value: string) => {
-      actions.setSearchQuery(value);
-    },
-    [actions]
-  );
-
-  const handleFeedback = useCallback(
-    (_studentId: string, _isGood: boolean) => {
-      // feedback quality not implemented
-    },
-    []
-  );
-
-  const viewModel = useMemo<MentorDashboardPresenterViewModel>(
-    () => ({
+  // 단순 객체 생성은 useMemo 불필요 - 직접 반환
+  return {
+    viewModel: {
       students,
       searchQuery: state.searchQuery,
-      onChangeSearch: handleChangeSearch,
-    }),
-    [handleChangeSearch, state.searchQuery, students]
-  );
-
-  const status: MentorDashboardPresenterStatus = useMemo(
-    () => ({
+      onChangeSearch: actions.setSearchQuery,
+    },
+    pendingEffects: state.pendingEffects,
+    status: {
       isLoading: state.isRefreshing,
       error: state.error,
-    }),
-    [state.error, state.isRefreshing]
-  );
-
-  const meta = useMemo<MentorDashboardPresenterMeta>(
-    () => ({
+    },
+    meta: {
       qualitySubmitting: state.qualitySubmitting,
       selectedStudentId: state.selectedStudentId,
-    }),
-    [state.qualitySubmitting, state.selectedStudentId]
-  );
-
-  const interactions: MentorDashboardPresenterInteractions = useMemo(
-    () => ({
+    },
+    interactions: {
       requestRefresh: actions.requestRefresh,
       acknowledgeEffect: actions.acknowledgeEffect,
       clearError: actions.clearError,
       selectStudent: actions.selectStudent,
-    }),
-    [actions.acknowledgeEffect, actions.clearError, actions.requestRefresh, actions.selectStudent]
-  );
-
-  return {
-    viewModel,
-    pendingEffects: state.pendingEffects,
-    status,
-    meta,
-    interactions,
+    },
   };
 };

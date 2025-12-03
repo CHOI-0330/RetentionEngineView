@@ -90,7 +90,16 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   if (response.status === 204) {
     return undefined as T;
   }
-  return (await response.json()) as T;
+  // 빈 응답 처리
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new HttpError(500, "Invalid JSON response from backend");
+  }
 };
 
 // Match backend controller semantics.
@@ -123,7 +132,7 @@ export async function GET(request: NextRequest) {
       throw new HttpError(403, "Forbidden");
     }
     const response = await getMbti(targetUserId, accessToken);
-    return NextResponse.json({ data: { mbti: response.mbti } });
+    return NextResponse.json({ data: { mbti: response?.mbti ?? null } });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

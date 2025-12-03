@@ -1,5 +1,3 @@
-import { useMemo } from "react";
-
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type { AuthController } from "../controllers/useAuthController";
 import type { MbtiType } from "../../domain/mbti.types";
@@ -52,8 +50,9 @@ export const useAuthPresenter = (
 ): AuthPresenterOutput => {
   const { state, actions } = controller;
 
-  const viewModel = useMemo<AuthPresenterViewModel>(
-    () => ({
+  // 단순 객체 생성은 useMemo 불필요 - 직접 반환
+  return {
+    viewModel: {
       register: {
         email: state.registerEmail,
         password: state.registerPassword,
@@ -66,45 +65,18 @@ export const useAuthPresenter = (
         password: state.loginPassword,
       },
       session: state.session,
-    }),
-    [
-      state.loginEmail,
-      state.loginPassword,
-      state.registerDisplayName,
-      state.registerEmail,
-      state.registerPassword,
-      state.registerRole,
-      state.registerMbti,
-      state.session,
-    ]
-  );
-
-  const status = useMemo<AuthPresenterStatus>(
-    () => ({
+    },
+    status: {
       isSubmitting: state.isSubmitting,
       error: state.error,
-    }),
-    [state.error, state.isSubmitting]
-  );
-
-  const interactions: AuthPresenterInteractions = useMemo(
-    () => ({
+    },
+    interactions: {
       setRegisterField: actions.setRegisterField,
       setLoginField: actions.setLoginField,
       submitRegistration: actions.submitRegistration,
       submitLogin: actions.submitLogin,
       submitLogout: actions.submitLogout,
       clearError: actions.clearError,
-    }),
-    [
-      actions.clearError,
-      actions.setLoginField,
-      actions.setRegisterField,
-      actions.submitLogin,
-      actions.submitLogout,
-      actions.submitRegistration,
-    ]
-  );
-
-  return { viewModel, status, interactions };
+    },
+  };
 };
