@@ -126,6 +126,7 @@ const StudentChatRuntime = ({
             }
           );
           controller.actions.notifyUserMessagePersisted(result.data);
+          controller.actions.enqueueAssistantAfterUserMessage(result.data);
           break;
         }
         case "REQUEST_BEGIN_ASSISTANT_MESSAGE": {

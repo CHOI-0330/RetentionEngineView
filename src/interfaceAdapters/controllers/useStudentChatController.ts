@@ -43,7 +43,7 @@ export type StudentChatControllerEffect =
   | {
       id: string;
       kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE";
-      payload: { prompt: Prompt; modelId?: string; runtimeId?: string };
+      payload: { prompt: Prompt; modelId?: string; runtimeId?: string; convId?: string };
     }
   | {
       id: string;
@@ -96,6 +96,7 @@ export interface StudentChatControllerActions {
   notifyAssistantResponseReady: (finalText: string) => void;
   notifyAssistantResponseCancelled: () => void;
   syncAssistantMessage: (message: Message) => void;
+  enqueueAssistantAfterUserMessage: (message: Message) => void;
   requestFeedbackForMessage: (msgId: string) => void;
   applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
   requestCreateFeedback: (content: string, targetMessage: Message) => void;
@@ -278,7 +279,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           ...previous,
           error: promptResult.error,
         }));
-        return;
+        return null;
       }
       const beginResult = beginAssistantMessageUseCase({
         conversation,
@@ -290,43 +291,24 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           ...previous,
           error: beginResult.error,
         }));
-        return;
+        return null;
       }
       console.log("[StudentChat][debug] enqueue begin/generate effects", {
         promptMessages: promptResult.value.messages.length,
         modelId,
         runtimeId,
       });
-      setState((previous) => {
-        const beginEffect = createEffect({
-          kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE",
-          payload: { convId: conversation.convId },
-        });
-        const generateEffect = createEffect({
-          kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
-          payload: {
-            prompt: promptResult.value,
-            modelId,
-            runtimeId,
-          },
-        });
-        const nextPendingEffects = [...previous.pendingEffects, beginEffect, generateEffect];
-        console.log("[StudentChat][debug] pendingEffects ->", nextPendingEffects);
-        return {
-          ...previous,
-          isAwaitingAssistant: true,
-          pendingEffects: nextPendingEffects,
-        };
-      });
+      return {
+        prompt: promptResult.value,
+      };
     },
-    [conversation, createEffect, currentUser, historyWindow, modelId, mutateState, runtimeId]
+    [conversation, currentUser, historyWindow, modelId, mutateState, runtimeId]
   );
 
   const notifyUserMessagePersisted = useCallback(
     (message: Message) => {
       setState((previous) => {
         const merged = sortMessagesAscending([...previous.messages, message]);
-        enqueueAssistantPreparation(merged, message.content);
         return {
           ...previous,
           messages: merged,
@@ -335,7 +317,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         };
       });
     },
-    [enqueueAssistantPreparation]
+    []
   );
 
   const notifyAssistantMessageCreated = useCallback(
@@ -441,6 +423,39 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       };
     });
   }, [createEffect]);
+
+  const enqueueAssistantAfterUserMessage = useCallback(
+    (userMessage: Message) => {
+      setState((previous) => {
+        const messagesWithUser = sortMessagesAscending([...previous.messages]);
+        const prep = enqueueAssistantPreparation(messagesWithUser, userMessage.content);
+        if (!prep) {
+          return previous;
+        }
+        const beginEffect = createEffect({
+          kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE",
+          payload: { convId: conversation.convId },
+        });
+        const generateEffect = createEffect({
+          kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
+          payload: {
+            prompt: prep.prompt,
+            modelId,
+            runtimeId,
+            convId: conversation.convId,
+          },
+        });
+        const nextPendingEffects = [...previous.pendingEffects, beginEffect, generateEffect];
+        console.log("[StudentChat][debug] pendingEffects ->", nextPendingEffects);
+        return {
+          ...previous,
+          isAwaitingAssistant: true,
+          pendingEffects: nextPendingEffects,
+        };
+      });
+    },
+    [conversation.convId, createEffect, enqueueAssistantPreparation, modelId, runtimeId]
+  );
 
   const syncAssistantMessage = useCallback(
     (message: Message) => {
@@ -570,6 +585,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       notifyAssistantResponseReady,
       notifyAssistantResponseCancelled,
       syncAssistantMessage,
+      enqueueAssistantAfterUserMessage,
       requestFeedbackForMessage,
       applyFeedbackForMessage,
       requestCreateFeedback,
@@ -585,6 +601,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       notifyAssistantResponseReady,
       notifyMessagesLoaded,
       notifyUserMessagePersisted,
+      enqueueAssistantAfterUserMessage,
       reportExternalFailure,
       requestCreateFeedback,
       requestFeedbackForMessage,
