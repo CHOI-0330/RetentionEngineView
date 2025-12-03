@@ -12,6 +12,7 @@ import {
   MessageCircle,
   ArrowRight,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Input } from "../../../src/components/ui/input";
 import { Label } from "../../../src/components/ui/label";
@@ -142,6 +143,28 @@ const StudentDashboardPage = () => {
     }
     return `Welcome back, ${session.displayName}`;
   }, [session?.displayName]);
+
+  const deleteConversationRequest = useCallback(
+    async (convId: string) => {
+      const response = await fetch("/api/entitle/student-chat", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.accessToken
+            ? { Authorization: `Bearer ${session.accessToken}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          action: "deleteConversation",
+          payload: { convId },
+        }),
+      });
+      await parseApiResponse(response);
+    },
+    [parseApiResponse, session?.accessToken]
+  );
 
   if (isSessionLoading || (!session && !didTrySessionRefresh)) {
     return (
@@ -355,6 +378,41 @@ const StudentDashboardPage = () => {
                       <span className="font-mono opacity-50">
                         ID: {conversation.conv_id.slice(0, 4)}...
                       </span>
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="relative z-20 h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={async (event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const confirmed = window.confirm(
+                            "この会話を削除しますか？この操作は取り消せません。"
+                          );
+                          if (!confirmed) {
+                            return;
+                          }
+                          setError(null);
+                          try {
+                            await deleteConversationRequest(
+                              conversation.conv_id
+                            );
+                            await refetchConversations();
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "会話の削除に失敗しました。"
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete conversation</span>
+                      </Button>
                     </div>
 
                     <div className="absolute inset-0 pointer-events-none border-2 border-primary/0 group-hover:border-primary/10 rounded-xl transition-all duration-300" />

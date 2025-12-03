@@ -11,7 +11,8 @@ type StudentChatAction =
   | "listConversationMessages"
   | "listFeedbacks"
   | "createFeedback"
-  | "createConversation";
+  | "createConversation"
+  | "deleteConversation";
 
 // DTOs for backend REST responses
 type ConversationDto = {
@@ -122,11 +123,18 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
       ...(init?.headers ?? {}),
     },
   });
+  const raw = await response.text();
   if (!response.ok) {
-    const body = await response.text();
-    throw new HttpError(response.status, body || "Backend request failed.");
+    throw new HttpError(response.status, raw || "Backend request failed.");
   }
-  return (await response.json()) as T;
+  if (!raw) {
+    return {} as T;
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new HttpError(response.status, raw || "Backend response parse failed.");
+  }
 };
 
 const mapApiMessageRow = (row: MessageDto): MessageRow => ({
@@ -187,6 +195,15 @@ const createConversationForNewHire = (input: { userId: string; title: string; ro
         displayName: input.displayName,
         email: "",
       }),
+    },
+    accessToken
+  );
+
+const deleteConversationForNewHire = (input: { userId: string; convId: string }, accessToken: string) =>
+  callBackend<void>(
+    `/conversations/newHire?userId=${encodeURIComponent(input.userId)}&convId=${encodeURIComponent(input.convId)}`,
+    {
+      method: "DELETE",
     },
     accessToken
   );
@@ -391,6 +408,20 @@ export async function POST(request: NextRequest) {
         const mapped = mapApiConversationRow(createdRow as { conv_id: string; title: string; created_at: string });
         mapped.ownerId = user.userId;
         return NextResponse.json({ data: mapped });
+      }
+      case "deleteConversation": {
+        const input = (payload ?? {}) as { convId?: string };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
+        }
+        await deleteConversationForNewHire(
+          {
+            userId: user.userId,
+            convId: input.convId,
+          },
+          accessToken
+        );
+        return NextResponse.json({ ok: true });
       }
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });

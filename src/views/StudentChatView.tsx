@@ -58,6 +58,7 @@ interface StudentChatViewProps {
   selectedConversationId?: string;
   onConversationChange?: (convId: string) => void;
   createDialog?: CreateConversationDialogProps;
+  onDeleteConversation?: () => void;
   viewModel: StudentChatViewModel;
   status: StudentChatPresenterStatus;
   meta: StudentChatPresenterMeta;
@@ -72,6 +73,7 @@ const StudentChatView = ({
   selectedConversationId,
   onConversationChange,
   createDialog,
+  onDeleteConversation,
   viewModel,
   status,
   meta,
@@ -137,6 +139,7 @@ const StudentChatView = ({
         showConversationPicker={showConversationPicker}
         onConversationChange={onConversationChange}
         createDialog={createDialog}
+        onDeleteConversation={onDeleteConversation}
       />
 
       {status.error ? (
@@ -216,6 +219,7 @@ interface ConversationHeaderProps {
   showConversationPicker: boolean;
   onConversationChange?: (convId: string) => void;
   createDialog?: CreateConversationDialogProps;
+  onDeleteConversation?: () => void;
 }
 
 const ConversationHeader = ({
@@ -225,6 +229,7 @@ const ConversationHeader = ({
   showConversationPicker,
   onConversationChange,
   createDialog,
+  onDeleteConversation,
 }: ConversationHeaderProps) => (
   <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div className="flex items-center gap-4">
@@ -268,6 +273,16 @@ const ConversationHeader = ({
     </div>
 
     <div className="flex items-center gap-3">
+      {onDeleteConversation ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+          onClick={onDeleteConversation}
+        >
+          会話を削除
+        </Button>
+      ) : null}
       {createDialog ? (
         <Dialog
           open={createDialog.isOpen}

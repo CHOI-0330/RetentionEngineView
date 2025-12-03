@@ -58,7 +58,8 @@ type StudentChatApiAction =
   | "listConversationMessages"
   | "listFeedbacks"
   | "createFeedback"
-  | "createConversation";
+  | "createConversation"
+  | "deleteConversation";
 
 interface StudentChatRuntimeProps {
   bootstrap: StudentChatBootstrap & { conversation: Conversation };
@@ -72,6 +73,7 @@ interface StudentChatRuntimeProps {
     title: string;
     mentorId?: string | null;
   }) => Promise<void>;
+  onDeleteConversation: (convId: string) => Promise<void>;
   callStudentChatApi: <T>(
     action: StudentChatApiAction,
     payload?: unknown
@@ -87,6 +89,7 @@ const StudentChatRuntime = ({
   selectedConversationId,
   onSelectConversation,
   onCreateConversation,
+  onDeleteConversation,
   callStudentChatApi,
 }: StudentChatRuntimeProps) => {
   const controller = useStudentChatController({
@@ -381,6 +384,11 @@ const StudentChatRuntime = ({
           }
         },
       }}
+      onDeleteConversation={
+        selectedConversationId
+          ? () => onDeleteConversation(selectedConversationId)
+          : undefined
+      }
       viewModel={presenter.viewModel}
       status={presenter.status}
       meta={presenter.meta}
@@ -553,6 +561,21 @@ const StudentChatPage = () => {
     [callStudentChatApi, loadConversation]
   );
 
+  const deleteConversation = useCallback(
+    async (convId: string) => {
+      try {
+        await callStudentChatApi<unknown>("deleteConversation", {
+          convId,
+        });
+        setLoadError(null);
+        await loadConversation();
+      } catch (error) {
+        setLoadError(normalizeError(error));
+      }
+    },
+    [callStudentChatApi, loadConversation]
+  );
+
   const handleInitialCreateSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -654,6 +677,7 @@ const StudentChatPage = () => {
       selectedConversationId={selectedConversationId}
       onSelectConversation={handleConversationChange}
       onCreateConversation={createConversation}
+       onDeleteConversation={deleteConversation}
       callStudentChatApi={callStudentChatApi}
     />
   );
