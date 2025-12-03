@@ -15,6 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import { MbtiCardSelector } from "../components/MbtiCardSelector";
+import { useState } from "react";
+import { MBTI_LABELS } from "../domain/mbti.types";
 import type {
   AuthPresenterInteractions,
   AuthPresenterStatus,
@@ -28,6 +38,8 @@ interface AuthViewProps {
 }
 
 const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
+  const [isMbtiModalOpen, setIsMbtiModalOpen] = useState(false);
+
   return (
     <div className="space-y-8">
       <header className="space-y-2 text-center lg:text-left">
@@ -144,6 +156,38 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
                   <SelectItem value="MENTOR">メンター</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>MBTI性格タイプ</Label>
+              <Dialog open={isMbtiModalOpen} onOpenChange={setIsMbtiModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between h-11 font-normal"
+                  >
+                    {viewModel.register.mbti
+                      ? `${viewModel.register.mbti} - ${
+                          MBTI_LABELS[viewModel.register.mbti]
+                        }`
+                      : "MBTIタイプを選択してください"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>MBTI性格タイプを選択</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <MbtiCardSelector
+                      value={viewModel.register.mbti}
+                      onChange={(value) => {
+                        interactions.setRegisterField("mbti", value);
+                        setIsMbtiModalOpen(false);
+                      }}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
             <Button
               type="submit"

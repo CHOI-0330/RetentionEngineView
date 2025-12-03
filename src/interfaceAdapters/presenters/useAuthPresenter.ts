@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type { AuthController } from "../controllers/useAuthController";
+import type { MbtiType } from "../../domain/mbti.types";
 
 export interface AuthPresenterViewModel {
   register: {
@@ -9,6 +10,7 @@ export interface AuthPresenterViewModel {
     password: string;
     displayName: string;
     role: "NEW_HIRE" | "MENTOR";
+    mbti: MbtiType | null;
   };
   login: {
     email: string;
@@ -28,7 +30,10 @@ export interface AuthPresenterStatus {
 }
 
 export interface AuthPresenterInteractions {
-  setRegisterField: (field: "email" | "password" | "displayName" | "role", value: string) => void;
+  setRegisterField: (
+    field: "email" | "password" | "displayName" | "role" | "mbti",
+    value: string | MbtiType | null
+  ) => void;
   setLoginField: (field: "email" | "password", value: string) => void;
   submitRegistration: () => void;
   submitLogin: () => void;
@@ -42,7 +47,9 @@ export interface AuthPresenterOutput {
   interactions: AuthPresenterInteractions;
 }
 
-export const useAuthPresenter = (controller: AuthController): AuthPresenterOutput => {
+export const useAuthPresenter = (
+  controller: AuthController
+): AuthPresenterOutput => {
   const { state, actions } = controller;
 
   const viewModel = useMemo<AuthPresenterViewModel>(
@@ -52,6 +59,7 @@ export const useAuthPresenter = (controller: AuthController): AuthPresenterOutpu
         password: state.registerPassword,
         displayName: state.registerDisplayName,
         role: state.registerRole,
+        mbti: state.registerMbti,
       },
       login: {
         email: state.loginEmail,
@@ -59,7 +67,16 @@ export const useAuthPresenter = (controller: AuthController): AuthPresenterOutpu
       },
       session: state.session,
     }),
-    [state.loginEmail, state.loginPassword, state.registerDisplayName, state.registerEmail, state.registerPassword, state.registerRole, state.session]
+    [
+      state.loginEmail,
+      state.loginPassword,
+      state.registerDisplayName,
+      state.registerEmail,
+      state.registerPassword,
+      state.registerRole,
+      state.registerMbti,
+      state.session,
+    ]
   );
 
   const status = useMemo<AuthPresenterStatus>(
@@ -79,7 +96,14 @@ export const useAuthPresenter = (controller: AuthController): AuthPresenterOutpu
       submitLogout: actions.submitLogout,
       clearError: actions.clearError,
     }),
-    [actions.clearError, actions.setLoginField, actions.setRegisterField, actions.submitLogin, actions.submitLogout, actions.submitRegistration]
+    [
+      actions.clearError,
+      actions.setLoginField,
+      actions.setRegisterField,
+      actions.submitLogin,
+      actions.submitLogout,
+      actions.submitRegistration,
+    ]
   );
 
   return { viewModel, status, interactions };

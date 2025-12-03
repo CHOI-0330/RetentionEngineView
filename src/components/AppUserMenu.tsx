@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Button } from '../components/ui/button';
-import { useSession } from './SessionProvider';
-import { getBrowserSupabaseClient } from '../lib/browserSupabaseClient';
+import Link from "next/link";
+import { Button } from "../components/ui/button";
+import { useSession } from "./SessionProvider";
+import { getBrowserSupabaseClient } from "../lib/browserSupabaseClient";
 
 export default function AppUserMenu() {
   const { session, isLoading, interactions } = useSession();
@@ -13,23 +13,23 @@ export default function AppUserMenu() {
     try {
       await supabase.auth.signOut();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     } finally {
       // Ensure local Supabase auth state is cleared even if signOut fails.
       try {
         Object.keys(localStorage)
-          .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+          .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
           .forEach((key) => localStorage.removeItem(key));
       } catch {
         // ignore
       }
       try {
         document.cookie
-          .split(';')
+          .split(";")
           .map((c) => c.trim())
-          .filter((c) => c.startsWith('sb-') && c.includes('auth-token'))
+          .filter((c) => c.startsWith("sb-") && c.includes("auth-token"))
           .forEach((cookie) => {
-            const name = cookie.split('=')[0];
+            const name = cookie.split("=")[0];
             document.cookie = `${name}=; path=/; max-age=0;`;
           });
       } catch {
@@ -37,12 +37,16 @@ export default function AppUserMenu() {
       }
       // Force a session refetch and then redirect to the home page.
       await interactions.refetchSession();
-      window.location.href = '/';
+      window.location.href = "/";
     }
   };
 
   if (isLoading) {
-    return <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap sm:whitespace-normal">認証確認中…</div>;
+    return (
+      <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap sm:whitespace-normal">
+        認証確認中…
+      </div>
+    );
   }
 
   if (!session) {
@@ -56,7 +60,12 @@ export default function AppUserMenu() {
     );
   }
 
-  const roleLabel = session.role === 'MENTOR' ? 'メンター' : session.role === 'NEW_HIRE' ? '新入社員' : session.role;
+  const roleLabel =
+    session.role === "MENTOR"
+      ? "メンター"
+      : session.role === "NEW_HIRE"
+      ? "新入社員"
+      : session.role;
 
   return (
     <div className="flex items-center gap-2 sm:gap-3 whitespace-nowrap sm:whitespace-normal">
@@ -66,7 +75,15 @@ export default function AppUserMenu() {
       <span className="rounded bg-primary px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-primary-foreground">
         {roleLabel}
       </span>
-      <Button size="sm" variant="outline" onClick={handleLogout} className="h-8 px-2 sm:px-3">
+      <Button asChild size="sm" variant="outline" className="h-8 px-2 sm:px-3">
+        <Link href="/profile">プロフィール</Link>
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleLogout}
+        className="h-8 px-2 sm:px-3"
+      >
         ログアウト
       </Button>
     </div>

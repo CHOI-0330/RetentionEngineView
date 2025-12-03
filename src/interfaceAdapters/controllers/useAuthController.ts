@@ -8,6 +8,7 @@ import {
   type LoginUserInput,
   type RegisterUserInput,
 } from "../../application/entitle/authUseCases";
+import type { MbtiType } from "../../domain/mbti.types";
 
 export type AuthEffect =
   | {
@@ -31,6 +32,7 @@ export interface AuthState {
   registerPassword: string;
   registerDisplayName: string;
   registerRole: "NEW_HIRE" | "MENTOR";
+  registerMbti: MbtiType | null;
   loginEmail: string;
   loginPassword: string;
   isSubmitting: boolean;
@@ -45,7 +47,10 @@ export interface AuthState {
 }
 
 export interface AuthActions {
-  setRegisterField: (field: "email" | "password" | "displayName" | "role", value: string) => void;
+  setRegisterField: (
+    field: "email" | "password" | "displayName" | "role" | "mbti",
+    value: string | MbtiType | null
+  ) => void;
   setLoginField: (field: "email" | "password", value: string) => void;
   submitRegistration: () => void;
   submitLogin: () => void;
@@ -66,6 +71,7 @@ const INITIAL_STATE: AuthState = {
   registerPassword: "",
   registerDisplayName: "",
   registerRole: "NEW_HIRE",
+  registerMbti: null,
   loginEmail: "",
   loginPassword: "",
   isSubmitting: false,
@@ -78,23 +84,42 @@ export const useAuthController = (): AuthController => {
   const effectIdRef = useRef(0);
   const [state, setState] = useState<AuthState>(INITIAL_STATE);
 
-  const setRegisterField = useCallback((field: "email" | "password" | "displayName" | "role", value: string) => {
-    setState((previous) => ({
-      ...previous,
-      registerEmail: field === "email" ? value : previous.registerEmail,
-      registerPassword: field === "password" ? value : previous.registerPassword,
-      registerDisplayName: field === "displayName" ? value : previous.registerDisplayName,
-      registerRole: field === "role" ? (value as AuthState["registerRole"]) : previous.registerRole,
-    }));
-  }, []);
+  const setRegisterField = useCallback(
+    (
+      field: "email" | "password" | "displayName" | "role" | "mbti",
+      value: string | MbtiType | null
+    ) => {
+      setState((previous) => ({
+        ...previous,
+        registerEmail:
+          field === "email" ? (value as string) : previous.registerEmail,
+        registerPassword:
+          field === "password" ? (value as string) : previous.registerPassword,
+        registerDisplayName:
+          field === "displayName"
+            ? (value as string)
+            : previous.registerDisplayName,
+        registerRole:
+          field === "role"
+            ? (value as AuthState["registerRole"])
+            : previous.registerRole,
+        registerMbti:
+          field === "mbti" ? (value as MbtiType | null) : previous.registerMbti,
+      }));
+    },
+    []
+  );
 
-  const setLoginField = useCallback((field: "email" | "password", value: string) => {
-    setState((previous) => ({
-      ...previous,
-      loginEmail: field === "email" ? value : previous.loginEmail,
-      loginPassword: field === "password" ? value : previous.loginPassword,
-    }));
-  }, []);
+  const setLoginField = useCallback(
+    (field: "email" | "password", value: string) => {
+      setState((previous) => ({
+        ...previous,
+        loginEmail: field === "email" ? value : previous.loginEmail,
+        loginPassword: field === "password" ? value : previous.loginPassword,
+      }));
+    },
+    []
+  );
 
   const clearError = useCallback(() => {
     setState((previous) => ({
@@ -162,7 +187,9 @@ export const useAuthController = (): AuthController => {
       if (!previous.session || previous.isSubmitting) {
         return previous;
       }
-      const validation = logoutUserUseCase({ accessToken: previous.session.accessToken });
+      const validation = logoutUserUseCase({
+        accessToken: previous.session.accessToken,
+      });
       if (validation.kind === "failure") {
         return { ...previous, error: validation.error };
       }
@@ -183,7 +210,9 @@ export const useAuthController = (): AuthController => {
   const acknowledgeEffect = useCallback((effectId: string) => {
     setState((previous) => ({
       ...previous,
-      pendingEffects: previous.pendingEffects.filter((effect) => effect.id !== effectId),
+      pendingEffects: previous.pendingEffects.filter(
+        (effect) => effect.id !== effectId
+      ),
       isSubmitting: false,
     }));
   }, []);
@@ -214,7 +243,17 @@ export const useAuthController = (): AuthController => {
       setSession,
       setError,
     }),
-    [acknowledgeEffect, clearError, setError, setLoginField, setRegisterField, setSession, submitLogin, submitLogout, submitRegistration]
+    [
+      acknowledgeEffect,
+      clearError,
+      setError,
+      setLoginField,
+      setRegisterField,
+      setSession,
+      submitLogin,
+      submitLogout,
+      submitRegistration,
+    ]
   );
 
   return { state, actions };
