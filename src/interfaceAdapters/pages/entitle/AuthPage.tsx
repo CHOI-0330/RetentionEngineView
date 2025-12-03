@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import AuthView from "../../../views/AuthView";
 import { useAuthController } from "../../controllers/useAuthController";
 import { useAuthPresenter } from "../../presenters/useAuthPresenter";
+import { useSession } from "../../../components/SessionProvider";
 
 const AuthPage = () => {
   const controller = useAuthController();
@@ -13,6 +14,7 @@ const AuthPage = () => {
   const processingRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { interactions } = useSession();
 
   const syncSessionFromApi = useMemo(
     () =>
@@ -73,9 +75,12 @@ const AuthPage = () => {
     const alreadyThere = pathname === target || pathname.startsWith(target);
     if (!alreadyThere && redirectedUserRef.current !== session.userId) {
       redirectedUserRef.current = session.userId;
-      router.replace(target);
+      void (async () => {
+        await interactions.refetchSession();
+        router.replace(target);
+      })();
     }
-  }, [controller.state.session, pathname, router]);
+  }, [controller.state.session, interactions, pathname, router]);
 
   useEffect(() => {
     if (processingRef.current || !controller.state.pendingEffects.length) {

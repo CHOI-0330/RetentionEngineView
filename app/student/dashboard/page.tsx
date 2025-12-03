@@ -24,7 +24,7 @@ interface ConversationListItem {
 }
 
 const StudentDashboardPage = () => {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, interactions } = useSession();
   const [conversations, setConversations] = useState<ConversationListItem[]>(
     []
   );
@@ -32,8 +32,16 @@ const StudentDashboardPage = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [didTrySessionRefresh, setDidTrySessionRefresh] = useState(false);
   const userId = session?.userId;
   const router = useRouter();
+
+  useEffect(() => {
+    if (!session && !isSessionLoading && !didTrySessionRefresh) {
+      setDidTrySessionRefresh(true);
+      void interactions.refetchSession();
+    }
+  }, [didTrySessionRefresh, interactions, isSessionLoading, session]);
 
   const parseApiResponse = useCallback(async (response: Response) => {
     const raw = await response.text();
@@ -135,7 +143,7 @@ const StudentDashboardPage = () => {
     return `Welcome back, ${session.displayName}`;
   }, [session?.displayName]);
 
-  if (isSessionLoading) {
+  if (isSessionLoading || (!session && !didTrySessionRefresh)) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
