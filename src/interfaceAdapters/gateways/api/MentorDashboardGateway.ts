@@ -19,6 +19,14 @@ interface MentorApiConversation {
   owner_name?: string;
 }
 
+export interface NewhireOption {
+  userId: string;
+  displayName: string;
+  email: string;
+  createdAt: string;
+  isAssigned: boolean;
+}
+
 /**
  * MentorDashboard API Gateway
  */
@@ -98,5 +106,22 @@ export class MentorDashboardGateway implements MentorDashboardPort {
     if (!result.ok) {
       throw new Error(result.error);
     }
+  }
+
+  /**
+   * 할당 가능한 신입사원 목록 조회
+   */
+  async listAvailableNewhires(): Promise<NewhireOption[]> {
+    const result = await apiFetch<NewhireOption[]>("/api/entitle/mentor/newhires", {
+      method: "GET",
+      accessToken: this.accessToken,
+      cacheTtl: 30 * 1000,
+    });
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    return result.data ?? [];
   }
 }

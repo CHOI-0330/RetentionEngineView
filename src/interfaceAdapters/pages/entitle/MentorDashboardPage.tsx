@@ -7,12 +7,19 @@ import MentorDashboardView from "../../../views/MentorDashboardView";
 import { useMentorDashboardController } from "../../controllers/useMentorDashboardController";
 import { useMentorDashboardPresenter } from "../../presenters/useMentorDashboardPresenter";
 import type { MentorDashboardControllerEffect } from "../../controllers/useMentorDashboardController";
-import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 
 // 공통 훅 & 유틸리티 사용
 import { useEffectQueue, useSessionGuard, useMentorDashboardGateway } from "../../hooks";
 import { normalizeError, isAuthError } from "../../utils/errors";
+import type { NewhireOption } from "../../gateways/api/MentorDashboardGateway";
 
 const MentorDashboardPage = () => {
   const controller = useMentorDashboardController();
@@ -30,7 +37,9 @@ const MentorDashboardPage = () => {
   });
 
   const hasRequestedInitial = useRef(false);
-  const [assignmentNewhireId, setAssignmentNewhireId] = useState("");
+  const [selectedNewhireId, setSelectedNewhireId] = useState<string>("");
+  const [newhireOptions, setNewhireOptions] = useState<NewhireOption[]>([]);
+  const [isLoadingNewhires, setIsLoadingNewhires] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
@@ -85,6 +94,20 @@ const MentorDashboardPage = () => {
     },
   });
 
+  // 신입사원 목록 로드
+  const loadNewhires = useCallback(async () => {
+    if (!session) return;
+    setIsLoadingNewhires(true);
+    try {
+      const newhires = await gateway.listAvailableNewhires();
+      setNewhireOptions(newhires);
+    } catch (error) {
+      console.error("Failed to load newhires:", error);
+    } finally {
+      setIsLoadingNewhires(false);
+    }
+  }, [gateway, session]);
+
   // 초기 데이터 로드
   useEffect(() => {
     if (hasRequestedInitial.current) return;
@@ -92,7 +115,8 @@ const MentorDashboardPage = () => {
 
     hasRequestedInitial.current = true;
     controller.actions.requestRefresh();
-  }, [controller.actions, sessionState]);
+    loadNewhires();
+  }, [controller.actions, sessionState, loadNewhires]);
 
   // 멘토 할당 생성 - Gateway 사용
   const handleCreateAssignment = async () => {
@@ -100,17 +124,18 @@ const MentorDashboardPage = () => {
       setAssignmentError("ログインしてください。");
       return;
     }
-    const trimmed = assignmentNewhireId.trim();
-    if (!trimmed) {
-      setAssignmentError("新入社員IDを入力してください。");
+    if (!selectedNewhireId) {
+      setAssignmentError("新入社員を選択してください。");
       return;
     }
     setIsAssigning(true);
     setAssignmentError(null);
     try {
-      await gateway.createAssignment(trimmed);
-      setAssignmentNewhireId("");
+      await gateway.createAssignment(selectedNewhireId);
+      setSelectedNewhireId("");
       controller.actions.requestRefresh();
+      // 신입사원 목록 다시 로드 (할당 상태 업데이트)
+      await loadNewhires();
     } catch (error) {
       setAssignmentError(
         error instanceof Error
@@ -150,38 +175,113 @@ const MentorDashboardPage = () => {
     );
   }
 
+  // 미할당/할당됨 신입사원 필터링
+  const availableNewhires = newhireOptions.filter((n) => !n.isAssigned);
+  const assignedNewhires = newhireOptions.filter((n) => n.isAssigned);
+
   return (
     <div className="space-y-4">
+      {/* 담당 중인 신입사원 목록 */}
+      {assignedNewhires.length > 0 && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold">担当中の新入社員</p>
+            <p className="text-xs text-muted-foreground">
+              現在あなたが担当している新入社員の一覧です。
+            </p>
+          </div>
+          <div className="grid gap-2">
+            {assignedNewhires.map((newhire) => (
+              <div
+                key={newhire.userId}
+                className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{newhire.displayName}</span>
+                  {newhire.email && (
+                    <span className="text-xs text-muted-foreground">
+                      {newhire.email}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  担当中
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 멘토 할당 생성 */}
       <div className="rounded-lg border p-4 space-y-3">
         <div>
           <p className="text-sm font-semibold">メンターアサイン作成</p>
           <p className="text-xs text-muted-foreground">
-            新入社員IDを入力して自身にアサインできます。
+            新入社員を選択して自身にアサインできます。
           </p>
         </div>
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">
-            新入社員IDを入力
+            新入社員を選択
           </label>
-          <Input
-            value={assignmentNewhireId}
-            onChange={(event) => setAssignmentNewhireId(event.target.value)}
-            placeholder="newhire-user-id"
-          />
+          <Select
+            value={selectedNewhireId}
+            onValueChange={setSelectedNewhireId}
+            disabled={isLoadingNewhires || isAssigning}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue
+                placeholder={
+                  isLoadingNewhires
+                    ? "読み込み中..."
+                    : availableNewhires.length === 0
+                      ? "割り当て可能な新入社員がいません"
+                      : "新入社員を選択してください"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {availableNewhires.map((newhire) => (
+                <SelectItem key={newhire.userId} value={newhire.userId}>
+                  <div className="flex flex-col">
+                    <span>{newhire.displayName}</span>
+                    {newhire.email && (
+                      <span className="text-xs text-muted-foreground">
+                        {newhire.email}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {assignmentError ? (
           <p className="text-sm text-destructive">{assignmentError}</p>
         ) : null}
-        <p className="text-xs text-muted-foreground">
-          ユーザー一覧は表示しません。IDを直接入力してください。
-        </p>
-        <Button
-          onClick={handleCreateAssignment}
-          disabled={isAssigning}
-          className="w-full sm:w-auto"
-        >
-          {isAssigning ? "作成中..." : "アサインを追加"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleCreateAssignment}
+            disabled={isAssigning || !selectedNewhireId}
+            className="w-full sm:w-auto"
+          >
+            {isAssigning ? "作成中..." : "アサインを追加"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={loadNewhires}
+            disabled={isLoadingNewhires}
+            className="w-full sm:w-auto"
+          >
+            {isLoadingNewhires ? "更新中..." : "一覧を更新"}
+          </Button>
+        </div>
+        {newhireOptions.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            全{newhireOptions.length}名中、{availableNewhires.length}名が割り当て可能
+          </p>
+        )}
       </div>
 
       <MentorDashboardView
