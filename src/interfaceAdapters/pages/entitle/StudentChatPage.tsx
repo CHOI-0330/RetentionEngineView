@@ -29,7 +29,7 @@ import {
 import { normalizeError, isAuthError } from "../../utils/errors";
 
 // Gateway 임포트
-import { StudentChatGateway, LLMGateway } from "../../gateways/api/StudentChatGateway";
+import { StudentChatGateway, LLMGateway, ResponseType } from "../../gateways/api/StudentChatGateway";
 
 interface StudentChatRuntimeProps {
   bootstrap: StudentChatBootstrap & { conversation: Conversation };
@@ -115,6 +115,7 @@ const StudentChatRuntime = ({
               prompt: { messages: { role: string; content: string }[] };
               modelId?: string;
               runtimeId?: string;
+              searchSettings?: { enableFileSearch?: boolean; allowWebSearch?: boolean; executeWebSearch?: boolean };
             };
             const questionMessage = [...(payload.prompt?.messages ?? [])]
               .reverse()
@@ -124,17 +125,36 @@ const StudentChatRuntime = ({
               throw new Error("Question must not be empty.");
             }
 
+            console.log("[StudentChat][debug] Calling llmGateway.generateResponse with searchSettings:", payload.searchSettings);
             const result = await llmGateway.generateResponse({
               question,
               conversationId: convId,
               modelId: payload.modelId,
               runtimeId: payload.runtimeId,
+              searchSettings: payload.searchSettings,
             });
+
+            // Web検索確認リクエストの場合
+            if (result.type === ResponseType.WEB_SEARCH_CONFIRMATION && result.needsWebSearch) {
+              // 確認メッセージを表示しつつ、確認ボタンも表示
+              controller.actions.notifyAssistantResponseReady(result.answer, result.sources);
+              controller.actions.showWebSearchConfirmation(
+                question,
+                result.webSearchReason ?? "",
+                result.confirmationLabels
+              );
+              break;
+            }
 
             if (!result.answer || typeof result.answer !== "string") {
               throw new Error("LLM backend response did not include answer.");
             }
-            controller.actions.notifyAssistantResponseReady(result.answer);
+            controller.actions.notifyAssistantResponseReady(result.answer, result.sources);
+
+            // Web検索実行後はexecuteWebSearchをリセット
+            if (payload.searchSettings?.executeWebSearch) {
+              controller.actions.setSearchSettings({ executeWebSearch: false });
+            }
           } catch (streamError) {
             controller.actions.reportExternalFailure(normalizeError(streamError));
             controller.actions.notifyAssistantResponseCancelled();
@@ -144,7 +164,7 @@ const StudentChatRuntime = ({
         case "REQUEST_FINALIZE_ASSISTANT_MESSAGE": {
           const convId = resolveConvId();
           if (!convId) throw new Error("convId is required");
-          const payload = effect.payload as { content?: string; finalText?: string };
+          const payload = effect.payload as { content?: string; finalText?: string; sources?: { fileSearch?: string[]; webSearch?: { title: string; url: string; snippet?: string }[] } };
           const result = await gateway.finalizeAssistantMessageWithConvId({
             convId,
             content: payload.content ?? payload.finalText ?? "",
@@ -152,6 +172,7 @@ const StudentChatRuntime = ({
           controller.actions.syncAssistantMessage({
             ...result,
             status: result.status ?? "DONE",
+            sources: payload.sources,
           });
           activeAssistantIdRef.current = null;
           break;
@@ -270,6 +291,8 @@ const StudentChatRuntime = ({
       status={presenter.status}
       meta={presenter.meta}
       interactions={presenter.interactions}
+      searchSettings={presenter.searchSettings}
+      pendingWebSearchConfirmation={presenter.pendingWebSearchConfirmation}
     />
   );
 };

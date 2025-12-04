@@ -34,6 +34,23 @@ export interface Conversation {
 
 export type MessageRole = "NEW_HIRE" | "ASSISTANT";
 
+/**
+ * ウェブ検索ソース
+ */
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+/**
+ * メッセージソース (Hybrid RAG 検索結果)
+ */
+export interface MessageSources {
+  fileSearch?: string[]; // ["onboarding-tips.txt", ...]
+  webSearch?: WebSource[]; // [{ title: "...", url: "..." }]
+}
+
 export interface Message {
   msgId: string;
   convId: string;
@@ -41,6 +58,7 @@ export interface Message {
   content: string;
   status?: AssistantStatus;
   createdAt: string;
+  sources?: MessageSources;
 }
 
 export type FeedbackAuthorRole = "MENTOR" | "NEW_HIRE";

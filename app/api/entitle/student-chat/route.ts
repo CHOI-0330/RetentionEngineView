@@ -292,9 +292,7 @@ export async function POST(request: NextRequest) {
         if (!trimmedContent) {
           throw new HttpError(400, "Message content must not be empty.");
         }
-        if (trimmedContent.length > MAX_MESSAGE_LENGTH) {
-          throw new HttpError(400, "Message content exceeds the allowed length.");
-        }
+        // AI応答は長さ制限なし（Web検索結果など長い応答を許可）
 
         const backendResult = await createMessage(
           {

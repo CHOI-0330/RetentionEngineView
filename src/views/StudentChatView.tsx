@@ -3,13 +3,25 @@ import type {
   StudentChatPresenterMeta,
   StudentChatPresenterStatus,
   StudentChatViewModel,
+  WebSearchConfirmation,
 } from "../interfaceAdapters/presenters/useStudentChatPresenter";
+import type { SearchSettings } from "../interfaceAdapters/gateways/api/StudentChatGateway";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-import { AlertTriangle, Loader2, MessageCircle, Eye } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  MessageCircle,
+  Eye,
+  Search,
+  Globe,
+  FileText,
+  ChevronDown,
+  Settings2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +45,6 @@ import {
   CollapsibleTrigger,
 } from "../components/ui/collapsible";
 import { Textarea } from "../components/ui/textarea";
-import { Skeleton } from "../components/ui/skeleton";
 import MarkdownRendererView from "../components/MarkdownRenderer";
 
 interface ConversationSummary {
@@ -63,6 +74,9 @@ interface StudentChatViewProps {
   status: StudentChatPresenterStatus;
   meta: StudentChatPresenterMeta;
   interactions: StudentChatPresenterInteractions;
+  // Hybrid RAG 設定
+  searchSettings: SearchSettings;
+  pendingWebSearchConfirmation: WebSearchConfirmation | null;
 }
 
 const LONG_WAIT_THRESHOLD_MS = 30000;
@@ -78,6 +92,8 @@ const StudentChatView = ({
   status,
   meta,
   interactions,
+  searchSettings,
+  pendingWebSearchConfirmation,
 }: StudentChatViewProps) => {
   const feedbackByMessageId = viewModel.mentorFeedbacks.reduce<
     Record<string, StudentChatViewModel["mentorFeedbacks"]>
@@ -126,7 +142,10 @@ const StudentChatView = ({
       setIsAssistantThinkingLong(false);
       return;
     }
-    const timerId = window.setTimeout(() => setIsAssistantThinkingLong(true), LONG_WAIT_THRESHOLD_MS);
+    const timerId = window.setTimeout(
+      () => setIsAssistantThinkingLong(true),
+      LONG_WAIT_THRESHOLD_MS
+    );
     return () => clearTimeout(timerId);
   }, [status.isAwaitingAssistant]);
 
@@ -207,7 +226,18 @@ const StudentChatView = ({
         onSend={viewModel.onSend}
         canSend={meta.canSend}
         isSending={status.isSending}
+        searchSettings={searchSettings}
+        onSearchSettingsChange={interactions.setSearchSettings}
       />
+
+      {/* ウェブ検索確認ボタン（チャット内に表示） */}
+      {pendingWebSearchConfirmation && (
+        <WebSearchConfirmationButtons
+          labels={pendingWebSearchConfirmation.labels}
+          onConfirm={interactions.confirmWebSearch}
+          onCancel={interactions.cancelWebSearch}
+        />
+      )}
     </div>
   );
 };
@@ -391,6 +421,12 @@ const StudentChatMessageBubble = ({
   const isStudent = message.sender === "student";
   const hasFeedback = feedbacks.length > 0;
   const [isAIFeedbackOpen, setAIFeedbackOpen] = useState(false);
+  const [isSourcesOpen, setSourcesOpen] = useState(false);
+
+  const hasSources =
+    message.sources &&
+    ((message.sources.fileSearch && message.sources.fileSearch.length > 0) ||
+      (message.sources.webSearch && message.sources.webSearch.length > 0));
 
   return (
     <div
@@ -448,6 +484,16 @@ const StudentChatMessageBubble = ({
               minute: "2-digit",
             })}
           </span>
+          {/* ソース表示ボタン */}
+          {!isStudent && hasSources && (
+            <button
+              onClick={() => setSourcesOpen(!isSourcesOpen)}
+              className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-600 hover:bg-emerald-100 transition-colors"
+            >
+              <Search className="h-3 w-3" />
+              <span className="font-medium">出典</span>
+            </button>
+          )}
           {!isStudent && feedbacks.length > 0 && (
             <button
               onClick={() => setAIFeedbackOpen(!isAIFeedbackOpen)}
@@ -460,6 +506,70 @@ const StudentChatMessageBubble = ({
             </button>
           )}
         </div>
+
+        {/* ソース表示 */}
+        {!isStudent && isSourcesOpen && hasSources && (
+          <div className="mt-3 w-full pl-10">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs text-emerald-700">
+                <Search className="h-3.5 w-3.5" />
+                <span className="font-semibold">回答の出典</span>
+              </div>
+
+              {/* FileSearchソース */}
+              {message.sources?.fileSearch &&
+                message.sources.fileSearch.length > 0 && (
+                  <div className="mb-2">
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium mb-1">
+                      <FileText className="h-3 w-3" />
+                      <span>社内ドキュメント</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {message.sources.fileSearch.map((source, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center rounded-md bg-white/80 px-2 py-0.5 text-[10px] text-emerald-700 border border-emerald-200"
+                        >
+                          {source}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* WebSearchソース */}
+              {message.sources?.webSearch &&
+                message.sources.webSearch.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-medium mb-1">
+                      <Globe className="h-3 w-3" />
+                      <span>ウェブ検索</span>
+                    </div>
+                    <div className="space-y-1">
+                      {message.sources.webSearch.map((source, idx) => (
+                        <a
+                          key={idx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block rounded-md bg-white/80 px-2 py-1.5 text-[11px] border border-blue-200 hover:bg-blue-50 transition-colors"
+                        >
+                          <span className="text-blue-700 font-medium">
+                            {source.title}
+                          </span>
+                          {source.snippet && (
+                            <p className="text-muted-foreground mt-0.5 line-clamp-2">
+                              {source.snippet}
+                            </p>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
 
         {/* Feedback Display */}
         {((!isStudent && isAIFeedbackOpen) ||
@@ -505,6 +615,8 @@ interface ChatComposerProps {
   onSend: () => void;
   canSend: boolean;
   isSending: boolean;
+  searchSettings: SearchSettings;
+  onSearchSettingsChange: (settings: Partial<SearchSettings>) => void;
 }
 
 const ChatComposer = ({
@@ -514,8 +626,11 @@ const ChatComposer = ({
   onSend,
   canSend,
   isSending,
+  searchSettings,
+  onSearchSettingsChange,
 }: ChatComposerProps) => {
   const [isComposing, setIsComposing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSend = () => {
     if (canSend && !isSending && value.trim()) {
@@ -529,6 +644,86 @@ const ChatComposer = ({
       className="border-t bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
       <div className="mx-auto max-w-3xl">
+        {/* 検索設定トグルバー */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* FileSearch トグル */}
+            <button
+              type="button"
+              onClick={() =>
+                onSearchSettingsChange({
+                  enableFileSearch: !searchSettings.enableFileSearch,
+                })
+              }
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                searchSettings.enableFileSearch
+                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              <FileText className="h-3 w-3" />
+              社内検索
+              {searchSettings.enableFileSearch ? " ON" : " OFF"}
+            </button>
+
+            {/* WebSearch トグル */}
+            <button
+              type="button"
+              onClick={() =>
+                onSearchSettingsChange({
+                  allowWebSearch: !searchSettings.allowWebSearch,
+                })
+              }
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                searchSettings.allowWebSearch
+                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              <Globe className="h-3 w-3" />
+              ウェブ検索
+              {searchSettings.allowWebSearch ? " 許可" : " OFF"}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <Settings2 className="h-3 w-3" />
+            <ChevronDown
+              className={`h-3 w-3 transition-transform ${
+                showSettings ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* 検索設定説明 (折りたたみ領域) */}
+        {showSettings && (
+          <div className="mb-3 rounded-lg border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <FileText className="h-3.5 w-3.5 mt-0.5 text-emerald-600" />
+                <div>
+                  <span className="font-medium text-foreground">社内検索:</span>{" "}
+                  アップロードされた社内ドキュメントから回答を検索します。
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Globe className="h-3.5 w-3.5 mt-0.5 text-blue-600" />
+                <div>
+                  <span className="font-medium text-foreground">
+                    ウェブ検索:
+                  </span>{" "}
+                  社内ドキュメントで回答が見つからない場合、ウェブ検索を許可します（確認あり）。
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form
           className="relative flex items-end gap-2 rounded-xl border bg-background p-2 shadow-sm focus-within:ring-1 focus-within:ring-ring"
           onSubmit={(e) => {
@@ -793,5 +988,107 @@ function FeedbackToggle({
         )}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/**
+ * ウェブ検索確認ボタン（チャット内に表示）
+ * - 方向キーで選択切り替え
+ * - Enterで選択確定
+ */
+interface WebSearchConfirmationButtonsProps {
+  labels?: {
+    confirm: string;
+    cancel: string;
+  };
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function WebSearchConfirmationButtons({
+  labels,
+  onConfirm,
+  onCancel,
+}: WebSearchConfirmationButtonsProps) {
+  const [selectedIndex, setSelectedIndex] = useState(0); // 0 = confirm, 1 = cancel
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const confirmLabel = labels?.confirm ?? "はい";
+  const cancelLabel = labels?.cancel ?? "いいえ";
+
+  // 方向キーとEnterのキーボードナビゲーション
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex(0);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex(1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (selectedIndex === 0) {
+          onConfirm();
+        } else {
+          onCancel();
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedIndex, onConfirm, onCancel]);
+
+  // フォーカス管理
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className="border-t bg-gradient-to-r from-blue-50/50 to-background px-4 py-3 focus:outline-none"
+    >
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-sm text-muted-foreground mr-2">
+            <Globe className="inline h-4 w-4 mr-1 text-blue-500" />
+            ウェブ検索を実行しますか？
+          </span>
+          <Button
+            variant={selectedIndex === 0 ? "default" : "outline"}
+            size="sm"
+            onClick={onConfirm}
+            onMouseEnter={() => setSelectedIndex(0)}
+            className={`gap-1.5 transition-all ${
+              selectedIndex === 0 ? "ring-2 ring-primary ring-offset-2" : ""
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            {confirmLabel}
+          </Button>
+          <Button
+            variant={selectedIndex === 1 ? "secondary" : "ghost"}
+            size="sm"
+            onClick={onCancel}
+            onMouseEnter={() => setSelectedIndex(1)}
+            className={`transition-all ${
+              selectedIndex === 1
+                ? "ring-2 ring-muted-foreground/50 ring-offset-2"
+                : ""
+            }`}
+          >
+            {cancelLabel}
+          </Button>
+        </div>
+        <p className="mt-2 text-center text-[10px] text-muted-foreground">
+          ← → キーで選択 • Enter で確定 • Esc でキャンセル
+        </p>
+      </div>
+    </div>
   );
 }

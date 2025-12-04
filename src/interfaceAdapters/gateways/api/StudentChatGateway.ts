@@ -244,6 +244,60 @@ export interface LLMGatewayConfig {
   accessToken?: string;
 }
 
+/**
+ * 検索設定 (Hybrid RAG)
+ */
+export interface SearchSettings {
+  enableFileSearch?: boolean; // ファイル検索有効化 (デフォルト: true)
+  allowWebSearch?: boolean; // ウェブ検索許可 (デフォルト: false)
+  executeWebSearch?: boolean; // ウェブ検索実行 (ユーザー承認後)
+}
+
+/**
+ * ウェブ検索ソース
+ */
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+/**
+ * レスポンスソース
+ */
+export interface ResponseSources {
+  fileSearch?: string[]; // ["onboarding-tips.txt", ...]
+  webSearch?: WebSource[]; // [{ title: "...", url: "..." }]
+}
+
+/**
+ * レスポンスタイプ
+ */
+export enum ResponseType {
+  ANSWER = 'ANSWER',
+  WEB_SEARCH_CONFIRMATION = 'WEB_SEARCH_CONFIRMATION',
+}
+
+/**
+ * Web検索確認ボタンラベル
+ */
+export interface WebSearchConfirmationLabels {
+  confirm: string;
+  cancel: string;
+}
+
+/**
+ * LLMレスポンスDTO
+ */
+export interface LLMGenerateResponse {
+  type: ResponseType;
+  answer: string;
+  needsWebSearch?: boolean;
+  webSearchReason?: string;
+  confirmationLabels?: WebSearchConfirmationLabels;
+  sources?: ResponseSources;
+}
+
 export class LLMGateway {
   private accessToken?: string;
 
@@ -260,8 +314,9 @@ export class LLMGateway {
     conversationId: string;
     modelId?: string;
     runtimeId?: string;
-  }): Promise<{ answer: string }> {
-    const result = await apiFetch<{ answer: string }>("/api/llm/generate", {
+    searchSettings?: SearchSettings;
+  }): Promise<LLMGenerateResponse> {
+    const result = await apiFetch<LLMGenerateResponse>("/api/llm/generate", {
       method: "POST",
       body: input,
       accessToken: this.accessToken,

@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 
-import type { Feedback, Message } from "../../domain/core";
+import type { Feedback, Message, MessageSources } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
+import type { SearchSettings } from "../gateways/api/StudentChatGateway";
 import type {
   StudentChatController,
   StudentChatControllerEffect,
@@ -16,6 +17,7 @@ export interface StudentChatMessageView {
   sender: StudentChatMessageSender;
   timestamp: Date;
   status?: Message["status"];
+  sources?: MessageSources;
 }
 
 export interface StudentChatFeedbackView {
@@ -55,6 +57,20 @@ export interface StudentChatPresenterInteractions {
   requestCreateFeedback: (content: string, message: Message) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
+  // Hybrid RAG 設定
+  setSearchSettings: (settings: Partial<SearchSettings>) => void;
+  // ウェブ検索確認
+  confirmWebSearch: () => void;
+  cancelWebSearch: () => void;
+}
+
+export interface WebSearchConfirmation {
+  question: string;
+  reason: string;
+  labels?: {
+    confirm: string;
+    cancel: string;
+  };
 }
 
 export interface StudentChatPresenterOutput {
@@ -63,6 +79,9 @@ export interface StudentChatPresenterOutput {
   status: StudentChatPresenterStatus;
   meta: StudentChatPresenterMeta;
   interactions: StudentChatPresenterInteractions;
+  // Hybrid RAG 状態
+  searchSettings: SearchSettings;
+  pendingWebSearchConfirmation: WebSearchConfirmation | null;
 }
 
 const toMessageView = (message: Message): StudentChatMessageView => ({
@@ -72,6 +91,7 @@ const toMessageView = (message: Message): StudentChatMessageView => ({
   sender: message.role === "ASSISTANT" ? "ai" : "student",
   timestamp: new Date(message.createdAt),
   status: message.role === "ASSISTANT" ? message.status ?? "DONE" : message.status,
+  sources: message.sources,
 });
 
 const toFeedbackView = (
@@ -102,7 +122,7 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
     return items;
   }, [state.authorNames, state.feedbackByMessageId]);
 
-  // meta 계산 (조건 로직이 있어 useMemo 유지)
+  // meta 計算 (条件ロジックがあるためuseMemo維持)
   const meta = useMemo<StudentChatPresenterMeta>(() => {
     const hasMoreHistory = Boolean(state.nextCursor);
     const isHistoryLoading = state.pendingEffects.some((effect) => effect.kind === "REQUEST_LIST_MESSAGES");
@@ -110,7 +130,7 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
     return { canSend, hasMoreHistory, isHistoryLoading };
   }, [state.nextCursor, state.pendingEffects, state.newMessage, state.isAwaitingAssistant, state.isSending]);
 
-  // 단순 객체들은 직접 반환
+  // シンプルなオブジェクトは直接返却
   return {
     viewModel: {
       messages,
@@ -134,6 +154,11 @@ export const useStudentChatPresenter = (controller: StudentChatController): Stud
       requestCreateFeedback: actions.requestCreateFeedback,
       clearError: actions.clearError,
       reportExternalFailure: actions.reportExternalFailure,
+      setSearchSettings: actions.setSearchSettings,
+      confirmWebSearch: actions.confirmWebSearch,
+      cancelWebSearch: actions.cancelWebSearch,
     },
+    searchSettings: state.searchSettings,
+    pendingWebSearchConfirmation: state.pendingWebSearchConfirmation ?? null,
   };
 };

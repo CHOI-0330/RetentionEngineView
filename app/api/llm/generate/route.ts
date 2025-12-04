@@ -93,7 +93,7 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
 };
 
 // Align with backend controller intent.
-const generateAnswer = (payload: { question: string; conversationId: string; modelId?: string; runtimeId?: string }, accessToken: string) =>
+const generateAnswer = (payload: { question: string; conversationId: string; modelId?: string; runtimeId?: string; searchSettings?: { enableFileSearch?: boolean; allowWebSearch?: boolean; executeWebSearch?: boolean } }, accessToken: string) =>
   callBackend<GenerateAnswerResponseDto>(
     "/llm/generate",
     {
@@ -111,6 +111,11 @@ export async function POST(request: NextRequest) {
       conversationId?: string;
       modelId?: string;
       runtimeId?: string;
+      searchSettings?: {
+        enableFileSearch?: boolean;
+        allowWebSearch?: boolean;
+        executeWebSearch?: boolean;
+      };
     };
     const question = (body.question ?? "").trim();
     if (!question) {
@@ -128,13 +133,10 @@ export async function POST(request: NextRequest) {
       conversationId,
       modelId: body.modelId,
       runtimeId: body.runtimeId,
+      searchSettings: body.searchSettings,
     };
     const backendResponse = await generateAnswer(payload, accessToken);
-    const answer = backendResponse.answer ?? backendResponse.data?.answer;
-    if (!answer || typeof answer !== "string") {
-      throw new HttpError(502, "LLM backend response did not include answer.");
-    }
-    return NextResponse.json({ answer });
+    return NextResponse.json(backendResponse);
   } catch (error) {
     console.error("[llm-generate][POST][error]", error);
     if (error instanceof HttpError) {

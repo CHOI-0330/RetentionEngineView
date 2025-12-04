@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { Conversation, Feedback, Message, MentorAssignment, User } from "../../domain/core";
+import type { Conversation, Feedback, Message, MentorAssignment, MessageSources, User } from "../../domain/core";
+import type { SearchSettings } from "../gateways/api/StudentChatGateway";
 import {
   beginAssistantMessageUseCase,
   buildPromptForConversationUseCase,
@@ -43,12 +44,12 @@ export type StudentChatControllerEffect =
   | {
       id: string;
       kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE";
-      payload: { prompt: Prompt; modelId?: string; runtimeId?: string; convId?: string };
+      payload: { prompt: Prompt; modelId?: string; runtimeId?: string; convId?: string; searchSettings?: SearchSettings };
     }
   | {
       id: string;
       kind: "REQUEST_FINALIZE_ASSISTANT_MESSAGE";
-      payload: { msgId: string; finalText: string };
+      payload: { msgId: string; finalText: string; sources?: MessageSources };
     }
   | {
       id: string;
@@ -83,6 +84,17 @@ export interface StudentChatControllerState {
   nextCursor?: string;
   activeAssistantMessageId?: string | null;
   pendingUserMessage?: { convId: string; authorId: string; content: string } | null;
+  // Hybrid RAG 設定
+  searchSettings: SearchSettings;
+  // ウェブ検索確認待機状態
+  pendingWebSearchConfirmation?: {
+    question: string;
+    reason: string;
+    labels?: {
+      confirm: string;
+      cancel: string;
+    };
+  } | null;
 }
 
 export interface StudentChatControllerActions {
@@ -93,7 +105,7 @@ export interface StudentChatControllerActions {
   notifyMessagesLoaded: (input: { items: Message[]; nextCursor?: string }) => void;
   notifyUserMessagePersisted: (message: Message) => void;
   notifyAssistantMessageCreated: (message: Message) => void;
-  notifyAssistantResponseReady: (finalText: string) => void;
+  notifyAssistantResponseReady: (finalText: string, sources?: MessageSources) => void;
   notifyAssistantResponseCancelled: () => void;
   syncAssistantMessage: (message: Message) => void;
   enqueueAssistantAfterUserMessage: (message: Message) => void;
@@ -102,6 +114,12 @@ export interface StudentChatControllerActions {
   requestCreateFeedback: (content: string, targetMessage: Message) => void;
   clearError: () => void;
   reportExternalFailure: (error: UseCaseFailure) => void;
+  // Hybrid RAG 設定アクション
+  setSearchSettings: (settings: Partial<SearchSettings>) => void;
+  // ウェブ検索確認アクション
+  showWebSearchConfirmation: (question: string, reason: string, labels?: { confirm: string; cancel: string }) => void;
+  confirmWebSearch: () => void;
+  cancelWebSearch: () => void;
 }
 
 export interface UseStudentChatControllerParams {
@@ -158,6 +176,13 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     nextCursor: initialCursor,
     activeAssistantMessageId: null,
     pendingUserMessage: null,
+    // Hybrid RAG デフォルト設定
+    searchSettings: {
+      enableFileSearch: true,
+      allowWebSearch: false,
+      executeWebSearch: false,
+    },
+    pendingWebSearchConfirmation: null,
   }));
 
   const mutateState = useCallback((updater: (previous: StudentChatControllerState) => StudentChatControllerState) => {
@@ -368,7 +393,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   );
 
   const notifyAssistantResponseReady = useCallback(
-    (finalText: string) => {
+    (finalText: string, sources?: MessageSources) => {
       setState((previous) => {
         const activeId = previous.activeAssistantMessageId;
         if (!activeId) {
@@ -384,7 +409,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
             ...previous.pendingEffects,
             createEffect({
               kind: "REQUEST_FINALIZE_ASSISTANT_MESSAGE",
-              payload: { msgId: activeId, finalText },
+              payload: { msgId: activeId, finalText, sources },
             }),
           ],
         };
@@ -443,10 +468,12 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
             modelId,
             runtimeId,
             convId: conversation.convId,
+            searchSettings: previous.searchSettings,
           },
         });
         const nextPendingEffects = [...previous.pendingEffects, beginEffect, generateEffect];
         console.log("[StudentChat][debug] pendingEffects ->", nextPendingEffects);
+        console.log("[StudentChat][debug] searchSettings at send time:", previous.searchSettings);
         return {
           ...previous,
           isAwaitingAssistant: true,
@@ -573,6 +600,96 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
     [mutateState]
   );
 
+  // Hybrid RAG 設定アクション
+  const setSearchSettings = useCallback(
+    (settings: Partial<SearchSettings>) => {
+      console.log("[StudentChat][debug] setSearchSettings called with:", settings);
+      mutateState((previous) => {
+        const newSettings = { ...previous.searchSettings, ...settings };
+        console.log("[StudentChat][debug] searchSettings updated:", newSettings);
+        return {
+          ...previous,
+          searchSettings: newSettings,
+        };
+      });
+    },
+    [mutateState]
+  );
+
+  // ウェブ検索確認ダイアログアクション
+  const showWebSearchConfirmation = useCallback(
+    (question: string, reason: string, labels?: { confirm: string; cancel: string }) => {
+      mutateState((previous) => ({
+        ...previous,
+        pendingWebSearchConfirmation: { question, reason, labels },
+      }));
+    },
+    [mutateState]
+  );
+
+  const confirmWebSearch = useCallback(() => {
+    setState((previous) => {
+      if (!previous.pendingWebSearchConfirmation) {
+        return previous;
+      }
+
+      // pendingWebSearchConfirmationに保存された元の質問を使用
+      const originalQuestion = previous.pendingWebSearchConfirmation.question;
+
+      // ウェブ検索実行設定を有効化
+      const updatedSettings = { ...previous.searchSettings, executeWebSearch: true };
+
+      // 新しいリクエストを生成（元の質問で検索）
+      const messagesWithUser = sortMessagesAscending([...previous.messages]);
+      const promptResult = buildPromptForConversationUseCase({
+        user: currentUser,
+        conversation,
+        messages: messagesWithUser,
+        question: originalQuestion,
+        historyWindow,
+      });
+
+      if (promptResult.kind === "failure") {
+        return {
+          ...previous,
+          error: promptResult.error,
+          pendingWebSearchConfirmation: null,
+        };
+      }
+
+      const beginEffect = createEffect({
+        kind: "REQUEST_BEGIN_ASSISTANT_MESSAGE",
+        payload: { convId: conversation.convId },
+      });
+
+      const generateEffect = createEffect({
+        kind: "REQUEST_GENERATE_ASSISTANT_RESPONSE",
+        payload: {
+          prompt: promptResult.value,
+          modelId,
+          runtimeId,
+          convId: conversation.convId,
+          searchSettings: updatedSettings,
+        },
+      });
+
+      return {
+        ...previous,
+        searchSettings: updatedSettings,
+        pendingWebSearchConfirmation: null,
+        isAwaitingAssistant: true,
+        pendingEffects: [...previous.pendingEffects, beginEffect, generateEffect],
+      };
+    });
+  }, [conversation, createEffect, currentUser, historyWindow, modelId, runtimeId]);
+
+  const cancelWebSearch = useCallback(() => {
+    mutateState((previous) => ({
+      ...previous,
+      pendingWebSearchConfirmation: null,
+    }));
+  }, [mutateState]);
+
   const actions = useMemo<StudentChatControllerActions>(
     () => ({
       setNewMessage,
@@ -591,6 +708,10 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       requestCreateFeedback,
       clearError,
       reportExternalFailure,
+      setSearchSettings,
+      showWebSearchConfirmation,
+      confirmWebSearch,
+      cancelWebSearch,
     }),
     [
       acknowledgeEffect,
@@ -608,6 +729,10 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       requestOlderMessages,
       sendMessage,
       setNewMessage,
+      setSearchSettings,
+      showWebSearchConfirmation,
+      confirmWebSearch,
+      cancelWebSearch,
     ]
   );
 
