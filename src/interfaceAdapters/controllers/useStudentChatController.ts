@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Conversation, Feedback, Message, MentorAssignment, MessageSources, User } from "../../domain/core";
 import type { SearchSettings } from "../gateways/api/StudentChatGateway";
@@ -231,7 +231,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   const acknowledgeEffect = useCallback((effectId: string) => {
     mutateState((previous) => {
       const next = previous.pendingEffects.filter((effect) => effect.id !== effectId);
-      console.log("[StudentChat][debug] acknowledgeEffect", { effectId, before: previous.pendingEffects, after: next });
       return {
         ...previous,
         pendingEffects: next,
@@ -287,10 +286,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
 
   const enqueueAssistantPreparation = useCallback(
     (messagesWithUser: Message[], userMessageContent: string) => {
-      console.log("[StudentChat][debug] owner check", {
-        conversationOwnerId: conversation.ownerId,
-        currentUserId: currentUser.userId,
-      });
       const promptResult = buildPromptForConversationUseCase({
         user: currentUser,
         conversation,
@@ -299,7 +294,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         historyWindow,
       });
       if (promptResult.kind === "failure") {
-        console.warn("[StudentChat][debug] promptResult failure", promptResult.error);
         mutateState((previous) => ({
           ...previous,
           error: promptResult.error,
@@ -311,18 +305,12 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         requester: currentUser,
       });
       if (beginResult.kind === "failure") {
-        console.warn("[StudentChat][debug] beginAssistantMessageUseCase failure", beginResult.error);
         mutateState((previous) => ({
           ...previous,
           error: beginResult.error,
         }));
         return null;
       }
-      console.log("[StudentChat][debug] enqueue begin/generate effects", {
-        promptMessages: promptResult.value.messages.length,
-        modelId,
-        runtimeId,
-      });
       return {
         prompt: promptResult.value,
       };
@@ -472,8 +460,6 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
           },
         });
         const nextPendingEffects = [...previous.pendingEffects, beginEffect, generateEffect];
-        console.log("[StudentChat][debug] pendingEffects ->", nextPendingEffects);
-        console.log("[StudentChat][debug] searchSettings at send time:", previous.searchSettings);
         return {
           ...previous,
           isAwaitingAssistant: true,
@@ -603,10 +589,8 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   // Hybrid RAG 設定アクション
   const setSearchSettings = useCallback(
     (settings: Partial<SearchSettings>) => {
-      console.log("[StudentChat][debug] setSearchSettings called with:", settings);
       mutateState((previous) => {
         const newSettings = { ...previous.searchSettings, ...settings };
-        console.log("[StudentChat][debug] searchSettings updated:", newSettings);
         return {
           ...previous,
           searchSettings: newSettings,
@@ -689,6 +673,48 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       pendingWebSearchConfirmation: null,
     }));
   }, [mutateState]);
+
+  // pendingEffectsの自動クリーンアップ（60秒後に未処理のeffectを削除）
+  const effectTimestampsRef = useRef<Map<string, number>>(new Map());
+  const EFFECT_TIMEOUT_MS = 60000;
+
+  useEffect(() => {
+    // 新しいeffectにタイムスタンプを設定
+    const now = Date.now();
+    for (const effect of state.pendingEffects) {
+      if (!effectTimestampsRef.current.has(effect.id)) {
+        effectTimestampsRef.current.set(effect.id, now);
+      }
+    }
+
+    // タイムアウトしたeffectを検出して削除
+    const expiredEffectIds: string[] = [];
+    for (const [effectId, timestamp] of effectTimestampsRef.current) {
+      if (now - timestamp > EFFECT_TIMEOUT_MS) {
+        expiredEffectIds.push(effectId);
+      }
+    }
+
+    if (expiredEffectIds.length > 0) {
+      // タイムスタンプマップからも削除
+      for (const id of expiredEffectIds) {
+        effectTimestampsRef.current.delete(id);
+      }
+      // stateから期限切れeffectを削除
+      mutateState((previous) => ({
+        ...previous,
+        pendingEffects: previous.pendingEffects.filter((e) => !expiredEffectIds.includes(e.id)),
+      }));
+    }
+
+    // 処理済みeffectのタイムスタンプをクリーンアップ
+    const currentEffectIds = new Set(state.pendingEffects.map((e) => e.id));
+    for (const effectId of effectTimestampsRef.current.keys()) {
+      if (!currentEffectIds.has(effectId)) {
+        effectTimestampsRef.current.delete(effectId);
+      }
+    }
+  }, [state.pendingEffects, mutateState]);
 
   const actions = useMemo<StudentChatControllerActions>(
     () => ({

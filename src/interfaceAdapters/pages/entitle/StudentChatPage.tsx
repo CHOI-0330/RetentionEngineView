@@ -125,7 +125,6 @@ const StudentChatRuntime = ({
               throw new Error("Question must not be empty.");
             }
 
-            console.log("[StudentChat][debug] Calling llmGateway.generateResponse with searchSettings:", payload.searchSettings);
             const result = await llmGateway.generateResponse({
               question,
               conversationId: convId,
