@@ -3,15 +3,62 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 import type { User } from "../../../../src/domain/core";
 
+type ErrorCode =
+  | "AUTH_ERROR"
+  | "VALIDATION_ERROR"
+  | "RATE_LIMITED"
+  | "TIMEOUT"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_ERROR";
+
 class HttpError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    public readonly code?: ErrorCode
   ) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+/**
+ * エラーをカテゴリ分類してクライアントに返却
+ */
+const categorizeError = (error: unknown): { code: ErrorCode; message: string; status: number; retryable: boolean } => {
+  if (error instanceof HttpError) {
+    // 認証エラー
+    if (error.status === 401) {
+      return { code: "AUTH_ERROR", message: "認証が必要です", status: 401, retryable: false };
+    }
+    // Rate Limit
+    if (error.status === 429) {
+      return { code: "RATE_LIMITED", message: "リクエスト制限を超えました。しばらく待ってから再試行してください", status: 429, retryable: true };
+    }
+    // バリデーションエラー
+    if (error.status === 400) {
+      return { code: "VALIDATION_ERROR", message: error.message, status: 400, retryable: false };
+    }
+    // サービス一時停止
+    if (error.status === 503) {
+      return { code: "SERVICE_UNAVAILABLE", message: "サービスが一時的に利用できません", status: 503, retryable: true };
+    }
+  }
+
+  // タイムアウト判定
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("aborted")) {
+      return { code: "TIMEOUT", message: "リクエストがタイムアウトしました。再試行してください", status: 504, retryable: true };
+    }
+    if (msg.includes("econnrefused") || msg.includes("fetch failed")) {
+      return { code: "SERVICE_UNAVAILABLE", message: "バックエンドサービスに接続できません", status: 503, retryable: true };
+    }
+  }
+
+  // その他内部エラー
+  return { code: "INTERNAL_ERROR", message: "予期しないエラーが発生しました", status: 500, retryable: false };
+};
 
 // DTOs for backend REST responses
 type GenerateAnswerResponseDto = {
@@ -139,13 +186,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(backendResponse);
   } catch (error) {
     console.error("[llm-generate][POST][error]", error);
-    if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
+    const categorized = categorizeError(error);
+    return NextResponse.json(
+      {
+        error: categorized.message,
+        code: categorized.code,
+        retryable: categorized.retryable,
+      },
+      { status: categorized.status }
+    );
   }
 }
 
