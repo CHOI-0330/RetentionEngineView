@@ -285,7 +285,7 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
   );
 
   const enqueueAssistantPreparation = useCallback(
-    (messagesWithUser: Message[], userMessageContent: string) => {
+    (messagesWithUser: Message[], userMessageContent: string): { prompt: Prompt } | { error: UseCaseFailure } | null => {
       const promptResult = buildPromptForConversationUseCase({
         user: currentUser,
         conversation,
@@ -294,28 +294,20 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         historyWindow,
       });
       if (promptResult.kind === "failure") {
-        mutateState((previous) => ({
-          ...previous,
-          error: promptResult.error,
-        }));
-        return null;
+        return { error: promptResult.error };
       }
       const beginResult = beginAssistantMessageUseCase({
         conversation,
         requester: currentUser,
       });
       if (beginResult.kind === "failure") {
-        mutateState((previous) => ({
-          ...previous,
-          error: beginResult.error,
-        }));
-        return null;
+        return { error: beginResult.error };
       }
       return {
         prompt: promptResult.value,
       };
     },
-    [conversation, currentUser, historyWindow, modelId, mutateState, runtimeId]
+    [conversation, currentUser, historyWindow]
   );
 
   const notifyUserMessagePersisted = useCallback(
@@ -391,13 +383,24 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
         if (index < 0) {
           return previous;
         }
+        // UseCaseで検証してからEffectを生成
+        const finalizeResult = finalizeAssistantMessageUseCase({
+          message: previous.messages[index],
+          finalText,
+        });
+        if (finalizeResult.kind === "failure") {
+          return { ...previous, error: finalizeResult.error };
+        }
+        const updatedMessages = [...previous.messages];
+        updatedMessages[index] = finalizeResult.value;
         return {
           ...previous,
+          messages: updatedMessages,
           pendingEffects: [
             ...previous.pendingEffects,
             createEffect({
               kind: "REQUEST_FINALIZE_ASSISTANT_MESSAGE",
-              payload: { msgId: activeId, finalText, sources },
+              payload: { msgId: finalizeResult.value.msgId, finalText: finalizeResult.value.content, sources },
             }),
           ],
         };
@@ -442,7 +445,12 @@ export const useStudentChatController = (params: UseStudentChatControllerParams)
       setState((previous) => {
         const messagesWithUser = sortMessagesAscending([...previous.messages]);
         const prep = enqueueAssistantPreparation(messagesWithUser, userMessage.content);
-        if (!prep) {
+        // エラーの場合はstateにエラーを設定
+        if (prep && "error" in prep) {
+          return { ...previous, error: prep.error };
+        }
+        // prep が null または prompt がない場合
+        if (!prep || !("prompt" in prep)) {
           return previous;
         }
         const beginEffect = createEffect({
