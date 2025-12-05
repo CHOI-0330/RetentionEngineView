@@ -6,20 +6,18 @@ import type {
   WebSearchConfirmation,
 } from "../interfaceAdapters/presenters/useStudentChatPresenter";
 import type { SearchSettings } from "../interfaceAdapters/gateways/api/StudentChatGateway";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card, CardContent } from "../components/ui/card";
 import {
   AlertTriangle,
   Loader2,
   MessageCircle,
-  Eye,
   Search,
   Globe,
   FileText,
   ChevronDown,
+  ChevronUp,
   Settings2,
 } from "lucide-react";
 import {
@@ -39,11 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../components/ui/collapsible";
 import { Textarea } from "../components/ui/textarea";
 import MarkdownRendererView from "../components/MarkdownRenderer";
 
@@ -95,12 +88,16 @@ const StudentChatView = ({
   searchSettings,
   pendingWebSearchConfirmation,
 }: StudentChatViewProps) => {
-  const feedbackByMessageId = viewModel.mentorFeedbacks.reduce<
-    Record<string, StudentChatViewModel["mentorFeedbacks"]>
-  >((acc, feedback) => {
-    acc[feedback.messageId] = [...(acc[feedback.messageId] ?? []), feedback];
-    return acc;
-  }, {});
+  const feedbackByMessageId = useMemo(
+    () =>
+      viewModel.mentorFeedbacks.reduce<
+        Record<string, StudentChatViewModel["mentorFeedbacks"]>
+      >((acc, feedback) => {
+        acc[feedback.messageId] = [...(acc[feedback.messageId] ?? []), feedback];
+        return acc;
+      }, {}),
+    [viewModel.mentorFeedbacks]
+  );
 
   const showConversationPicker =
     Boolean(onConversationChange) && (conversationOptions?.length ?? 0) > 1;
@@ -207,7 +204,14 @@ const StudentChatView = ({
               onClick={interactions.requestOlderMessages}
               disabled={!meta.hasMoreHistory || meta.isHistoryLoading}
               aria-label="過去メッセージを読み込む"
-            ></Button>
+            >
+              {meta.isHistoryLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <ChevronUp className="h-3 w-3 mr-1" />
+              )}
+              過去を読み込む
+            </Button>
           </div>
 
           <StudentChatMessageList
@@ -414,10 +418,10 @@ interface StudentChatMessageBubbleProps {
   feedbacks: StudentChatViewModel["mentorFeedbacks"];
 }
 
-const StudentChatMessageBubble = ({
+const StudentChatMessageBubble = memo(function StudentChatMessageBubble({
   message,
   feedbacks,
-}: StudentChatMessageBubbleProps) => {
+}: StudentChatMessageBubbleProps) {
   const isStudent = message.sender === "student";
   const hasFeedback = feedbacks.length > 0;
   const [isAIFeedbackOpen, setAIFeedbackOpen] = useState(false);
@@ -606,7 +610,7 @@ const StudentChatMessageBubble = ({
       </div>
     </div>
   );
-};
+});
 
 interface ChatComposerProps {
   containerRef?: RefObject<HTMLDivElement>;
@@ -791,205 +795,6 @@ const ChatComposer = ({
 };
 
 export default StudentChatView;
-
-function TypingDots() {
-  return (
-    <span className="inline-flex items-center gap-1 ml-1" aria-hidden="true">
-      <span
-        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{
-          animation: "typingDot 1s ease-in-out infinite",
-          animationDelay: "0ms",
-        }}
-      />
-      <span
-        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{
-          animation: "typingDot 1s ease-in-out infinite",
-          animationDelay: "200ms",
-        }}
-      />
-      <span
-        className="inline-block size-2.5 rounded-full bg-primary opacity-60"
-        style={{
-          animation: "typingDot 1s ease-in-out infinite",
-          animationDelay: "400ms",
-        }}
-      />
-      <style jsx>{`
-        @keyframes typingDot {
-          0%,
-          60%,
-          100% {
-            transform: translateY(0);
-            opacity: 0.6;
-          }
-          30% {
-            transform: translateY(-3px);
-            opacity: 1;
-          }
-        }
-      `}</style>
-    </span>
-  );
-}
-
-function FeedbackToggle({
-  feedbacks,
-  inline = false,
-  iconOnly = true,
-  fullRow = false,
-}: {
-  feedbacks: StudentChatViewModel["mentorFeedbacks"];
-  inline?: boolean;
-  iconOnly?: boolean;
-  fullRow?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        {fullRow ? (
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md px-2 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-            aria-expanded={open}
-          >
-            <span className="inline-flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" /> フィードバック{" "}
-              {feedbacks.length}件
-            </span>
-            <Eye className="h-4 w-4" />
-          </button>
-        ) : iconOnly ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={open ? "閉じる" : "フィードバックを確認"}
-          >
-            <Eye className="h-4 w-4" />
-            <span className="sr-only">
-              {open ? "閉じる" : "フィードバックを確認"}
-            </span>
-          </Button>
-        ) : (
-          <Button variant="ghost" size="sm" className="h-7 px-2">
-            {open ? "閉じる" : "確認"}
-          </Button>
-        )}
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2">
-        {inline ? (
-          <div className="space-y-3 text-base">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{feedbacks[0]?.authorName}</span>
-                <span>
-                  {feedbacks[0]?.timestamp.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-              <p className="leading-relaxed">{feedbacks[0]?.content}</p>
-              <Badge variant="secondary" className="text-xs capitalize">
-                {feedbacks[0]?.status}
-              </Badge>
-            </div>
-            {feedbacks.length > 1 ? (
-              <Collapsible>
-                <CollapsibleTrigger className="text-xs text-primary underline">
-                  さらに表示（{feedbacks.length - 1}）
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 space-y-2">
-                  {feedbacks.slice(1).map((fb) => (
-                    <div
-                      key={`${fb.id}-${fb.timestamp.toISOString()}`}
-                      className="rounded-md border bg-background p-3"
-                    >
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{fb.authorName}</span>
-                        <span>
-                          {fb.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <p className="mt-1 leading-relaxed">{fb.content}</p>
-                      <Badge
-                        variant="secondary"
-                        className="mt-1 text-xs capitalize"
-                      >
-                        {fb.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ) : null}
-          </div>
-        ) : (
-          <Card className="border-dashed bg-muted/30">
-            <CardContent className="space-y-3 p-4 text-base">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MessageCircle className="h-4 w-4" />
-                <span>メンターからのフィードバック</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{feedbacks[0]?.authorName}</span>
-                  <span>
-                    {feedbacks[0]?.timestamp.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-                <p className="leading-relaxed">{feedbacks[0]?.content}</p>
-                <Badge variant="secondary" className="text-xs capitalize">
-                  {feedbacks[0]?.status}
-                </Badge>
-              </div>
-              {feedbacks.length > 1 ? (
-                <Collapsible>
-                  <CollapsibleTrigger className="text-xs text-primary underline">
-                    さらに表示（{feedbacks.length - 1}）
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-2">
-                    {feedbacks.slice(1).map((fb) => (
-                      <div
-                        key={`${fb.id}-${fb.timestamp.toISOString()}`}
-                        className="rounded-md border bg-background p-3"
-                      >
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{fb.authorName}</span>
-                          <span>
-                            {fb.timestamp.toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                        <p className="mt-1 leading-relaxed">{fb.content}</p>
-                        <Badge
-                          variant="secondary"
-                          className="mt-1 text-xs capitalize"
-                        >
-                          {fb.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              ) : null}
-            </CardContent>
-          </Card>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 /**
  * ウェブ検索確認ボタン（チャット内に表示）
