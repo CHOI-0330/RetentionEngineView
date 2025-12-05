@@ -18,3 +18,5 @@ export type {
 } from "./useStudentChatGateway";
 
 export { useMentorDashboardGateway } from "./useMentorDashboardGateway";
+
+export { useStudentDashboardGateway } from "./useStudentDashboardGateway";

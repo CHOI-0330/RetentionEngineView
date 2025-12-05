@@ -101,5 +101,3 @@ dist/
 
 # OS-specific files
 .DS_Store
-
-.env.local
