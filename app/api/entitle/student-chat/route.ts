@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { mapFeedbackRow, mapMessageRow, type FeedbackRow, type MessageRow } from "../../../../src/interfaceAdapters/gateways/supabase/types";
+import {
+  mapFeedbackRow,
+  mapMessageRow,
+  type FeedbackRow,
+  type MessageRow,
+} from "../../../../src/interfaceAdapters/gateways/supabase/types";
 import type { User } from "../../../../src/domain/core";
 import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 type StudentChatAction =
@@ -40,17 +45,16 @@ type FeedbackDto = {
 };
 
 class HttpError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(public readonly status: number, message: string) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
 const MAX_MESSAGE_LENGTH = 4000;
-const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const BACKEND_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000"
+).replace(/\/$/, "");
 
 const getAdminClient = createAdminSupabaseClient;
 
@@ -59,13 +63,17 @@ const resolveAccessToken = (request: NextRequest): string | null => {
   const accessTokenFromHeader = headerToken?.toLowerCase().startsWith("bearer ")
     ? headerToken.slice(7).trim()
     : null;
-  const cookieAccessToken = request.cookies.get("auth_access_token")?.value ?? null;
-  const supabaseCookie = request.cookies.getAll().find((cookie) => cookie.name.includes("-auth-token"));
+  const cookieAccessToken =
+    request.cookies.get("auth_access_token")?.value ?? null;
+  const supabaseCookie = request.cookies
+    .getAll()
+    .find((cookie) => cookie.name.includes("-auth-token"));
   let supabaseAccessToken: string | null = null;
   if (supabaseCookie) {
     try {
       const parsed = JSON.parse(supabaseCookie.value);
-      supabaseAccessToken = typeof parsed?.access_token === "string" ? parsed.access_token : null;
+      supabaseAccessToken =
+        typeof parsed?.access_token === "string" ? parsed.access_token : null;
     } catch {
       supabaseAccessToken = null;
     }
@@ -111,18 +119,25 @@ const logRequest = (label: string, payload: unknown) => {
   console.log(`[student-chat][${label}]`, payload);
 };
 
-const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> => {
+const callBackend = async <T>(
+  path: string,
+  init?: RequestInit,
+  accessToken?: string
+): Promise<T> => {
   if (!BACKEND_BASE_URL) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   }
-  const response = await fetch(`${BACKEND_BASE_URL}/${path.replace(/^\//, "")}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  const response = await fetch(
+    `${BACKEND_BASE_URL}/${path.replace(/^\//, "")}`,
+    {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    }
+  );
   const raw = await response.text();
   if (!response.ok) {
     throw new HttpError(response.status, raw || "Backend request failed.");
@@ -133,7 +148,10 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   try {
     return JSON.parse(raw) as T;
   } catch {
-    throw new HttpError(response.status, raw || "Backend response parse failed.");
+    throw new HttpError(
+      response.status,
+      raw || "Backend response parse failed."
+    );
   }
 };
 
@@ -157,7 +175,9 @@ const mapApiFeedbackRow = (row: FeedbackDto): FeedbackRow => ({
   updated_at: row.updated_at ?? null,
 });
 
-const mapApiConversationRow = (row: ConversationDto): {
+const mapApiConversationRow = (
+  row: ConversationDto
+): {
   convId: string;
   ownerId: string;
   title: string;
@@ -183,8 +203,19 @@ const getConversationListByNewHire = (userId: string, accessToken: string) =>
     accessToken
   );
 
-const createConversationForNewHire = (input: { userId: string; title: string; role: User["role"]; displayName: string }, accessToken: string) =>
-  callBackend<{ data?: { conv_id: string; title: string; created_at: string } } | { conv_id: string; title: string; created_at: string }>(
+const createConversationForNewHire = (
+  input: {
+    userId: string;
+    title: string;
+    role: User["role"];
+    displayName: string;
+  },
+  accessToken: string
+) =>
+  callBackend<
+    | { data?: { conv_id: string; title: string; created_at: string } }
+    | { conv_id: string; title: string; created_at: string }
+  >(
     "/conversations/newHire",
     {
       method: "POST",
@@ -199,9 +230,14 @@ const createConversationForNewHire = (input: { userId: string; title: string; ro
     accessToken
   );
 
-const deleteConversationForNewHire = (input: { userId: string; convId: string }, accessToken: string) =>
+const deleteConversationForNewHire = (
+  input: { userId: string; convId: string },
+  accessToken: string
+) =>
   callBackend<void>(
-    `/conversations/newHire?userId=${encodeURIComponent(input.userId)}&convId=${encodeURIComponent(input.convId)}`,
+    `/conversations/newHire?userId=${encodeURIComponent(
+      input.userId
+    )}&convId=${encodeURIComponent(input.convId)}`,
     {
       method: "DELETE",
     },
@@ -215,7 +251,10 @@ const getMessages = (convId: string, accessToken: string) =>
     accessToken
   );
 
-const createMessage = (input: { convId: string; role: string; content: string }, accessToken: string) =>
+const createMessage = (
+  input: { convId: string; role: string; content: string },
+  accessToken: string
+) =>
   callBackend<{ data: MessageDto }>(
     "/messages",
     {
@@ -232,7 +271,10 @@ const getFeedbackByMessage = (messageId: string, accessToken: string) =>
     accessToken
   );
 
-const createFeedback = (input: { messageId: string; authorId: string; content: string }, accessToken: string) =>
+const createFeedback = (
+  input: { messageId: string; authorId: string; content: string },
+  accessToken: string
+) =>
   callBackend<{
     data: FeedbackDto;
   }>(
@@ -265,7 +307,10 @@ export async function POST(request: NextRequest) {
           throw new HttpError(400, "Message content must not be empty.");
         }
         if (trimmedContent.length > MAX_MESSAGE_LENGTH) {
-          throw new HttpError(400, "Message content exceeds the allowed length.");
+          throw new HttpError(
+            400,
+            "Message content exceeds the allowed length."
+          );
         }
 
         const backendResult = await createMessage(
@@ -280,7 +325,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ data: mapped });
       }
       case "beginAssistantMessage": {
-        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
+        return NextResponse.json(
+          { error: "Not implemented without Supabase." },
+          { status: 501 }
+        );
       }
       case "finalizeAssistantMessage": {
         const input = (payload ?? {}) as { convId?: string; content?: string };
@@ -306,20 +354,35 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ data: mapped });
       }
       case "cancelAssistantMessage": {
-        return NextResponse.json({ error: "Not implemented without Supabase." }, { status: 501 });
+        return NextResponse.json(
+          { error: "Not implemented without Supabase." },
+          { status: 501 }
+        );
       }
       case "listConversationMessages": {
-        const input = (payload ?? {}) as { convId?: string; cursor?: string; limit?: number };
+        const input = (payload ?? {}) as {
+          convId?: string;
+          cursor?: string;
+          limit?: number;
+        };
         if (!input.convId || typeof input.convId !== "string") {
           throw new HttpError(400, "convId is required.");
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
         const backendMessages = await getMessages(input.convId, accessToken);
-        const rows = (backendMessages.data ?? []).map(mapApiMessageRow).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id));
+        const rows = (backendMessages.data ?? [])
+          .map(mapApiMessageRow)
+          .sort(
+            (a, b) =>
+              a.created_at.localeCompare(b.created_at) ||
+              a.msg_id.localeCompare(b.msg_id)
+          );
 
         let filtered = rows;
         if (input.cursor) {
-          const cursorIndex = rows.findIndex((row) => row.msg_id === input.cursor);
+          const cursorIndex = rows.findIndex(
+            (row) => row.msg_id === input.cursor
+          );
           if (cursorIndex === -1) {
             throw new HttpError(404, "Cursor message not found.");
           }
@@ -327,18 +390,26 @@ export async function POST(request: NextRequest) {
         }
 
         const paged = filtered.slice(-pageSize);
-        const nextCursor = filtered.length > paged.length ? paged[0]?.msg_id : undefined;
+        const nextCursor =
+          filtered.length > paged.length ? paged[0]?.msg_id : undefined;
 
         const items = paged.map(mapMessageRow);
         return NextResponse.json({ data: { items, nextCursor } });
       }
       case "listFeedbacks": {
-        const input = (payload ?? {}) as { msgId?: string; cursor?: string; limit?: number };
+        const input = (payload ?? {}) as {
+          msgId?: string;
+          cursor?: string;
+          limit?: number;
+        };
         if (!input.msgId || typeof input.msgId !== "string") {
           throw new HttpError(400, "msgId is required.");
         }
         const pageSize = Math.min(Math.max(input.limit ?? 50, 1), 100);
-        const backendFeedbacks = await getFeedbackByMessage(input.msgId, accessToken);
+        const backendFeedbacks = await getFeedbackByMessage(
+          input.msgId,
+          accessToken
+        );
         const sorted = (backendFeedbacks.data ?? [])
           .map(mapApiFeedbackRow)
           .sort((a, b) => {
@@ -350,7 +421,9 @@ export async function POST(request: NextRequest) {
 
         let filtered = sorted;
         if (input.cursor) {
-          const cursorIndex = sorted.findIndex((row) => row.fb_id === input.cursor);
+          const cursorIndex = sorted.findIndex(
+            (row) => row.fb_id === input.cursor
+          );
           if (cursorIndex === -1) {
             throw new HttpError(404, "Cursor feedback not found.");
           }
@@ -358,20 +431,30 @@ export async function POST(request: NextRequest) {
         }
 
         const paged = filtered.slice(0, pageSize);
-        const nextCursor = paged.length === pageSize ? paged[paged.length - 1]?.fb_id : undefined;
+        const nextCursor =
+          paged.length === pageSize
+            ? paged[paged.length - 1]?.fb_id
+            : undefined;
 
         const items = paged.map(mapFeedbackRow);
-        const authorIds = Array.from(new Set(items.map((feedback) => feedback.authorId)));
+        const authorIds = Array.from(
+          new Set(items.map((feedback) => feedback.authorId))
+        );
         return NextResponse.json({
           data: {
             items,
             nextCursor,
-            authorNames: Object.fromEntries(authorIds.map((id) => [id, id] as const)),
+            authorNames: Object.fromEntries(
+              authorIds.map((id) => [id, id] as const)
+            ),
           },
         });
       }
       case "createFeedback": {
-        const input = (payload ?? {}) as { targetMsgId?: string; content?: string };
+        const input = (payload ?? {}) as {
+          targetMsgId?: string;
+          content?: string;
+        };
         if (!input.targetMsgId || typeof input.targetMsgId !== "string") {
           throw new HttpError(400, "targetMsgId is required.");
         }
@@ -403,7 +486,9 @@ export async function POST(request: NextRequest) {
           accessToken
         );
         const createdRow = (created as any)?.data ?? created;
-        const mapped = mapApiConversationRow(createdRow as { conv_id: string; title: string; created_at: string });
+        const mapped = mapApiConversationRow(
+          createdRow as { conv_id: string; title: string; created_at: string }
+        );
         mapped.ownerId = user.userId;
         return NextResponse.json({ data: mapped });
       }
@@ -427,7 +512,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[student-chat][POST][error]", error);
     if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -443,14 +531,23 @@ export async function GET(request: NextRequest) {
   try {
     const { accessToken, user: authUser } = await requireAuth(request);
     logRequest("GET", { convId: requestedConvId, userId: authUser.userId });
-    const convListResponse = await getConversationListByNewHire(authUser.userId, accessToken);
+    const convListResponse = await getConversationListByNewHire(
+      authUser.userId,
+      accessToken
+    );
 
-    type ConversationRow = { conv_id: string; title: string; created_at: string };
-    const convRows: ConversationRow[] = Array.isArray((convListResponse as any)?.data)
+    type ConversationRow = {
+      conv_id: string;
+      title: string;
+      created_at: string;
+    };
+    const convRows: ConversationRow[] = Array.isArray(
+      (convListResponse as any)?.data
+    )
       ? ((convListResponse as any).data as ConversationRow[])
       : Array.isArray(convListResponse)
-        ? (convListResponse as ConversationRow[])
-        : [];
+      ? (convListResponse as ConversationRow[])
+      : [];
 
     const conversations = convRows.map((row: ConversationRow) => {
       const mapped = mapApiConversationRow(row);
@@ -482,27 +579,49 @@ export async function GET(request: NextRequest) {
 
     let selectedConversation = conversations[0];
     if (requestedConvId) {
-      const matched = conversations.find((conv) => conv.convId === requestedConvId);
+      const matched = conversations.find(
+        (conv) => conv.convId === requestedConvId
+      );
       if (matched) {
         selectedConversation = matched;
       }
     }
 
-    const messagesResponse = await getMessages(selectedConversation.convId, accessToken);
+    const messagesResponse = await getMessages(
+      selectedConversation.convId,
+      accessToken
+    );
     const initialMessages = (messagesResponse.data ?? [])
       .map(mapApiMessageRow)
-      .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.msg_id.localeCompare(b.msg_id))
+      .sort(
+        (a, b) =>
+          a.created_at.localeCompare(b.created_at) ||
+          a.msg_id.localeCompare(b.msg_id)
+      )
       .map(mapMessageRow);
 
-    const feedbackByMessageId: Record<string, ReturnType<typeof mapFeedbackRow>[]> = {};
+    const feedbackByMessageId: Record<
+      string,
+      ReturnType<typeof mapFeedbackRow>[]
+    > = {};
     const authorIds = new Set<string>();
 
-    for (const msg of initialMessages) {
-      const feedbackResponse = await getFeedbackByMessage(msg.msgId, accessToken);
-      const mapped = (feedbackResponse.data ?? []).map(mapApiFeedbackRow).map(mapFeedbackRow);
-      if (mapped.length) {
-        feedbackByMessageId[msg.msgId] = mapped;
-        mapped.forEach((item) => authorIds.add(item.authorId));
+    const feedbackPromises = initialMessages.map(async (msg) => {
+      const feedbackResponse = await getFeedbackByMessage(
+        msg.msgId,
+        accessToken
+      );
+      const mapped = (feedbackResponse.data ?? [])
+        .map(mapApiFeedbackRow)
+        .map(mapFeedbackRow);
+      return { msgId: msg.msgId, feedbacks: mapped };
+    });
+
+    const feedbackResults = await Promise.all(feedbackPromises);
+    for (const { msgId, feedbacks } of feedbackResults) {
+      if (feedbacks.length) {
+        feedbackByMessageId[msgId] = feedbacks;
+        feedbacks.forEach((item) => authorIds.add(item.authorId));
       }
     }
 
@@ -519,7 +638,9 @@ export async function GET(request: NextRequest) {
         },
         initialMessages,
         initialFeedbacks: feedbackByMessageId,
-        authorNames: Object.fromEntries(Array.from(authorIds).map((id) => [id, id] as const)),
+        authorNames: Object.fromEntries(
+          Array.from(authorIds).map((id) => [id, id] as const)
+        ),
         mentorAssignments: [],
         availableConversations: conversations.map((conv) => ({
           convId: conv.convId,
@@ -532,7 +653,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[student-chat][GET][error]", error);
     if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
