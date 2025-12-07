@@ -23,6 +23,13 @@ export async function POST(request: NextRequest) {
     role?: string;
   };
 
+  console.log("[register] Received payload:", {
+    email: payload.email,
+    displayName: payload.displayName,
+    role: payload.role,
+    hasPassword: !!payload.password,
+  });
+
   const result = registerUserUseCase({
     email: payload.email ?? "",
     password: payload.password ?? "",
@@ -53,6 +60,9 @@ export async function POST(request: NextRequest) {
       email: result.value.email,
       password: result.value.password,
       email_confirm: true,
+      user_metadata: {
+        display_name: result.value.displayName,
+      },
     });
 
     if (error) {
@@ -70,19 +80,24 @@ export async function POST(request: NextRequest) {
     const userId = data.user.id;
 
     // 3. user テーブルに upsert (競合時は更新)
+    const upsertData = {
+      user_id: userId,
+      display_name: result.value.displayName,
+      email: result.value.email,
+      role: result.value.role,
+    };
+    console.log("[register] Upserting to user table:", upsertData);
+
     const { error: upsertError } = await adminClient.from("user").upsert(
-      {
-        user_id: userId,
-        display_name: result.value.displayName,
-        email: result.value.email,
-        role: result.value.role,
-      },
+      upsertData,
       { onConflict: "user_id" }
     );
 
     if (upsertError) {
+      console.error("[register] Upsert error:", upsertError);
       throw new HttpError(500, upsertError.message ?? "Failed to persist user profile.");
     }
+    console.log("[register] Upsert successful");
 
     return NextResponse.json({ data: { userId } });
   } catch (error) {
