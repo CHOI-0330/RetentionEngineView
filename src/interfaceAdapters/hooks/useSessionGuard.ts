@@ -3,9 +3,9 @@
 import { useSession } from "../../components/SessionProvider";
 
 /**
- * 세션 및 권한 체크를 위한 공통 훅
+ * セッション及び権限チェック用の共通フック
  *
- * 여러 Page에서 중복되던 세션/권한 체크 로직을 통합합니다.
+ * 複数のPageで重複していたセッション/権限チェックロジックを統合します。
  *
  * @example
  * ```tsx
@@ -15,7 +15,7 @@ import { useSession } from "../../components/SessionProvider";
  * if (state === "unauthenticated") return <LoginPrompt />;
  * if (state === "unauthorized") return <UnauthorizedMessage role={session?.role} />;
  *
- * // state === "authenticated" - 정상 렌더링
+ * // state === "authenticated" - 正常レンダリング
  * return <MainContent session={session} />;
  * ```
  */
@@ -42,12 +42,12 @@ export interface SessionGuardResult {
 
 export interface UseSessionGuardOptions {
   /**
-   * 필요한 역할. 지정하지 않으면 로그인만 확인
+   * 必要なロール。指定しなければログインのみ確認
    */
   requiredRole?: UserRole;
 
   /**
-   * 여러 역할 중 하나라도 해당하면 허용
+   * 複数ロールのいずれかに該当すれば許可
    */
   allowedRoles?: UserRole[];
 }
@@ -58,17 +58,17 @@ export function useSessionGuard(
   const { session, isLoading } = useSession();
   const { requiredRole, allowedRoles } = options;
 
-  // 로딩 중
+  // ローディング中
   if (isLoading) {
     return { state: "loading", session: null, isLoading: true };
   }
 
-  // 미인증
+  // 未認証
   if (!session) {
     return { state: "unauthenticated", session: null, isLoading: false };
   }
 
-  // 역할 체크
+  // ロールチェック
   if (requiredRole && session.role !== requiredRole) {
     return { state: "unauthorized", session, isLoading: false };
   }
@@ -79,12 +79,12 @@ export function useSessionGuard(
     }
   }
 
-  // 인증됨
+  // 認証済み
   return { state: "authenticated", session, isLoading: false };
 }
 
 /**
- * 세션 가드 상태에 따른 UI 렌더링 헬퍼
+ * セッションガード状態に応じたUIレンダリングヘルパー
  */
 export interface SessionGuardMessages {
   loading?: string;

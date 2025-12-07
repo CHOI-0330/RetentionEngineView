@@ -1,9 +1,4 @@
-import type {
-  MentorDashboardPresenterInteractions,
-  MentorDashboardPresenterMeta,
-  MentorDashboardPresenterStatus,
-  MentorDashboardPresenterViewModel,
-} from "../interfaceAdapters/presenters/useMentorDashboardPresenter";
+import type { UseCaseFailure } from "../application/entitle/models";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -11,6 +6,10 @@ import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Loader2, Search } from "lucide-react";
 import Link from "next/link";
+
+// ============================================
+// 型定義
+// ============================================
 
 export interface MentorDashboardStudentItem {
   id: string;
@@ -27,6 +26,29 @@ export interface MentorDashboardStudentItem {
   };
   totalChats: number;
   conversationId: string;
+}
+
+export interface MentorDashboardPresenterViewModel {
+  students: MentorDashboardStudentItem[];
+  searchQuery: string;
+  onChangeSearch: (value: string) => void;
+}
+
+export interface MentorDashboardPresenterStatus {
+  isLoading: boolean;
+  error: UseCaseFailure | null;
+}
+
+export interface MentorDashboardPresenterMeta {
+  qualitySubmitting: Record<string, boolean>;
+  selectedStudentId: string | null | undefined;
+}
+
+export interface MentorDashboardPresenterInteractions {
+  requestRefresh: () => void;
+  acknowledgeEffect: (effectId: string) => void;
+  clearError: () => void;
+  selectStudent: (studentId: string | null) => void;
 }
 
 interface MentorDashboardViewProps {

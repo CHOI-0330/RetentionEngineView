@@ -1,164 +1,533 @@
-import { useMemo } from "react";
+/**
+ * StudentChat Presenter V2
+ *
+ * 新アーキテクチャ：React Hook（React依存層）
+ * - Factory経由でServiceを生成
+ * - React状態管理
+ * - ViewModelをViewに提供
+ */
 
-import type { Feedback, Message, MessageSources } from "../../domain/core";
+import { useState, useEffect, useMemo, useCallback } from "react";
+
+import type { User, Conversation, Message, Feedback, MentorAssignment } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
-import type { SearchSettings } from "../gateways/api/StudentChatGateway";
+import type { StudentChatBootstrap, SearchSettings } from "../gateways/api/types";
+import {
+  createStudentChatService,
+} from "../../application/entitle/factories/StudentChatFactory";
 import type {
-  StudentChatController,
-  StudentChatControllerEffect,
-} from "../controllers/useStudentChatController";
+  StudentChatViewModel,
+  MessageViewModel,
+} from "../services/StudentChatService";
 
-export type StudentChatMessageSender = "student" | "ai";
+// ============================================
+// 状態型定義
+// ============================================
 
-export interface StudentChatMessageView {
-  id: string;
-  content: string;
-  format: "markdown" | "text";
-  sender: StudentChatMessageSender;
-  timestamp: Date;
-  status?: Message["status"];
-  sources?: MessageSources;
-}
-
-export interface StudentChatFeedbackView {
-  id: string;
-  messageId: string;
-  content: string;
-  authorName: string;
-  timestamp: Date;
-  status: "pending" | "reviewed" | "applied";
-}
-
-export interface StudentChatViewModel {
-  messages: StudentChatMessageView[];
-  mentorFeedbacks: StudentChatFeedbackView[];
-  newMessage: string;
-  onChangeNewMessage: (value: string) => void;
-  onSend: () => void;
-}
-
-export interface StudentChatPresenterStatus {
+interface PresenterState {
+  bootstrap: StudentChatBootstrap | null;
+  activeConversationId: string | null;
+  isLoading: boolean;
+  error: UseCaseFailure | null;
+  // メッセージ送信状態
   isSending: boolean;
   isAwaitingAssistant: boolean;
-  error: UseCaseFailure | null;
+  newMessage: string;
+  // 検索設定
+  searchSettings: SearchSettings;
+  // フィードバック状態
+  feedbacks: Record<string, Feedback[]>; // msgId -> Feedback[]
+  feedbackLoading: Record<string, boolean>; // msgId -> loading
+  feedbackInput: Record<string, string>; // msgId -> input text
+  feedbackSubmitting: Record<string, boolean>; // msgId -> submitting
 }
 
-export interface StudentChatPresenterMeta {
-  canSend: boolean;
-  hasMoreHistory: boolean;
-  isHistoryLoading: boolean;
+// ============================================
+// Props型定義
+// ============================================
+
+interface UseStudentChatPresenterProps {
+  accessToken?: string;
+  userId?: string;
+  role?: User["role"];
+  initialConvId?: string;
 }
 
-export interface StudentChatPresenterInteractions {
-  acknowledgeEffect: (effectId: string) => void;
-  requestOlderMessages: () => void;
-  requestFeedbackForMessage: (msgId: string) => void;
-  applyFeedbackForMessage: (msgId: string, feedbacks: Feedback[], authorNames?: Record<string, string>) => void;
-  requestCreateFeedback: (content: string, message: Message) => void;
-  clearError: () => void;
-  reportExternalFailure: (error: UseCaseFailure) => void;
-  // Hybrid RAG 設定
-  setSearchSettings: (settings: Partial<SearchSettings>) => void;
-  // ウェブ検索確認
-  confirmWebSearch: () => void;
-  cancelWebSearch: () => void;
-}
-
-export interface WebSearchConfirmation {
-  question: string;
-  reason: string;
-  labels?: {
-    confirm: string;
-    cancel: string;
-  };
-}
+// ============================================
+// Output型定義
+// ============================================
 
 export interface StudentChatPresenterOutput {
-  viewModel: StudentChatViewModel;
-  pendingEffects: StudentChatControllerEffect[];
-  status: StudentChatPresenterStatus;
-  meta: StudentChatPresenterMeta;
-  interactions: StudentChatPresenterInteractions;
-  // Hybrid RAG 状態
+  // ViewModel
+  viewModel: StudentChatViewModel | null;
+  // 状態
+  isLoading: boolean;
+  error: UseCaseFailure | null;
+  isSending: boolean;
+  isAwaitingAssistant: boolean;
+  newMessage: string;
+  // アクション
+  actions: {
+    // メッセージ
+    setNewMessage: (value: string) => void;
+    sendMessage: () => Promise<void>;
+    // 会話
+    selectConversation: (convId: string) => Promise<void>;
+    createConversation: (title: string) => Promise<void>;
+    deleteConversation: (convId: string) => Promise<void>;
+    // エラー
+    clearError: () => void;
+    // リロード
+    reload: () => Promise<void>;
+  };
+  // 検索設定
   searchSettings: SearchSettings;
-  pendingWebSearchConfirmation: WebSearchConfirmation | null;
+  setSearchSettings: (settings: Partial<SearchSettings>) => void;
+  // フィードバック
+  feedback: {
+    feedbacks: Record<string, Feedback[]>;
+    isLoading: (msgId: string) => boolean;
+    isSubmitting: (msgId: string) => boolean;
+    getInput: (msgId: string) => string;
+    setInput: (msgId: string, value: string) => void;
+    loadFeedbacks: (msgId: string) => Promise<void>;
+    submitFeedback: (msgId: string) => Promise<void>;
+  };
 }
 
-const toMessageView = (message: Message): StudentChatMessageView => ({
-  id: message.msgId,
-  content: message.content,
-  format: message.role === "ASSISTANT" ? "markdown" : "text",
-  sender: message.role === "ASSISTANT" ? "ai" : "student",
-  timestamp: new Date(message.createdAt),
-  status: message.role === "ASSISTANT" ? message.status ?? "DONE" : message.status,
-  sources: message.sources,
-});
+// ============================================
+// 初期状態
+// ============================================
 
-const toFeedbackView = (
-  feedback: Feedback,
-  authorName: string
-): StudentChatFeedbackView => ({
-  id: feedback.fbId,
-  messageId: feedback.targetMsgId,
-  content: feedback.content,
-  authorName,
-  timestamp: new Date(feedback.createdAt),
-  status: feedback.visibility === "ALL" ? "applied" : "reviewed",
-});
+const initialState: PresenterState = {
+  bootstrap: null,
+  activeConversationId: null,
+  isLoading: true,
+  error: null,
+  isSending: false,
+  isAwaitingAssistant: false,
+  newMessage: "",
+  searchSettings: {
+    enableFileSearch: true,
+    allowWebSearch: false,
+    executeWebSearch: false,
+  },
+  feedbacks: {},
+  feedbackLoading: {},
+  feedbackInput: {},
+  feedbackSubmitting: {},
+};
 
-export const useStudentChatPresenter = (controller: StudentChatController): StudentChatPresenterOutput => {
-  const { state, actions } = controller;
+// ============================================
+// Presenter Hook
+// ============================================
 
-  const messages = useMemo(() => state.messages.map(toMessageView), [state.messages]);
+export function useStudentChatPresenter(
+  props: UseStudentChatPresenterProps
+): StudentChatPresenterOutput {
+  const { accessToken, userId, role, initialConvId } = props;
 
-  const mentorFeedbacks = useMemo(() => {
-    const items: StudentChatFeedbackView[] = [];
-    for (const [, feedbacks] of Object.entries(state.feedbackByMessageId)) {
-      for (const feedback of feedbacks) {
-        const authorName = state.authorNames[feedback.authorId] ?? feedback.authorId;
-        items.push(toFeedbackView(feedback, authorName));
+  // Service生成（Factory使用）
+  const service = useMemo(
+    () => createStudentChatService({ accessToken }),
+    [accessToken]
+  );
+
+  // 状態
+  const [state, setState] = useState<PresenterState>(initialState);
+
+  // リクエスター情報
+  const requester = useMemo(() => {
+    if (!userId || !role) return null;
+    return { userId, role };
+  }, [userId, role]);
+
+  // ============================================
+  // 初期データロード
+  // ============================================
+
+  const loadInitialData = useCallback(
+    async (convId?: string) => {
+      if (!requester) {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: { kind: "ValidationError", message: "ログインしてください。" },
+        }));
+        return;
       }
+
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      const result = await service.fetchInitialData(requester, convId);
+
+      if (result.kind === "failure") {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: result.error,
+        }));
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        bootstrap: result.value,
+        activeConversationId: result.value.conversation?.convId ?? null,
+        isLoading: false,
+        error: null,
+      }));
+    },
+    [requester, service]
+  );
+
+  // 初回ロード
+  useEffect(() => {
+    if (requester) {
+      void loadInitialData(initialConvId);
     }
-    return items;
-  }, [state.authorNames, state.feedbackByMessageId]);
+  }, [requester, initialConvId, loadInitialData]);
 
-  // meta 計算 (条件ロジックがあるためuseMemo維持)
-  const meta = useMemo<StudentChatPresenterMeta>(() => {
-    const hasMoreHistory = Boolean(state.nextCursor);
-    const isHistoryLoading = state.pendingEffects.some((effect) => effect.kind === "REQUEST_LIST_MESSAGES");
-    const canSend = state.newMessage.trim().length > 0 && !state.isSending && !state.isAwaitingAssistant;
-    return { canSend, hasMoreHistory, isHistoryLoading };
-  }, [state.nextCursor, state.pendingEffects, state.newMessage, state.isAwaitingAssistant, state.isSending]);
+  // ============================================
+  // アクション
+  // ============================================
 
-  // シンプルなオブジェクトは直接返却
+  const setNewMessage = useCallback((value: string) => {
+    setState((prev) => ({ ...prev, newMessage: value }));
+  }, []);
+
+  const sendMessage = useCallback(async () => {
+    const { bootstrap, newMessage, searchSettings } = state;
+    if (!bootstrap?.conversation || !bootstrap.currentUser || !newMessage.trim()) {
+      return;
+    }
+
+    const questionText = newMessage.trim();
+    setState((prev) => ({ ...prev, isSending: true, error: null }));
+
+    // 1. ユーザーメッセージ送信
+    const result = await service.sendMessage(
+      bootstrap.currentUser,
+      bootstrap.conversation,
+      questionText
+    );
+
+    if (result.kind === "failure") {
+      setState((prev) => ({
+        ...prev,
+        isSending: false,
+        error: result.error,
+      }));
+      return;
+    }
+
+    // ユーザーメッセージをローカル状態に追加（リロードなし）
+    setState((prev) => {
+      if (!prev.bootstrap) return prev;
+      return {
+        ...prev,
+        newMessage: "",
+        isSending: false,
+        isAwaitingAssistant: true,
+        bootstrap: {
+          ...prev.bootstrap,
+          initialMessages: [
+            ...prev.bootstrap.initialMessages,
+            result.value,
+          ],
+        },
+      };
+    });
+
+    // 2. LLM応答生成
+    const llmResult = await service.generateLLMResponse(
+      bootstrap.currentUser,
+      bootstrap.conversation,
+      questionText,
+      searchSettings
+    );
+
+    if (llmResult.kind === "failure") {
+      setState((prev) => ({
+        ...prev,
+        isAwaitingAssistant: false,
+        error: llmResult.error,
+      }));
+      return;
+    }
+
+    // 3. アシスタントメッセージ保存
+    const beginResult = await service.beginAssistantMessage(
+      bootstrap.conversation,
+      bootstrap.currentUser
+    );
+
+    if (beginResult.kind === "failure") {
+      setState((prev) => ({
+        ...prev,
+        isAwaitingAssistant: false,
+        error: beginResult.error,
+      }));
+      return;
+    }
+
+    const finalizeResult = await service.finalizeAssistantMessage(
+      beginResult.value,
+      llmResult.value.answer
+    );
+
+    // アシスタントメッセージをローカル状態に追加（リロードなし）
+    setState((prev) => {
+      if (!prev.bootstrap) return prev;
+      const assistantMessage = finalizeResult.kind === "success"
+        ? finalizeResult.value
+        : { ...beginResult.value, content: llmResult.value.answer, status: "DONE" as const };
+
+      return {
+        ...prev,
+        isAwaitingAssistant: false,
+        bootstrap: {
+          ...prev.bootstrap,
+          initialMessages: [
+            ...prev.bootstrap.initialMessages,
+            assistantMessage,
+          ],
+        },
+      };
+    });
+  }, [state, service]);
+
+  const selectConversation = useCallback(
+    async (convId: string) => {
+      setState((prev) => ({ ...prev, activeConversationId: convId }));
+      await loadInitialData(convId);
+    },
+    [loadInitialData]
+  );
+
+  const createConversation = useCallback(
+    async (title: string) => {
+      if (!requester) return;
+
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      const result = await service.createConversation(requester, title);
+
+      if (result.kind === "failure") {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: result.error,
+        }));
+        return;
+      }
+
+      await loadInitialData(result.value.convId);
+    },
+    [requester, service, loadInitialData]
+  );
+
+  const deleteConversation = useCallback(
+    async (convId: string) => {
+      if (!requester || !state.bootstrap) return;
+
+      const conversation = state.bootstrap.conversation?.convId === convId
+        ? state.bootstrap.conversation
+        : {
+            convId,
+            ownerId: requester.userId,
+            title: "",
+            state: "ACTIVE" as const,
+            createdAt: "",
+            lastActiveAt: "",
+          };
+
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      const result = await service.deleteConversation(requester, conversation);
+
+      if (result.kind === "failure") {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: result.error,
+        }));
+        return;
+      }
+
+      await loadInitialData();
+    },
+    [requester, state.bootstrap, service, loadInitialData]
+  );
+
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
+
+  const reload = useCallback(async () => {
+    await loadInitialData(state.activeConversationId ?? undefined);
+  }, [loadInitialData, state.activeConversationId]);
+
+  const setSearchSettings = useCallback((settings: Partial<SearchSettings>) => {
+    setState((prev) => ({
+      ...prev,
+      searchSettings: { ...prev.searchSettings, ...settings },
+    }));
+  }, []);
+
+  // ============================================
+  // フィードバック操作
+  // ============================================
+
+  const isFeedbackLoading = useCallback(
+    (msgId: string) => state.feedbackLoading[msgId] ?? false,
+    [state.feedbackLoading]
+  );
+
+  const isFeedbackSubmitting = useCallback(
+    (msgId: string) => state.feedbackSubmitting[msgId] ?? false,
+    [state.feedbackSubmitting]
+  );
+
+  const getFeedbackInput = useCallback(
+    (msgId: string) => state.feedbackInput[msgId] ?? "",
+    [state.feedbackInput]
+  );
+
+  const setFeedbackInput = useCallback((msgId: string, value: string) => {
+    setState((prev) => ({
+      ...prev,
+      feedbackInput: { ...prev.feedbackInput, [msgId]: value },
+    }));
+  }, []);
+
+  const loadFeedbacks = useCallback(
+    async (msgId: string) => {
+      const { bootstrap } = state;
+      if (!bootstrap?.currentUser || !bootstrap.conversation) return;
+
+      // 対象メッセージを取得
+      const targetMessage = bootstrap.initialMessages.find((m) => m.msgId === msgId);
+      if (!targetMessage) return;
+
+      setState((prev) => ({
+        ...prev,
+        feedbackLoading: { ...prev.feedbackLoading, [msgId]: true },
+      }));
+
+      const result = await service.listFeedbacks(
+        bootstrap.currentUser,
+        bootstrap.conversation,
+        targetMessage,
+        bootstrap.mentorAssignments
+      );
+
+      if (result.kind === "failure") {
+        setState((prev) => ({
+          ...prev,
+          feedbackLoading: { ...prev.feedbackLoading, [msgId]: false },
+          error: result.error,
+        }));
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        feedbackLoading: { ...prev.feedbackLoading, [msgId]: false },
+        feedbacks: { ...prev.feedbacks, [msgId]: result.value.items },
+      }));
+    },
+    [state, service]
+  );
+
+  const submitFeedback = useCallback(
+    async (msgId: string) => {
+      const { bootstrap, feedbackInput, feedbacks } = state;
+      const content = feedbackInput[msgId]?.trim();
+      if (!bootstrap?.currentUser || !bootstrap.conversation || !content) return;
+
+      // 対象メッセージを取得
+      const targetMessage = bootstrap.initialMessages.find((m) => m.msgId === msgId);
+      if (!targetMessage) return;
+
+      setState((prev) => ({
+        ...prev,
+        feedbackSubmitting: { ...prev.feedbackSubmitting, [msgId]: true },
+      }));
+
+      const existingCount = feedbacks[msgId]?.length ?? 0;
+
+      const result = await service.createFeedback(
+        bootstrap.currentUser,
+        bootstrap.conversation,
+        targetMessage,
+        content,
+        bootstrap.mentorAssignments,
+        existingCount
+      );
+
+      if (result.kind === "failure") {
+        setState((prev) => ({
+          ...prev,
+          feedbackSubmitting: { ...prev.feedbackSubmitting, [msgId]: false },
+          error: result.error,
+        }));
+        return;
+      }
+
+      // フィードバックをローカル状態に追加
+      setState((prev) => ({
+        ...prev,
+        feedbackSubmitting: { ...prev.feedbackSubmitting, [msgId]: false },
+        feedbackInput: { ...prev.feedbackInput, [msgId]: "" },
+        feedbacks: {
+          ...prev.feedbacks,
+          [msgId]: [...(prev.feedbacks[msgId] ?? []), result.value],
+        },
+      }));
+    },
+    [state, service]
+  );
+
+  // ============================================
+  // ViewModel生成
+  // ============================================
+
+  const viewModel = useMemo(() => {
+    if (!state.bootstrap) return null;
+    return service.toViewModel(state.bootstrap, state.activeConversationId ?? undefined);
+  }, [service, state.bootstrap, state.activeConversationId]);
+
+  // ============================================
+  // 返却
+  // ============================================
+
   return {
-    viewModel: {
-      messages,
-      mentorFeedbacks,
-      newMessage: state.newMessage,
-      onChangeNewMessage: actions.setNewMessage,
-      onSend: actions.sendMessage,
-    },
-    pendingEffects: state.pendingEffects,
-    status: {
-      isSending: state.isSending,
-      isAwaitingAssistant: state.isAwaitingAssistant,
-      error: state.error,
-    },
-    meta,
-    interactions: {
-      acknowledgeEffect: actions.acknowledgeEffect,
-      requestOlderMessages: actions.requestOlderMessages,
-      requestFeedbackForMessage: actions.requestFeedbackForMessage,
-      applyFeedbackForMessage: actions.applyFeedbackForMessage,
-      requestCreateFeedback: actions.requestCreateFeedback,
-      clearError: actions.clearError,
-      reportExternalFailure: actions.reportExternalFailure,
-      setSearchSettings: actions.setSearchSettings,
-      confirmWebSearch: actions.confirmWebSearch,
-      cancelWebSearch: actions.cancelWebSearch,
+    viewModel,
+    isLoading: state.isLoading,
+    error: state.error,
+    isSending: state.isSending,
+    isAwaitingAssistant: state.isAwaitingAssistant,
+    newMessage: state.newMessage,
+    actions: {
+      setNewMessage,
+      sendMessage,
+      selectConversation,
+      createConversation,
+      deleteConversation,
+      clearError,
+      reload,
     },
     searchSettings: state.searchSettings,
-    pendingWebSearchConfirmation: state.pendingWebSearchConfirmation ?? null,
+    setSearchSettings,
+    feedback: {
+      feedbacks: state.feedbacks,
+      isLoading: isFeedbackLoading,
+      isSubmitting: isFeedbackSubmitting,
+      getInput: getFeedbackInput,
+      setInput: setFeedbackInput,
+      loadFeedbacks,
+      submitFeedback,
+    },
   };
-};
+}

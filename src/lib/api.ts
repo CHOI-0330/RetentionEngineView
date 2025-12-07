@@ -1,8 +1,8 @@
 /**
- * 공통 API 유틸리티
- * - 중복된 fetch/JSON 파싱 로직 통합
- * - 간단한 요청 캐싱 지원
- * - 에러 핸들링 표준화
+ * 共通APIユーティリティ
+ * - 重複したfetch/JSONパースロジック統合
+ * - シンプルなリクエストキャッシング対応
+ * - エラーハンドリング標準化
  */
 
 export interface ApiResponse<T> {
@@ -18,20 +18,20 @@ export interface ApiError {
 
 export type ApiResult<T> = ApiResponse<T> | ApiError;
 
-// 간단한 인메모리 캐시
+// シンプルなインメモリキャッシュ
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
 }
 
 const cache = new Map<string, CacheEntry<unknown>>();
-const DEFAULT_CACHE_TTL = 30 * 1000; // 30초
+const DEFAULT_CACHE_TTL = 30 * 1000; // 30秒
 
-// 진행 중인 요청 추적 (중복 요청 방지)
+// 進行中のリクエスト追跡（重複リクエスト防止）
 const pendingRequests = new Map<string, Promise<unknown>>();
 
 /**
- * 캐시에서 데이터 조회
+ * キャッシュからデータ取得
  */
 function getFromCache<T>(key: string, ttl: number): T | null {
   const entry = cache.get(key);
@@ -47,7 +47,7 @@ function getFromCache<T>(key: string, ttl: number): T | null {
 }
 
 /**
- * 캐시에 데이터 저장
+ * キャッシュにデータ保存
  */
 function setToCache<T>(key: string, data: T): void {
   cache.set(key, {
@@ -57,7 +57,7 @@ function setToCache<T>(key: string, data: T): void {
 }
 
 /**
- * 특정 패턴의 캐시 무효화
+ * 特定パターンのキャッシュ無効化
  */
 export function invalidateCache(pattern?: string | RegExp): void {
   if (!pattern) {
@@ -76,22 +76,22 @@ export function invalidateCache(pattern?: string | RegExp): void {
 export interface FetchOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
   /**
-   * 캐시 TTL (밀리초). 0이면 캐시 비활성화
-   * GET 요청에만 적용됨
+   * キャッシュTTL（ミリ秒）。0ならキャッシュ無効化
+   * GETリクエストにのみ適用
    */
   cacheTtl?: number;
   /**
-   * 인증 토큰
+   * 認証トークン
    */
   accessToken?: string;
 }
 
 /**
- * 표준화된 API fetch 함수
- * - JSON 파싱 자동 처리
- * - 에러 핸들링 표준화
- * - GET 요청 캐싱 지원
- * - 중복 요청 방지 (동일 요청 진행 중이면 대기)
+ * 標準化されたAPI fetch関数
+ * - JSONパース自動処理
+ * - エラーハンドリング標準化
+ * - GETリクエストキャッシング対応
+ * - 重複リクエスト防止（同一リクエスト進行中なら待機）
  */
 export async function apiFetch<T>(
   url: string,
@@ -109,7 +109,7 @@ export async function apiFetch<T>(
   const isGet = method.toUpperCase() === "GET";
   const cacheKey = `${method}:${url}`;
 
-  // GET 요청이고 캐시가 활성화된 경우, 캐시 확인
+  // GETリクエストでキャッシュが有効な場合、キャッシュ確認
   if (isGet && cacheTtl > 0) {
     const cached = getFromCache<T>(cacheKey, cacheTtl);
     if (cached !== null) {
@@ -117,13 +117,13 @@ export async function apiFetch<T>(
     }
   }
 
-  // 동일한 요청이 진행 중이면 대기
+  // 同一リクエストが進行中なら待機
   if (isGet && pendingRequests.has(cacheKey)) {
     try {
       const result = await pendingRequests.get(cacheKey);
       return result as ApiResult<T>;
     } catch {
-      // 기존 요청이 실패한 경우 새로 시도
+      // 既存リクエストが失敗した場合、新規試行
     }
   }
 
@@ -175,7 +175,7 @@ export async function apiFetch<T>(
 
       const data = (json as { data?: T })?.data ?? (json as T);
 
-      // GET 요청이고 캐시가 활성화된 경우, 캐시에 저장
+      // GETリクエストでキャッシュが有効な場合、キャッシュに保存
       if (isGet && cacheTtl > 0) {
         setToCache(cacheKey, data);
       }
@@ -192,7 +192,7 @@ export async function apiFetch<T>(
     }
   })();
 
-  // GET 요청은 중복 요청 방지
+  // GETリクエストは重複リクエスト防止
   if (isGet) {
     pendingRequests.set(cacheKey, fetchPromise);
   }
@@ -201,7 +201,7 @@ export async function apiFetch<T>(
 }
 
 /**
- * 세션 데이터 타입
+ * セッションデータ型
  */
 export interface SessionData {
   accessToken: string;
@@ -211,15 +211,15 @@ export interface SessionData {
   displayName?: string;
 }
 
-// 세션 전용 캐시 키
+// セッション専用キャッシュキー
 const SESSION_CACHE_KEY = "session";
-const SESSION_CACHE_TTL = 60 * 1000; // 1분
+const SESSION_CACHE_TTL = 60 * 1000; // 1分
 
 /**
- * 세션 fetch (캐싱 + 중복 요청 방지)
+ * セッションfetch（キャッシング + 重複リクエスト防止）
  */
 export async function fetchSession(): Promise<SessionData | null> {
-  // 캐시 확인
+  // キャッシュ確認
   const cached = getFromCache<SessionData>(SESSION_CACHE_KEY, SESSION_CACHE_TTL);
   if (cached !== null) {
     return cached;
@@ -238,7 +238,7 @@ export async function fetchSession(): Promise<SessionData | null> {
 }
 
 /**
- * 세션 캐시 무효화 (로그인/로그아웃 후 호출)
+ * セッションキャッシュ無効化（ログイン/ログアウト後に呼び出し）
  */
 export function invalidateSessionCache(): void {
   cache.delete(`GET:/api/auth/session`);

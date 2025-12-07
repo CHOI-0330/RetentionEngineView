@@ -90,7 +90,7 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
   if (response.status === 204) {
     return undefined as T;
   }
-  // 빈 응답 처리
+  // 空レスポンス処理
   const text = await response.text();
   if (!text) {
     return undefined as T;

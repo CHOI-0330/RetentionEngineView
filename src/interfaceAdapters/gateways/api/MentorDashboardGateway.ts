@@ -1,12 +1,13 @@
 /**
  * MentorDashboard API Gateway
  *
- * MentorDashboardPort 인터페이스를 구현하여
- * Page에서 직접 API를 호출하는 대신 Gateway를 통해 호출하도록 합니다.
+ * MentorDashboardPortインターフェースを実装して
+ * Pageから直接APIを呼び出す代わりにGatewayを通じて呼び出すようにします。
  */
 
 import type { MentorDashboardPort, StudentSummary } from "../../../application/entitle/ports";
 import { apiFetch } from "../../../lib/api";
+import { createErrorFromStatus } from "../../errors";
 
 export interface MentorDashboardGatewayConfig {
   accessToken?: string;
@@ -42,7 +43,7 @@ export class MentorDashboardGateway implements MentorDashboardPort {
   }
 
   /**
-   * 멘토가 담당하는 학생들의 요약 정보 조회
+   * メンターが担当する学生たちの要約情報照会
    */
   async listStudentSummaries(_input: { mentorId: string }): Promise<StudentSummary[]> {
     const result = await apiFetch<MentorApiConversation[]>("/api/entitle/mentor", {
@@ -52,10 +53,10 @@ export class MentorDashboardGateway implements MentorDashboardPort {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
 
-    // apiFetch가 이미 data를 추출하므로 result.data가 배열
+    // apiFetchが既にdataを抽出するためresult.dataが配列
     const conversations = result.data ?? [];
 
     return conversations.map((c) => ({
@@ -82,19 +83,19 @@ export class MentorDashboardGateway implements MentorDashboardPort {
   }
 
   /**
-   * 피드백 품질 평가 제출
+   * フィードバック品質評価提出
    */
   async submitFeedbackQuality(_input: {
     mentorId: string;
     studentId: string;
     isPositive: boolean;
   }): Promise<void> {
-    // 현재 API에서 지원하지 않음 - 나중에 구현
+    // 現在APIでサポートされていない - 後で実装
     console.warn("submitFeedbackQuality is not yet implemented");
   }
 
   /**
-   * 멘토 할당 생성
+   * メンター割り当て生成
    */
   async createAssignment(newhireId: string): Promise<void> {
     const result = await apiFetch<unknown>("/api/entitle/mentor", {
@@ -104,12 +105,12 @@ export class MentorDashboardGateway implements MentorDashboardPort {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
   }
 
   /**
-   * 할당 가능한 신입사원 목록 조회
+   * 割り当て可能な新入社員一覧照会
    */
   async listAvailableNewhires(): Promise<NewhireOption[]> {
     const result = await apiFetch<NewhireOption[]>("/api/entitle/mentor/newhires", {
@@ -119,7 +120,7 @@ export class MentorDashboardGateway implements MentorDashboardPort {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
 
     return result.data ?? [];

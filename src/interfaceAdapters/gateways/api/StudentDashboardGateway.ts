@@ -1,21 +1,18 @@
 /**
  * StudentDashboard API Gateway
  *
- * StudentDashboardPort 인터페이스를 구현하여
- * Page에서 직접 API를 호출하는 대신 Gateway를 통해 호출하도록 합니다.
+ * StudentDashboardPort 인터페이스 구현
  */
 
-import type { Conversation } from "../../../domain/core";
+import type {
+  StudentDashboardPort,
+  ConversationListItem,
+} from "../../../application/entitle/ports/StudentDashboardPort";
 import { apiFetch, invalidateCache } from "../../../lib/api";
+import { createErrorFromStatus } from "../../errors";
 
 export interface StudentDashboardGatewayConfig {
   accessToken?: string;
-}
-
-export interface ConversationListItem {
-  convId: string;
-  title: string;
-  lastActiveAt: string;
 }
 
 export interface StudentDashboardBootstrap {
@@ -30,7 +27,7 @@ export interface StudentDashboardBootstrap {
 /**
  * StudentDashboard API Gateway
  */
-export class StudentDashboardGateway {
+export class StudentDashboardGateway implements StudentDashboardPort {
   private accessToken?: string;
 
   constructor(config: StudentDashboardGatewayConfig = {}) {
@@ -42,7 +39,7 @@ export class StudentDashboardGateway {
   }
 
   /**
-   * 대화 목록 조회 (경량 API)
+   * 会話リスト取得（軽量API）
    */
   async listConversations(): Promise<ConversationListItem[]> {
     const result = await apiFetch<StudentDashboardBootstrap>("/api/entitle/conversations", {
@@ -52,14 +49,14 @@ export class StudentDashboardGateway {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
 
     return result.data?.conversations ?? [];
   }
 
   /**
-   * 새 대화 생성
+   * 新規会話作成
    */
   async createConversation(title: string): Promise<{ convId: string }> {
     const result = await apiFetch<{ convId: string }>("/api/entitle/student-chat", {
@@ -72,17 +69,17 @@ export class StudentDashboardGateway {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
 
-    // 캐시 무효화
+    // キャッシュ無効化
     invalidateCache(/conversations/);
 
     return result.data;
   }
 
   /**
-   * 대화 삭제
+   * 会話削除
    */
   async deleteConversation(convId: string): Promise<void> {
     const result = await apiFetch<{ ok: boolean }>("/api/entitle/student-chat", {
@@ -95,10 +92,10 @@ export class StudentDashboardGateway {
     });
 
     if (!result.ok) {
-      throw new Error(result.error);
+      throw createErrorFromStatus(result.status, result.error);
     }
 
-    // 캐시 무효화
+    // キャッシュ無効化
     invalidateCache(/conversations/);
   }
 }

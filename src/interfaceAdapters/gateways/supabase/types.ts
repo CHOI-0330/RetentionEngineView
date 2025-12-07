@@ -7,6 +7,10 @@ import type {
   Conversation,
   MentorAssignment,
   User,
+  AvatarSettings,
+  AvatarGender,
+  AvatarPersonality,
+  AvatarGenerationStatus,
 } from "../../../domain/core";
 
 export interface MessageRow {
@@ -103,4 +107,32 @@ export const mapMentorAssignmentRow = (row: MentorAssignmentRow): MentorAssignme
   revokedAt: row.revoked_at ?? undefined,
   createdBy: row.created_by ?? undefined,
   note: row.note ?? undefined,
+});
+
+// ===== Avatar Settings =====
+
+export interface AvatarSettingsRow {
+  id: string;
+  user_id: string;
+  gender: AvatarGender;
+  personality_preset: AvatarPersonality;
+  is_generated: boolean;
+  generation_status: AvatarGenerationStatus;
+  generation_progress: number;
+  generation_seed: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const mapAvatarSettingsRow = (row: AvatarSettingsRow): AvatarSettings => ({
+  id: row.id,
+  userId: row.user_id,
+  gender: row.gender,
+  personalityPreset: row.personality_preset,
+  isGenerated: row.is_generated,
+  generationStatus: row.generation_status,
+  generationProgress: row.generation_progress,
+  generationSeed: row.generation_seed ?? undefined,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });

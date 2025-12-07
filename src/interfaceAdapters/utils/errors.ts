@@ -1,52 +1,82 @@
-import type { UseCaseFailure } from "../../application/entitle/models";
+import type { UseCaseFailure, UseCaseFailureKind } from "../../application/entitle/models";
+import {
+  AppError,
+  AuthenticationError,
+  AuthorizationError,
+  NetworkError,
+  TimeoutError,
+  ValidationError,
+  NotFoundError,
+  ServerError,
+  normalizeToAppError,
+  isAuthError as isAuthErrorInternal,
+  isNetworkError as isNetworkErrorInternal,
+  isRetryableError as isRetryableErrorInternal,
+} from "../errors";
+
+// エラークラスをre-export
+export {
+  AppError,
+  AuthenticationError,
+  AuthorizationError,
+  NetworkError,
+  TimeoutError,
+  ValidationError,
+  NotFoundError,
+  ServerError,
+  ERROR_TYPES,
+} from "../errors";
 
 /**
- * 에러를 UseCaseFailure 형태로 정규화
+ * AppErrorをUseCaseFailureKindにマッピング
+ */
+function mapErrorToFailureKind(error: AppError): UseCaseFailureKind {
+  if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
+    return "Forbidden";
+  }
+  if (error instanceof NotFoundError) {
+    return "NotFound";
+  }
+  return "ValidationError";
+}
+
+/**
+ * エラーをUseCaseFailure形態に正規化
  *
- * 여러 Page에서 중복되던 normalizeError 함수를 통합합니다.
+ * 複数Pageで重複していたnormalizeError関数を統合します。
  */
 export function normalizeError(reason: unknown): UseCaseFailure {
-  if (reason instanceof Error) {
-    // 인증 에러 체크
-    if (/Unauthorized|Forbidden|401|403/i.test(reason.message)) {
-      return {
-        kind: "Forbidden",
-        message: reason.message,
-      };
-    }
-
-    // 네트워크 에러 체크 (ValidationError로 매핑)
-    if (/network|fetch|timeout/i.test(reason.message)) {
-      return {
-        kind: "ValidationError",
-        message: `ネットワークエラー: ${reason.message}`,
-      };
-    }
-
-    return {
-      kind: "ValidationError",
-      message: reason.message,
-    };
-  }
+  const appError = normalizeToAppError(reason);
 
   return {
-    kind: "ValidationError",
-    message: String(reason),
+    kind: mapErrorToFailureKind(appError),
+    message: appError.message,
   };
 }
 
 /**
- * 에러가 인증 관련인지 확인
+ * エラーが認証関連かどうか確認
  */
 export function isAuthError(error: unknown): boolean {
-  if (error instanceof Error) {
-    return /Unauthorized|Forbidden|401|403/i.test(error.message);
-  }
-  return false;
+  return isAuthErrorInternal(error);
 }
 
 /**
- * 에러 메시지 추출
+ * エラーがネットワーク関連かどうか確認
+ */
+export function isNetworkError(error: unknown): boolean {
+  return isNetworkErrorInternal(error);
+}
+
+/**
+ * エラーがリトライ可能かどうか確認
+ */
+export function isRetryableError(error: unknown): boolean {
+  return isRetryableErrorInternal(error);
+}
+
+/**
+ * エラーメッセージ抽出
  */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {

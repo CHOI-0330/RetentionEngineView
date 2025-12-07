@@ -68,16 +68,16 @@ const requireMentorAuth = async (request: NextRequest) => {
 /**
  * GET /api/entitle/mentor/newhires
  *
- * 멘토가 할당 가능한 신입사원 목록 조회
- * - NEW_HIRE 역할의 사용자 목록 반환
- * - 현재 멘토에게 이미 할당된 사원은 isAssigned: true로 표시
+ * メンターが割り当て可能な新入社員リスト照会
+ * - NEW_HIREロールのユーザーリストを返却
+ * - 現在メンターに既に割り当てられた社員はisAssigned: trueで表示
  */
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireMentorAuth(request);
     const adminClient = getAdminClient();
 
-    // 1. NEW_HIRE 역할의 모든 사용자 조회
+    // 1. NEW_HIREロールの全ユーザー照会
     const { data: newhires, error: newhiresError } = await adminClient
       .from("user")
       .select("user_id, display_name, email, created_at")
@@ -88,14 +88,14 @@ export async function GET(request: NextRequest) {
       throw new HttpError(500, newhiresError.message);
     }
 
-    // 2. 현재 멘토에게 할당된 신입사원 목록 조회
+    // 2. 現在メンターに割り当てられた新入社員リスト照会
     const { data: assignments, error: assignmentsError } = await adminClient
       .from("mentor_assignment")
       .select("newhire_id")
       .eq("mentor_id", user.userId);
 
     if (assignmentsError) {
-      // 테이블이 없을 수 있으므로 에러 무시
+      // テーブルが存在しない可能性があるためエラー無視
       console.warn("mentor_assignment query error:", assignmentsError.message);
     }
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       (assignments ?? []).map((a: { newhire_id: string }) => a.newhire_id)
     );
 
-    // 3. DTO로 변환
+    // 3. DTOに変換
     const result: NewhireDto[] = (newhires ?? []).map((n: {
       user_id: string;
       display_name: string | null;

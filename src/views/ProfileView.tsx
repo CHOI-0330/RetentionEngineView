@@ -1,20 +1,49 @@
+/**
+ * Profile View V2
+ *
+ * V2アーキテクチャ用のプロフィールビュー
+ * PresenterV2から受け取ったViewModelを表示
+ */
+
 import { Button } from "../components/ui/button";
 import { Alert } from "../components/ui/alert";
 import { MbtiCardSelector } from "../components/MbtiCardSelector";
-import type {
-  MbtiPresenterViewModel,
-  MbtiPresenterStatus,
-  MbtiPresenterInteractions,
-} from "../interfaceAdapters/presenters/useMbtiPresenter";
+import type { ProfileViewModel } from "../interfaceAdapters/services/ProfileService";
+import type { UseCaseFailure } from "../application/entitle/models";
+import type { MbtiType } from "../domain/mbti.types";
+
+// ============================================
+// Props型定義
+// ============================================
 
 interface ProfileViewProps {
-  viewModel: MbtiPresenterViewModel;
-  status: MbtiPresenterStatus;
-  interactions: MbtiPresenterInteractions;
+  viewModel: ProfileViewModel;
+  isLoading: boolean;
+  isSaving: boolean;
+  error: UseCaseFailure | null;
+  actions: {
+    setSelectedMbti: (mbti: MbtiType | null) => void;
+    saveMbti: () => Promise<void>;
+    clearError: () => void;
+    cancel: () => void;
+  };
 }
 
-const ProfileView = ({ viewModel, status, interactions }: ProfileViewProps) => {
-  const hasChanges = viewModel.selectedMbti !== viewModel.currentMbti;
+// ============================================
+// Component
+// ============================================
+
+const ProfileView = ({
+  viewModel,
+  isLoading,
+  isSaving,
+  error,
+  actions,
+}: ProfileViewProps) => {
+  // エラーメッセージ整形
+  const errorMessage = error
+    ? `${error.kind}: ${error.message}`
+    : null;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto p-6">
@@ -25,16 +54,16 @@ const ProfileView = ({ viewModel, status, interactions }: ProfileViewProps) => {
         </p>
       </header>
 
-      {status.error && (
+      {errorMessage && (
         <Alert
           variant="destructive"
           className="flex items-start justify-between gap-3 animate-in fade-in zoom-in-95"
         >
-          <span>{status.error}</span>
+          <span>{errorMessage}</span>
           <Button
             variant="ghost"
             size="sm"
-            onClick={interactions.clearError}
+            onClick={actions.clearError}
             className="h-auto p-0 hover:bg-transparent"
           >
             閉じる
@@ -52,36 +81,39 @@ const ProfileView = ({ viewModel, status, interactions }: ProfileViewProps) => {
           </div>
 
           <MbtiCardSelector
-            value={viewModel.selectedMbti}
-            onChange={interactions.setSelectedMbti}
-            disabled={status.isLoading}
+            value={viewModel.selectedMbti?.type ?? null}
+            onChange={actions.setSelectedMbti}
+            disabled={isLoading || isSaving}
           />
 
           {viewModel.currentMbti && (
-            <div className="rounded-md bg-muted/50 p-4 text-sm">
+            <div className="rounded-md bg-muted/50 p-4 text-sm space-y-2">
               <p className="font-medium">現在設定されているMBTI</p>
-              <p className="text-muted-foreground">{viewModel.currentMbti}</p>
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">
+                  {viewModel.currentMbti.type} - {viewModel.currentMbti.label}
+                </p>
+                <p className="text-muted-foreground">
+                  {viewModel.currentMbti.description}
+                </p>
+              </div>
             </div>
           )}
         </div>
 
         <div className="flex gap-3">
           <Button
-            onClick={interactions.saveMbti}
-            disabled={
-              status.isLoading || !hasChanges || !viewModel.selectedMbti
-            }
+            onClick={actions.saveMbti}
+            disabled={isLoading || isSaving || !viewModel.canSave}
             className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
           >
-            {status.isLoading ? "保存中..." : "保存"}
+            {isSaving ? "保存中..." : "保存"}
           </Button>
-          {hasChanges && (
+          {viewModel.hasChanges && (
             <Button
               variant="outline"
-              onClick={() =>
-                interactions.setSelectedMbti(viewModel.currentMbti)
-              }
-              disabled={status.isLoading}
+              onClick={actions.cancel}
+              disabled={isLoading || isSaving}
             >
               キャンセル
             </Button>

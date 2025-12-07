@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 
 /**
- * Effect 큐 처리를 위한 공통 훅
+ * Effectキュー処理のための共通フック
  *
- * 여러 Page에서 중복되던 Effect 큐 관리 로직을 통합합니다.
- * - 중복 Effect 방지 (동일 ID는 한 번만 처리)
- * - 순차적 처리 (한 번에 하나씩)
- * - 재귀적 큐 처리 (하나 완료 후 다음 자동 처리)
+ * 複数Pageで重複していたEffectキュー管理ロジックを統合します。
+ * - 重複Effect防止（同一IDは一度だけ処理）
+ * - 順次処理（一度に一つずつ）
+ * - 再帰的キュー処理（一つ完了後、次を自動処理）
  *
  * @example
  * ```tsx
@@ -34,29 +34,29 @@ export interface EffectBase {
 
 export interface UseEffectQueueOptions<T extends EffectBase> {
   /**
-   * 처리할 Effect 목록 (Controller/Presenter에서 제공)
+   * 処理するEffect一覧（Controller/Presenterから提供）
    */
   pendingEffects: T[];
 
   /**
-   * 각 Effect를 처리하는 함수
-   * 비동기 작업 (API 호출 등)을 수행
+   * 各Effectを処理する関数
+   * 非同期作業（API呼び出し等）を実行
    */
   processEffect: (effect: T) => Promise<void>;
 
   /**
-   * Effect 처리 완료 후 호출 (acknowledgeEffect 등)
+   * Effect処理完了後に呼び出し（acknowledgeEffect等）
    */
   onEffectComplete: (effect: T) => void;
 
   /**
-   * 에러 발생 시 호출
+   * エラー発生時に呼び出し
    */
   onError?: (error: unknown, effect: T) => void;
 
   /**
-   * 특정 Effect 종류에 대한 후처리
-   * 예: "REQUEST_REFRESH" 완료 후 finalizeRefresh() 호출
+   * 特定Effect種類に対する後処理
+   * 例: "REQUEST_REFRESH"完了後finalizeRefresh()呼び出し
    */
   onEffectKindComplete?: (effect: T) => void;
 }
@@ -73,12 +73,12 @@ export function useEffectQueue<T extends EffectBase>({
   const enqueuedEffectIdsRef = useRef<Set<string>>(new Set());
 
   const processQueuedEffects = useCallback(() => {
-    // 이미 처리 중이면 대기
+    // 既に処理中なら待機
     if (processingRef.current) {
       return;
     }
 
-    // 큐에서 다음 Effect 꺼내기
+    // キューから次のEffectを取り出す
     const nextEffect = effectQueueRef.current.shift();
     if (!nextEffect) {
       return;
@@ -91,25 +91,25 @@ export function useEffectQueue<T extends EffectBase>({
         onError?.(error, nextEffect);
       })
       .finally(() => {
-        // Effect 종류별 후처리
+        // Effect種類別後処理
         onEffectKindComplete?.(nextEffect);
 
-        // Effect 완료 처리
+        // Effect完了処理
         onEffectComplete(nextEffect);
 
-        // 큐에서 ID 제거
+        // キューからID削除
         enqueuedEffectIdsRef.current.delete(nextEffect.id);
 
-        // 처리 완료 표시
+        // 処理完了表示
         processingRef.current = false;
 
-        // 다음 Effect 처리 (재귀)
+        // 次のEffect処理（再帰）
         processQueuedEffects();
       });
   }, [processEffect, onEffectComplete, onError, onEffectKindComplete]);
 
   useEffect(() => {
-    // 새 Effect를 큐에 추가 (중복 방지)
+    // 新しいEffectをキューに追加（重複防止）
     pendingEffects.forEach((effect) => {
       if (!enqueuedEffectIdsRef.current.has(effect.id)) {
         enqueuedEffectIdsRef.current.add(effect.id);
@@ -117,7 +117,7 @@ export function useEffectQueue<T extends EffectBase>({
       }
     });
 
-    // 큐 처리 시작
+    // キュー処理開始
     processQueuedEffects();
   }, [pendingEffects, processQueuedEffects]);
 }

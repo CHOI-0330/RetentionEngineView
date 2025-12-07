@@ -1,7 +1,8 @@
 /**
- * StudentDashboard View
+ * StudentDashboard View - V2 Architecture
  *
- * 순수 UI 컴포넌트 - 비즈니스 로직 없음
+ * 純粋なUIコンポーネント - ビジネスロジックなし
+ * V2 Presenterの出力を直接使用
  */
 
 import { memo } from "react";
@@ -17,36 +18,57 @@ import {
   ArrowRight,
   Sparkles,
   Trash2,
+  User,
 } from "lucide-react";
 
+import type { UseCaseFailure } from "../application/entitle/models";
 import type {
-  StudentDashboardPresenterViewModel,
-  StudentDashboardPresenterStatus,
-  StudentDashboardPresenterMeta,
-  StudentDashboardPresenterInteractions,
+  StudentDashboardViewModel,
   ConversationViewModel,
-} from "../interfaceAdapters/presenters/useStudentDashboardPresenter";
+} from "../interfaceAdapters/services/StudentDashboardService";
+
+// ============================================
+// Props型定義
+// ============================================
 
 export interface StudentDashboardViewProps {
   heading: string;
-  viewModel: StudentDashboardPresenterViewModel;
-  status: StudentDashboardPresenterStatus;
-  meta: StudentDashboardPresenterMeta;
-  interactions: StudentDashboardPresenterInteractions;
+  viewModel: StudentDashboardViewModel;
+  isLoading: boolean;
+  isCreating: boolean;
+  error: UseCaseFailure | null;
+  searchQuery: string;
+  newTitle: string;
+  isDeleting: Record<string, boolean>;
+  actions: {
+    setSearchQuery: (value: string) => void;
+    setNewTitle: (value: string) => void;
+    refresh: () => Promise<void>;
+    createConversation: (title: string) => Promise<void>;
+    deleteConversation: (convId: string) => Promise<void>;
+    clearError: () => void;
+  };
   onNavigateToConversation: (convId: string) => void;
 }
+
+// ============================================
+// メインコンポーネント
+// ============================================
 
 const StudentDashboardView = ({
   heading,
   viewModel,
-  status,
-  meta,
-  interactions,
+  isLoading,
+  isCreating,
+  error,
+  newTitle,
+  isDeleting,
+  actions,
   onNavigateToConversation,
 }: StudentDashboardViewProps) => {
   const handleCreateConversation = () => {
-    const title = viewModel.newTitle.trim() || "新しい会話";
-    interactions.requestCreateConversation(title);
+    const title = newTitle.trim() || "新しい会話";
+    void actions.createConversation(title);
   };
 
   const handleDeleteConversation = (convId: string) => {
@@ -54,7 +76,7 @@ const StudentDashboardView = ({
       "この会話を削除しますか？この操作は取り消せません。"
     );
     if (confirmed) {
-      interactions.requestDeleteConversation(convId);
+      void actions.deleteConversation(convId);
     }
   };
 
@@ -65,27 +87,25 @@ const StudentDashboardView = ({
 
       <div className="container px-4 sm:px-6 space-y-12">
         {/* Error Display */}
-        {status.error && (
-          <ErrorBanner
-            message={status.error.message}
-            onClose={interactions.clearError}
-          />
+        {error && (
+          <ErrorBanner message={error.message} onClose={actions.clearError} />
         )}
 
         {/* Create New Section */}
         <CreateConversationSection
-          newTitle={viewModel.newTitle}
-          onChangeNewTitle={viewModel.onChangeNewTitle}
+          newTitle={newTitle}
+          onChangeNewTitle={actions.setNewTitle}
           onCreateConversation={handleCreateConversation}
-          isCreating={status.isCreating}
+          isCreating={isCreating}
         />
 
         {/* Conversations Grid */}
         <ConversationsSection
           conversations={viewModel.conversations}
-          conversationCount={meta.conversationCount}
-          isLoading={status.isLoading}
-          hasConversations={meta.hasConversations}
+          conversationCount={viewModel.totalCount}
+          isLoading={isLoading}
+          hasConversations={viewModel.hasConversations}
+          isDeleting={isDeleting}
           onNavigateToConversation={onNavigateToConversation}
           onDeleteConversation={handleDeleteConversation}
         />
@@ -118,6 +138,15 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             AIメンターとの会話を通じて、新しいスキルや知識を身につけましょう。過去の会話履歴を確認したり、新しいトピックについて相談できます。
           </p>
+          <div className="pt-2">
+            <a
+              href="/student/profile"
+              className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
+            >
+              <User className="h-4 w-4" />
+              AIアバターを設定する
+            </a>
+          </div>
         </div>
       </div>
 
@@ -206,6 +235,7 @@ interface ConversationsSectionProps {
   conversationCount: number;
   isLoading: boolean;
   hasConversations: boolean;
+  isDeleting: Record<string, boolean>;
   onNavigateToConversation: (convId: string) => void;
   onDeleteConversation: (convId: string) => void;
 }
@@ -215,6 +245,7 @@ const ConversationsSection = memo(function ConversationsSection({
   conversationCount,
   isLoading,
   hasConversations,
+  isDeleting,
   onNavigateToConversation,
   onDeleteConversation,
 }: ConversationsSectionProps) {
@@ -243,6 +274,7 @@ const ConversationsSection = memo(function ConversationsSection({
               key={conversation.id}
               conversation={conversation}
               index={index}
+              isDeleting={isDeleting[conversation.id] ?? false}
               onNavigate={onNavigateToConversation}
               onDelete={onDeleteConversation}
             />
@@ -283,6 +315,7 @@ const EmptyState = memo(function EmptyState() {
 interface ConversationCardProps {
   conversation: ConversationViewModel;
   index: number;
+  isDeleting: boolean;
   onNavigate: (convId: string) => void;
   onDelete: (convId: string) => void;
 }
@@ -290,6 +323,7 @@ interface ConversationCardProps {
 const ConversationCard = memo(function ConversationCard({
   conversation,
   index,
+  isDeleting,
   onNavigate,
   onDelete,
 }: ConversationCardProps) {
@@ -317,14 +351,7 @@ const ConversationCard = memo(function ConversationCard({
         </h3>
 
         <div className="mt-auto pt-4 flex items-center justify-between text-xs text-muted-foreground border-t border-border/30">
-          <span>
-            {conversation.createdAt.toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+          <span>{conversation.displayDate}</span>
           <span className="font-mono opacity-50">
             ID: {conversation.id.slice(0, 4)}...
           </span>
@@ -340,9 +367,9 @@ const ConversationCard = memo(function ConversationCard({
               event.stopPropagation();
               onDelete(conversation.id);
             }}
-            disabled={conversation.isDeleting}
+            disabled={isDeleting}
           >
-            {conversation.isDeleting ? (
+            {isDeleting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Trash2 className="h-4 w-4" />

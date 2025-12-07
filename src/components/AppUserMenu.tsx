@@ -17,7 +17,7 @@ export default function AppUserMenu() {
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      // 세션 캐시 무효화 후 홈으로 이동
+      // セッションキャッシュを無効化してホームへ移動
       invalidateSessionCache();
       window.location.href = "/";
     }

@@ -289,7 +289,7 @@ export async function POST(
     }
     const content = typeof body.content === "string" ? body.content : "";
 
-    // 메시지가 멘토에게 접근 가능한지 확인
+    // メッセージがメンターにアクセス可能か確認
     const messagesResponse = await callBackend<{ data: MessageDto[] }>(
       `/messages/mentor?mentorId=${encodeURIComponent(authUser.userId)}&convId=${encodeURIComponent(convId)}`,
       undefined,
@@ -301,7 +301,7 @@ export async function POST(
       return NextResponse.json({ error: "Message not found or not accessible." }, { status: 404 });
     }
 
-    // 기존 멘토 피드백 존재 여부 확인 (백엔드에는 업데이트 엔드포인트가 없어 중복 작성 방지만 수행)
+    // 既存メンターフィードバック存在有無確認（バックエンドには更新エンドポイントがないため重複作成防止のみ実行）
     const feedbackRes = await callBackend<{ data: FeedbackDto[] }>(
       `/feedback?messageId=${encodeURIComponent(targetMessage.msgId)}`,
       undefined,

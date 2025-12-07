@@ -1,6 +1,6 @@
 import type { FeedbackAuthorRole } from "../../domain/core";
 
-export type UseCaseFailureKind = "Forbidden" | "NotFound" | "ValidationError";
+export type UseCaseFailureKind = "Forbidden" | "NotFound" | "ValidationError" | "ExternalServiceError";
 
 export interface UseCaseFailure {
   kind: UseCaseFailureKind;

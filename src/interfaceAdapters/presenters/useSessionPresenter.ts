@@ -17,7 +17,7 @@ export interface SessionViewModel {
 export interface SessionInteractions {
   refetchSession: () => Promise<void>;
   /**
-   * 세션 캐시를 무효화하고 다시 fetch (로그인/로그아웃 후 사용)
+   * セッションキャッシュを無効化して再fetch（ログイン/ログアウト後に使用）
    */
   invalidateAndRefetch: () => Promise<void>;
 }

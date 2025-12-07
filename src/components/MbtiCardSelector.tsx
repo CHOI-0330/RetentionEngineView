@@ -24,7 +24,7 @@ export function MbtiCardSelector({
   disabled = false,
   className = "",
 }: MbtiCardSelectorProps) {
-  // 현재 선택된 MBTI가 속한 카테고리를 찾거나 기본값으로 첫 번째 카테고리 사용
+  // 現在選択されたMBTIが属するカテゴリを見つけるか、デフォルトで最初のカテゴリを使用
   const defaultCategory =
     (Object.keys(MBTI_CATEGORIES) as MbtiCategory[]).find((cat) =>
       MBTI_CATEGORIES[cat].includes(value as MbtiType)
@@ -69,7 +69,7 @@ export function MbtiCardSelector({
                         ? cn(
                             "border-primary bg-primary/5 shadow-md",
                             colorClass.split(" ")[0]
-                          ) // 선택 시 텍스트 색상 적용
+                          ) // 選択時にテキスト色を適用
                         : "border-muted bg-card hover:border-primary/50 text-muted-foreground",
                       disabled &&
                         "opacity-50 cursor-not-allowed hover:transform-none hover:shadow-none"

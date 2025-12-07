@@ -24,7 +24,7 @@ const getAnonClient = () => {
 };
 
 /**
- * refresh token으로 새 access token 발급
+ * refresh tokenで新しいaccess token発行
  */
 async function refreshAccessToken(refreshToken: string): Promise<{
   accessToken: string;
@@ -62,20 +62,20 @@ export async function GET(request: NextRequest) {
     const adminClient = createAdminSupabaseClient();
     let userData = await adminClient.auth.getUser(accessToken);
 
-    // access token이 만료된 경우 refresh 시도
+    // access tokenが満了した場合refresh試行
     let tokensRefreshed = false;
     let newAccessToken = accessToken;
     let newRefreshToken = refreshToken;
 
     if (userData.error || !userData.data.user) {
-      // JWT 만료 에러인 경우 refresh 시도
+      // JWT満了エラーの場合refresh試行
       const isTokenExpired = userData.error?.message?.toLowerCase().includes("expired") ||
                             userData.error?.message?.toLowerCase().includes("invalid");
 
       if (isTokenExpired) {
         const refreshed = await refreshAccessToken(refreshToken);
         if (refreshed) {
-          // 새 토큰으로 다시 시도
+          // 新しいトークンで再試行
           newAccessToken = refreshed.accessToken;
           newRefreshToken = refreshed.refreshToken;
           tokensRefreshed = true;
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // refresh 후에도 실패하면 에러
+      // refresh後も失敗したらエラー
       if (userData.error || !userData.data.user) {
         throw new HttpError(401, userData.error?.message ?? "Unauthorized");
       }
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.json({ data: responseData });
 
-    // 토큰이 갱신된 경우 쿠키도 업데이트
+    // トークンが更新された場合クッキーも更新
     if (tokensRefreshed) {
       setAuthCookies(response, responseData);
     }

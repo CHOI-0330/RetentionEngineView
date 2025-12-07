@@ -1,59 +1,71 @@
 /**
- * StudentChat API Gateway
+ * StudentChat API Gateway (Facade)
  *
- * MessagePort, FeedbackPort 인터페이스를 구현하여
- * Page에서 직접 API를 호출하는 대신 Gateway를 통해 호출하도록 합니다.
+ * @deprecated 개별 Gateway 사용을 권장합니다:
+ * - MessageGateway: 메시지 관련 작업
+ * - FeedbackGateway: 피드백 관련 작업
+ * - ConversationGateway: 대화 관련 작업
+ * - LLMGateway: LLM 생성 관련 작업
+ *
+ * 이 파일은 하위 호환성을 위해 유지됩니다.
  */
 
 import type { Message, Feedback, Conversation } from "../../../domain/core";
 import type { MessagePort, FeedbackPort } from "../../../application/entitle/ports";
+import type { ConversationPort } from "../../../application/entitle/ports/ConversationPort";
 import type { ValidatedFeedback } from "../../../application/entitle/models";
-import { apiFetch } from "../../../lib/api";
 
-export interface StudentChatGatewayConfig {
-  accessToken?: string;
-}
+import { MessageGateway } from "./MessageGateway";
+import { FeedbackGateway } from "./FeedbackGateway";
+import { ConversationGateway } from "./ConversationGateway";
+import type { GatewayConfig, StudentChatBootstrap } from "./types";
+
+// 타입 re-export (하위 호환성)
+export type {
+  GatewayConfig as StudentChatGatewayConfig,
+  ConversationOption,
+  MentorOption,
+  StudentChatBootstrap,
+  SearchSettings,
+  WebSource,
+  ResponseSources,
+  WebSearchConfirmationLabels,
+  LLMGenerateResponse,
+} from "./types";
+
+export { ResponseType } from "./types";
+export { LLMGateway } from "./LLMGateway";
+export type { GatewayConfig as LLMGatewayConfig } from "./types";
 
 /**
- * StudentChat API Gateway
+ * StudentChat API Gateway (Facade)
  *
- * Clean Architecture의 Gateway/Repository 역할을 수행합니다.
- * - Page 컴포넌트에서 직접 API를 호출하지 않고 이 Gateway를 통해 호출
- * - Port 인터페이스를 구현하여 의존성 역전 원칙 준수
+ * 개별 Gateway들을 조합하여 기존 인터페이스 유지
+ *
+ * @deprecated 개별 Gateway 사용을 권장합니다.
  */
-export class StudentChatGateway implements MessagePort, FeedbackPort {
-  private accessToken?: string;
+export class StudentChatGateway implements MessagePort, FeedbackPort, ConversationPort {
+  private messageGateway: MessageGateway;
+  private feedbackGateway: FeedbackGateway;
+  private conversationGateway: ConversationGateway;
 
-  constructor(config: StudentChatGatewayConfig = {}) {
-    this.accessToken = config.accessToken;
+  constructor(config: GatewayConfig = {}) {
+    this.messageGateway = new MessageGateway(config);
+    this.feedbackGateway = new FeedbackGateway(config);
+    this.conversationGateway = new ConversationGateway(config);
   }
 
   /**
-   * accessToken 업데이트 (세션 갱신 시 사용)
+   * accessToken 업데이트 (세션 업데이트 시 사용)
    */
   setAccessToken(token: string | undefined): void {
-    this.accessToken = token;
-  }
-
-  /**
-   * 공통 API 호출 헬퍼
-   */
-  private async callApi<T>(action: string, payload?: unknown): Promise<T> {
-    const result = await apiFetch<T>("/api/entitle/student-chat", {
-      method: "POST",
-      body: { action, payload },
-      accessToken: this.accessToken,
-    });
-
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
-
-    return result.data;
+    this.messageGateway.setAccessToken(token);
+    this.feedbackGateway.setAccessToken(token);
+    this.conversationGateway.setAccessToken(token);
   }
 
   // ============================================
-  // MessagePort 구현
+  // MessagePort 구현 (위임)
   // ============================================
 
   async createUserMessage(input: {
@@ -61,60 +73,29 @@ export class StudentChatGateway implements MessagePort, FeedbackPort {
     authorId: string;
     content: string;
   }): Promise<Message> {
-    return this.callApi<Message>("createUserMessage", {
-      convId: input.convId,
-      content: input.content,
-    });
+    return this.messageGateway.createUserMessage(input);
   }
 
   async beginAssistantMessage(convId: string): Promise<Message> {
-    // 클라이언트에서 임시 메시지 생성 (서버 호출 없음)
-    const tempId =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `assistant-${Date.now()}`;
-
-    return {
-      msgId: tempId,
-      convId,
-      role: "ASSISTANT",
-      content: "",
-      status: "DRAFT",
-      createdAt: new Date().toISOString(),
-    };
+    return this.messageGateway.beginAssistantMessage(convId);
   }
 
   async finalizeAssistantMessage(input: {
     msgId: string;
     finalText: string;
   }): Promise<Message> {
-    // convId가 필요하므로 별도 파라미터로 받아야 함
-    // 현재 API 구조상 convId를 함께 전달해야 함
-    throw new Error(
-      "finalizeAssistantMessage requires convId. Use finalizeAssistantMessageWithConvId instead."
-    );
+    return this.messageGateway.finalizeAssistantMessage(input);
   }
 
-  /**
-   * convId를 포함한 finalizeAssistantMessage
-   */
   async finalizeAssistantMessageWithConvId(input: {
     convId: string;
     content: string;
   }): Promise<Message> {
-    return this.callApi<Message>("finalizeAssistantMessage", input);
+    return this.messageGateway.finalizeAssistantMessageWithConvId(input);
   }
 
-  async cancelAssistantMessage(_msgId: string): Promise<Message> {
-    // 클라이언트에서만 처리 (서버 호출 없음)
-    return {
-      msgId: _msgId,
-      convId: "",
-      role: "ASSISTANT",
-      content: "",
-      status: "CANCELLED",
-      createdAt: new Date().toISOString(),
-    };
+  async cancelAssistantMessage(msgId: string): Promise<Message> {
+    return this.messageGateway.cancelAssistantMessage(msgId);
   }
 
   async listConversationMessages(input: {
@@ -126,25 +107,17 @@ export class StudentChatGateway implements MessagePort, FeedbackPort {
     nextCursor?: string;
     lastSeqNo?: number;
   }> {
-    return this.callApi<{
-      items: Message[];
-      nextCursor?: string;
-      lastSeqNo?: number;
-    }>("listConversationMessages", input);
+    return this.messageGateway.listConversationMessages(input);
   }
 
   // ============================================
-  // FeedbackPort 구현
+  // FeedbackPort 구현 (위임)
   // ============================================
 
   async createFeedback(
     input: ValidatedFeedback & { visibility?: "ALL" | "OWNER_ONLY" | "MENTOR_ONLY" }
   ): Promise<Feedback> {
-    return this.callApi<Feedback>("createFeedback", {
-      targetMsgId: input.targetMsgId,
-      content: input.content,
-      visibility: input.visibility,
-    });
+    return this.feedbackGateway.createFeedback(input);
   }
 
   async listFeedbacks(input: {
@@ -156,176 +129,49 @@ export class StudentChatGateway implements MessagePort, FeedbackPort {
     nextCursor?: string;
     authorNames?: Record<string, string>;
   }> {
-    return this.callApi<{
-      items: Feedback[];
-      nextCursor?: string;
-      authorNames?: Record<string, string>;
-    }>("listFeedbacks", input);
+    return this.feedbackGateway.listFeedbacks(input);
   }
 
   async updateFeedback(input: {
     feedbackId: string;
     content: string;
   }): Promise<Feedback> {
-    return this.callApi<Feedback>("updateFeedback", input);
+    return this.feedbackGateway.updateFeedback(input);
   }
 
   // ============================================
-  // Conversation 관련 메서드 (ConversationPort 확장)
+  // ConversationPort 구현 (위임)
   // ============================================
 
-  async createConversation(input: { title: string }): Promise<Conversation> {
-    return this.callApi<Conversation>("createConversation", input);
+  async createConversation(input: { title: string; mentorId?: string | null }): Promise<Conversation> {
+    return this.conversationGateway.createConversation(input);
   }
 
   async deleteConversation(convId: string): Promise<void> {
-    await this.callApi<unknown>("deleteConversation", { convId });
+    return this.conversationGateway.deleteConversation(convId);
+  }
+
+  async listConversations(): Promise<Conversation[]> {
+    return this.conversationGateway.listConversations();
+  }
+
+  async getConversation(convId: string): Promise<Conversation | null> {
+    return this.conversationGateway.getConversation(convId);
+  }
+
+  async touchLastActive(convId: string): Promise<void> {
+    return this.conversationGateway.touchLastActive(convId);
+  }
+
+  async listMentorConversations(input: { mentorId: string }): Promise<Conversation[]> {
+    return this.conversationGateway.listMentorConversations(input);
   }
 
   // ============================================
-  // Bootstrap 데이터 로드
+  // Bootstrap 데이터 로드 (위임)
   // ============================================
 
   async fetchBootstrap(convId?: string): Promise<StudentChatBootstrap> {
-    const params = new URLSearchParams();
-    if (convId) {
-      params.set("convId", convId);
-    }
-    const url = `/api/entitle/student-chat${params.toString() ? `?${params.toString()}` : ""}`;
-
-    const result = await apiFetch<StudentChatBootstrap>(url, {
-      method: "GET",
-      accessToken: this.accessToken,
-      cacheTtl: convId ? 0 : 30 * 1000,
-    });
-
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
-
-    return result.data;
-  }
-}
-
-// ============================================
-// Bootstrap 데이터 타입 (Page에서 이동)
-// ============================================
-
-import type { User, MentorAssignment } from "../../../domain/core";
-
-export interface ConversationOption {
-  convId: string;
-  title: string;
-  lastActiveAt: string;
-}
-
-export interface MentorOption {
-  mentorId: string;
-  displayName: string;
-  email?: string;
-}
-
-export interface StudentChatBootstrap {
-  conversation: Conversation | null;
-  currentUser: User;
-  initialMessages: Message[];
-  initialFeedbacks: Record<string, Feedback[]>;
-  authorNames: Record<string, string>;
-  mentorAssignments: MentorAssignment[];
-  availableConversations: ConversationOption[];
-  availableMentors: MentorOption[];
-}
-
-// ============================================
-// LLM Gateway (별도 분리)
-// ============================================
-
-export interface LLMGatewayConfig {
-  accessToken?: string;
-}
-
-/**
- * 検索設定 (Hybrid RAG)
- */
-export interface SearchSettings {
-  enableFileSearch?: boolean; // ファイル検索有効化 (デフォルト: true)
-  allowWebSearch?: boolean; // ウェブ検索許可 (デフォルト: false)
-  executeWebSearch?: boolean; // ウェブ検索実行 (ユーザー承認後)
-}
-
-/**
- * ウェブ検索ソース
- */
-export interface WebSource {
-  title: string;
-  url: string;
-  snippet?: string;
-}
-
-/**
- * レスポンスソース
- */
-export interface ResponseSources {
-  fileSearch?: string[]; // ["onboarding-tips.txt", ...]
-  webSearch?: WebSource[]; // [{ title: "...", url: "..." }]
-}
-
-/**
- * レスポンスタイプ
- */
-export enum ResponseType {
-  ANSWER = 'ANSWER',
-  WEB_SEARCH_CONFIRMATION = 'WEB_SEARCH_CONFIRMATION',
-}
-
-/**
- * Web検索確認ボタンラベル
- */
-export interface WebSearchConfirmationLabels {
-  confirm: string;
-  cancel: string;
-}
-
-/**
- * LLMレスポンスDTO
- */
-export interface LLMGenerateResponse {
-  type: ResponseType;
-  answer: string;
-  needsWebSearch?: boolean;
-  webSearchReason?: string;
-  confirmationLabels?: WebSearchConfirmationLabels;
-  sources?: ResponseSources;
-}
-
-export class LLMGateway {
-  private accessToken?: string;
-
-  constructor(config: LLMGatewayConfig = {}) {
-    this.accessToken = config.accessToken;
-  }
-
-  setAccessToken(token: string | undefined): void {
-    this.accessToken = token;
-  }
-
-  async generateResponse(input: {
-    question: string;
-    conversationId: string;
-    modelId?: string;
-    runtimeId?: string;
-    searchSettings?: SearchSettings;
-  }): Promise<LLMGenerateResponse> {
-    const result = await apiFetch<LLMGenerateResponse>("/api/llm/generate", {
-      method: "POST",
-      body: input,
-      accessToken: this.accessToken,
-    });
-
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
-
-    return result.data;
+    return this.conversationGateway.fetchBootstrap(convId);
   }
 }

@@ -10,13 +10,8 @@ export type {
   SessionGuardMessages,
 } from "./useSessionGuard";
 
-export { useStudentChatGateway } from "./useStudentChatGateway";
+export { useAvatarPreloader } from "./useAvatarPreloader";
 export type {
-  StudentChatBootstrap,
-  ConversationOption,
-  MentorOption,
-} from "./useStudentChatGateway";
-
-export { useMentorDashboardGateway } from "./useMentorDashboardGateway";
-
-export { useStudentDashboardGateway } from "./useStudentDashboardGateway";
+  UseAvatarPreloaderOptions,
+  UseAvatarPreloaderResult,
+} from "./useAvatarPreloader";

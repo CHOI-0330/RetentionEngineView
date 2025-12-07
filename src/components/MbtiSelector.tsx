@@ -19,15 +19,15 @@ interface MbtiSelectorProps {
 }
 
 /**
- * MBTI 선택 컴포넌트
- * 16가지 MBTI 타입을 드롭다운으로 선택할 수 있습니다.
+ * MBTI選択コンポーネント
+ * 16種類のMBTIタイプをドロップダウンで選択できます。
  */
 export function MbtiSelector({
   value,
   onChange,
   disabled = false,
-  label = "MBTI 성격 유형",
-  placeholder = "MBTI 타입을 선택해주세요",
+  label = "MBTI性格タイプ",
+  placeholder = "MBTIタイプを選択してください",
   required = false,
   className = "",
 }: MbtiSelectorProps) {
@@ -56,7 +56,7 @@ export function MbtiSelector({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">선택 안 함</SelectItem>
+          <SelectItem value="none">選択しない</SelectItem>
           {MBTI_TYPES.map((mbtiType) => (
             <SelectItem key={mbtiType} value={mbtiType}>
               {mbtiType} - {MBTI_LABELS[mbtiType]}

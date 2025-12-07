@@ -31,6 +31,17 @@ import type {
   AuthPresenterViewModel,
 } from "../interfaceAdapters/presenters/useAuthPresenter";
 
+/**
+ * AuthView - V2 Architecture Compatible
+ *
+ * この View は Clean Architectureと互換性があります。
+ * useAuthPresenter から提供される deprecated 型を使用していますが、
+ * データ構造は V2 の AuthViewModel と同一です。
+ *
+ * @deprecated 型定義は useAuthPresenter.ts で deprecated とマークされていますが、
+ * Clean Architectureとの互換性のために保持されています。
+ */
+
 interface AuthViewProps {
   viewModel: AuthPresenterViewModel;
   status: AuthPresenterStatus;
