@@ -5,7 +5,7 @@
  * Port（Gateway）を注入して検証からAPI呼び出しまで一貫して処理
  */
 
-import type { Conversation, Message, User } from "../../domain/core";
+import type { Conversation, Message, MessageSources, User } from "../../domain/core";
 import type { UseCaseResult, UseCaseFailureKind } from "./models";
 import type { MessagePort } from "./ports/MessagePort";
 
@@ -111,6 +111,7 @@ export class MessageUseCase {
   async finalizeAssistantMessage(args: {
     message: Message;
     finalText: string;
+    sources?: MessageSources;
   }): Promise<UseCaseResult<Message>> {
     // 検証: ロール
     if (args.message.role !== "ASSISTANT") {
@@ -134,6 +135,7 @@ export class MessageUseCase {
         msgId: args.message.msgId,
         finalText: trimmed,
         convId: args.message.convId,
+        sources: args.sources,
       });
       return success(result);
     } catch (error) {

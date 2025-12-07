@@ -36,6 +36,7 @@ export const StudentChatView = memo(function StudentChatView({
   actions,
   searchSettings,
   onSearchSettingsChange,
+  webSearchPending,
   feedback,
 }: StudentChatViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -238,6 +239,9 @@ export const StudentChatView = memo(function StudentChatView({
                 authorNames={viewModel.authorNames}
                 isAwaitingAssistant={status.isAwaitingAssistant}
                 feedback={feedback}
+                webSearchPending={webSearchPending}
+                onConfirmWebSearch={() => void actions.confirmWebSearch()}
+                onCancelWebSearch={actions.cancelWebSearch}
               />
               <div ref={bottomRef} className="h-px" />
             </div>

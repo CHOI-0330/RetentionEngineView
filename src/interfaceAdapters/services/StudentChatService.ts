@@ -6,7 +6,7 @@
  * ViewModelへの変換も担当
  */
 
-import type { User, Conversation, Message } from "../../domain/core";
+import type { User, Conversation, Message, MessageSources } from "../../domain/core";
 import type { UseCaseResult } from "../../application/entitle/models";
 import type {
   StudentChatBootstrap,
@@ -38,6 +38,7 @@ export interface MessageViewModel {
   role: "user" | "assistant";
   status: "draft" | "partial" | "done" | "cancelled";
   createdAt: string;
+  sources?: MessageSources;
 }
 
 export interface StudentChatViewModel {
@@ -151,11 +152,13 @@ export class StudentChatService {
    */
   async finalizeAssistantMessage(
     message: Message,
-    finalText: string
+    finalText: string,
+    sources?: MessageSources
   ): Promise<UseCaseResult<Message>> {
     return this.messageUseCase.finalizeAssistantMessage({
       message,
       finalText,
+      sources,
     });
   }
 
@@ -297,6 +300,7 @@ export class StudentChatService {
       role: m.role === "NEW_HIRE" ? "user" : "assistant",
       status: this.mapMessageStatus(m.status),
       createdAt: m.createdAt,
+      sources: m.sources,
     }));
   }
 

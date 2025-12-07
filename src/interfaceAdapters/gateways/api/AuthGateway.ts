@@ -24,6 +24,7 @@ export interface LoginResponse {
   refreshToken: string;
   userId: string;
   role: UserRole;
+  displayName?: string;
 }
 
 /**

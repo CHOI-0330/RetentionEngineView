@@ -77,6 +77,22 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
         </Alert>
       ) : null}
 
+      {status.successMessage ? (
+        <Alert
+          className="flex items-start justify-between gap-3 animate-in fade-in zoom-in-95 border-green-200 bg-green-50 text-green-800"
+        >
+          <span>{status.successMessage}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={interactions.clearSuccessMessage}
+            className="h-auto p-0 hover:bg-transparent text-green-700"
+          >
+            閉じる
+          </Button>
+        </Alert>
+      ) : null}
+
       <Tabs defaultValue="login" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8 h-12 bg-muted/50 p-1">
           <TabsTrigger

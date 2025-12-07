@@ -33,6 +33,7 @@ export interface AuthSessionViewModel {
   refreshToken: string;
   userId: string;
   role: "NEW_HIRE" | "MENTOR" | "ADMIN";
+  displayName?: string;
 }
 
 export interface AuthViewModel {

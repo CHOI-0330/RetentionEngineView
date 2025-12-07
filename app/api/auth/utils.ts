@@ -5,6 +5,7 @@ interface AuthCookiePayload {
   refreshToken: string;
   userId: string;
   role: string;
+  displayName?: string; // Optional - not stored in cookie, just for type compatibility
 }
 
 const baseOptions = {

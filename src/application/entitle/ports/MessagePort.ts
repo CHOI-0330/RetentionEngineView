@@ -5,7 +5,7 @@
  * Gateway層が実装すべきインターフェース
  */
 
-import type { Message } from "../../../domain/core";
+import type { Message, MessageSources } from "../../../domain/core";
 
 /**
  * MessagePort
@@ -43,12 +43,14 @@ export interface MessagePort {
    * @param input.msgId - メッセージID
    * @param input.finalText - 最終テキスト
    * @param input.convId - 会話ID（サーバー保存用）
+   * @param input.sources - 参照ソース（オプション）
    * @returns 完成したメッセージオブジェクト
    */
   finalizeAssistantMessage(input: {
     msgId: string;
     finalText: string;
     convId?: string;
+    sources?: MessageSources;
   }): Promise<Message>;
 
   /**

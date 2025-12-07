@@ -9,6 +9,7 @@ import Link from "next/link";
 import AppUserMenu from "../src/components/AppUserMenu";
 import { SessionProvider } from "../src/components/SessionProvider";
 import { cn } from "../src/components/ui/utils";
+import { Toaster } from "../src/components/ui/sonner";
 
 export default function RootLayout({
   children,
@@ -47,6 +48,7 @@ export default function RootLayout({
           <div id="content" className="relative">
             {children}
           </div>
+          <Toaster richColors position="top-center" />
         </SessionProvider>
       </body>
     </html>

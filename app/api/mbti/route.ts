@@ -166,3 +166,4 @@ export async function PUT(request: NextRequest) {
 }
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";

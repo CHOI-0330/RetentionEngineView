@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { toast } from "sonner";
 
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type { MbtiType } from "../../domain/mbti.types";
@@ -37,6 +38,8 @@ interface PresenterState {
   // 状態
   isSubmitting: boolean;
   error: UseCaseFailure | null;
+  // 成功メッセージ
+  successMessage: string | null;
 }
 
 // ============================================
@@ -58,6 +61,7 @@ export interface AuthPresenterOutput {
   // 状態
   isSubmitting: boolean;
   error: UseCaseFailure | null;
+  successMessage: string | null;
   // アクション
   actions: {
     // フォーム入力
@@ -72,8 +76,9 @@ export interface AuthPresenterOutput {
     submitLogout: () => Promise<void>;
     // セッション管理
     setSession: (session: AuthSessionViewModel | null) => void;
-    // エラー
+    // エラー・成功メッセージ
     clearError: () => void;
+    clearSuccessMessage: () => void;
   };
 }
 
@@ -102,6 +107,7 @@ export interface AuthPresenterViewModel {
     refreshToken: string;
     userId: string;
     role: "NEW_HIRE" | "MENTOR" | "ADMIN";
+    displayName?: string;
   } | null;
 }
 
@@ -112,6 +118,7 @@ export interface AuthPresenterViewModel {
 export interface AuthPresenterStatus {
   isSubmitting: boolean;
   error: UseCaseFailure | null;
+  successMessage: string | null;
 }
 
 /**
@@ -128,6 +135,7 @@ export interface AuthPresenterInteractions {
   submitLogin: () => void;
   submitLogout: () => void;
   clearError: () => void;
+  clearSuccessMessage: () => void;
 }
 
 // ============================================
@@ -145,6 +153,7 @@ const initialState: PresenterState = {
   session: null,
   isSubmitting: false,
   error: null,
+  successMessage: null,
 };
 
 // ============================================
@@ -255,7 +264,7 @@ export function useAuthPresenter(
       return;
     }
 
-    // 成功時は状態をリセット
+    // 成功時は状態をリセット + 成功メッセージ設定
     setState((prev) => ({
       ...prev,
       isSubmitting: false,
@@ -264,6 +273,7 @@ export function useAuthPresenter(
       registerPassword: "",
       registerDisplayName: "",
       registerMbti: null,
+      successMessage: "アカウントを作成しました。ログインタブからログインしてください。",
     }));
   }, [state, service]);
 
@@ -293,9 +303,18 @@ export function useAuthPresenter(
         refreshToken: result.value.refreshToken,
         userId: result.value.userId,
         role: result.value.role,
+        displayName: result.value.displayName,
       },
       loginPassword: "", // セキュリティのためパスワードをクリア
     }));
+
+    // ログイン成功トースト
+    toast.success("ログインしました", {
+      description: result.value.displayName
+        ? `ようこそ、${result.value.displayName}さん`
+        : undefined,
+      duration: 3000,
+    });
   }, [state, service]);
 
   const submitLogout = useCallback(async () => {
@@ -332,6 +351,11 @@ export function useAuthPresenter(
       error: null,
       session: null,
     }));
+
+    // ログアウト成功トースト
+    toast.success("ログアウトしました", {
+      duration: 3000,
+    });
   }, [state, service]);
 
   // ============================================
@@ -343,11 +367,15 @@ export function useAuthPresenter(
   }, []);
 
   // ============================================
-  // エラー管理
+  // エラー・成功メッセージ管理
   // ============================================
 
   const clearError = useCallback(() => {
     setState((prev) => ({ ...prev, error: null }));
+  }, []);
+
+  const clearSuccessMessage = useCallback(() => {
+    setState((prev) => ({ ...prev, successMessage: null }));
   }, []);
 
   // ============================================
@@ -391,6 +419,7 @@ export function useAuthPresenter(
     viewModel,
     isSubmitting: state.isSubmitting,
     error: state.error,
+    successMessage: state.successMessage,
     actions: {
       setRegisterField,
       setLoginField,
@@ -399,6 +428,7 @@ export function useAuthPresenter(
       submitLogout,
       setSession,
       clearError,
+      clearSuccessMessage,
     },
   };
 }

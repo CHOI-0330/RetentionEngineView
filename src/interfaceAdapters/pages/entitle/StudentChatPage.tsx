@@ -105,6 +105,7 @@ const StudentChatPage = ({ convId }: StudentChatPageProps) => {
         actions={presenter.actions}
         searchSettings={presenter.searchSettings}
         onSearchSettingsChange={presenter.setSearchSettings}
+        webSearchPending={presenter.webSearchPending}
         feedback={presenter.feedback}
       />
     </div>

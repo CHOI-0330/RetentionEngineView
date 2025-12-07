@@ -4,7 +4,7 @@
  * MessagePort 인터페이스 구현
  */
 
-import type { Message } from "../../../domain/core";
+import type { Message, MessageSources } from "../../../domain/core";
 import type { MessagePort } from "../../../application/entitle/ports";
 import { apiFetch } from "../../../lib/api";
 import { createErrorFromStatus } from "../../errors";
@@ -67,14 +67,16 @@ export class MessageGateway implements MessagePort {
     msgId: string;
     finalText: string;
     convId?: string;
+    sources?: MessageSources;
   }): Promise<Message> {
-    // 서버에 ASSISTANT 메시지 저장 요청 (convId + content 전송)
+    // 서버에 ASSISTANT 메시지 저장 요청 (convId + content + sources 전송)
     if (!input.convId) {
       throw new Error("convId is required for finalizeAssistantMessage");
     }
     return this.callApi<Message>("finalizeAssistantMessage", {
       convId: input.convId,
       content: input.finalText,
+      sources: input.sources,
     });
   }
 

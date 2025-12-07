@@ -26,13 +26,21 @@ const getAnonClient = () => {
   return createClient(url, anonKey);
 };
 
-const fetchUserRole = async (userId: string): Promise<string> => {
+const fetchUserProfile = async (userId: string): Promise<{ role: string; displayName: string }> => {
   const adminClient = getAdminClient();
-  const { data, error } = await adminClient.from("user").select("role").eq("user_id", userId).single();
+  const { data, error } = await adminClient
+    .from("user")
+    .select("role, display_name")
+    .eq("user_id", userId)
+    .single();
   if (error || !data) {
     throw new HttpError(500, error?.message ?? "User profile not found.");
   }
-  return (data as { role: string }).role;
+  const profile = data as { role: string; display_name?: string };
+  return {
+    role: profile.role,
+    displayName: profile.display_name ?? "",
+  };
 };
 
 export async function POST(request: NextRequest) {
@@ -59,13 +67,14 @@ export async function POST(request: NextRequest) {
     if (error || !data.user || !data.session) {
       throw error ?? new Error("Failed to sign in.");
     }
-    const role = await fetchUserRole(data.user.id);
+    const profile = await fetchUserProfile(data.user.id);
     const response = NextResponse.json({
       data: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
         userId: data.user.id,
-        role,
+        role: profile.role,
+        displayName: profile.displayName,
       },
     });
     // Keep cookie handling consistent with logout / refresh so we never forget an option.
@@ -73,7 +82,8 @@ export async function POST(request: NextRequest) {
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
       userId: data.user.id,
-      role,
+      role: profile.role,
+      displayName: profile.displayName,
     });
     return response;
   } catch (error) {

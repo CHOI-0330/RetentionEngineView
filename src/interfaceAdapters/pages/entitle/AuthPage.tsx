@@ -100,6 +100,7 @@ const AuthPage = () => {
       status={{
         isSubmitting: presenter.isSubmitting,
         error: presenter.error,
+        successMessage: presenter.successMessage,
       }}
       interactions={{
         setRegisterField: presenter.actions.setRegisterField,
@@ -108,6 +109,7 @@ const AuthPage = () => {
         submitLogin: presenter.actions.submitLogin,
         submitLogout: presenter.actions.submitLogout,
         clearError: presenter.actions.clearError,
+        clearSuccessMessage: presenter.actions.clearSuccessMessage,
       }}
     />
   );
