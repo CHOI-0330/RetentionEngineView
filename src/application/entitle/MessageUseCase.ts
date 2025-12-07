@@ -133,6 +133,7 @@ export class MessageUseCase {
       const result = await this.port.finalizeAssistantMessage({
         msgId: args.message.msgId,
         finalText: trimmed,
+        convId: args.message.convId,
       });
       return success(result);
     } catch (error) {

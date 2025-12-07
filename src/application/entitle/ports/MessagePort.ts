@@ -42,11 +42,13 @@ export interface MessagePort {
    * @param input - 完成パラメータ
    * @param input.msgId - メッセージID
    * @param input.finalText - 最終テキスト
+   * @param input.convId - 会話ID（サーバー保存用）
    * @returns 完成したメッセージオブジェクト
    */
   finalizeAssistantMessage(input: {
     msgId: string;
     finalText: string;
+    convId?: string;
   }): Promise<Message>;
 
   /**

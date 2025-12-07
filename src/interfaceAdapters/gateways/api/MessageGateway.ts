@@ -47,7 +47,7 @@ export class MessageGateway implements MessagePort {
   }
 
   async beginAssistantMessage(convId: string): Promise<Message> {
-    // 클라이언트에서 임시 메시지 생성 (서버 호출 없음)
+    // 클라이언트에서 임시 메시지 생성 (서버는 finalizeAssistantMessage에서 저장)
     const tempId =
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
@@ -66,11 +66,16 @@ export class MessageGateway implements MessagePort {
   async finalizeAssistantMessage(input: {
     msgId: string;
     finalText: string;
+    convId?: string;
   }): Promise<Message> {
-    // convId가 필요하므로 별도 파라미터로 받아야 함
-    throw new Error(
-      "finalizeAssistantMessage requires convId. Use finalizeAssistantMessageWithConvId instead."
-    );
+    // 서버에 ASSISTANT 메시지 저장 요청 (convId + content 전송)
+    if (!input.convId) {
+      throw new Error("convId is required for finalizeAssistantMessage");
+    }
+    return this.callApi<Message>("finalizeAssistantMessage", {
+      convId: input.convId,
+      content: input.finalText,
+    });
   }
 
   /**
@@ -83,16 +88,9 @@ export class MessageGateway implements MessagePort {
     return this.callApi<Message>("finalizeAssistantMessage", input);
   }
 
-  async cancelAssistantMessage(_msgId: string): Promise<Message> {
-    // 클라이언트에서만 처리 (서버 호출 없음)
-    return {
-      msgId: _msgId,
-      convId: "",
-      role: "ASSISTANT",
-      content: "",
-      status: "CANCELLED",
-      createdAt: new Date().toISOString(),
-    };
+  async cancelAssistantMessage(msgId: string): Promise<Message> {
+    // 서버에 ASSISTANT 메시지 취소 요청
+    return this.callApi<Message>("cancelAssistantMessage", { msgId });
   }
 
   async listConversationMessages(input: {
