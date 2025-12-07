@@ -10,12 +10,14 @@
 ## 1. 테스트 요약
 
 ### 1.1 전체 테스트 결과
+
 - **총 테스트 단계**: 6단계
 - **성공**: 2단계
 - **실패**: 2단계
 - **부분 성공**: 2단계
 
 ### 1.2 주요 발견 사항
+
 1. **학생 계정 로그인 실패** - 500 Internal Server Error
 2. **멘토-학생 간 역할 기반 접근 제어 작동** - 멘토 계정으로 학생 페이지 접근 시 차단
 3. **학생 대시보드 UI 존재 확인** - 일시적으로 접근 성공
@@ -32,11 +34,13 @@
 **스크린샷**: `/Users/choeseong-un/RetentionEngine/.playwright-mcp/page-2025-12-07T09-01-20-312Z.png`
 
 #### 실행 내용
+
 - URL: http://localhost:3000
-- 이메일: student@gmail.com
+- 이메일: newhire@gmail.com
 - 비밀번호: 11111111
 
 #### 에러 상세
+
 ```
 Console Error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
 API Endpoint: http://localhost:3000/api/auth/login
@@ -44,11 +48,13 @@ Error Message: "Invalid login credentials"
 ```
 
 #### 분석
+
 - 백엔드 API에서 500 에러 발생
 - 로그인 크레덴셜이 데이터베이스에 존재하지 않거나 인증 로직에 문제가 있음
 - 401 Unauthorized 에러도 동시에 발생하여 세션 관리 문제 가능성
 
 #### UI 요소 확인
+
 ✅ 이메일 입력창 정상 작동
 ✅ 비밀번호 입력창 정상 작동
 ✅ 로그인 버튼 정상 작동
@@ -63,16 +69,19 @@ Error Message: "Invalid login credentials"
 **스크린샷**: `/Users/choeseong-un/RetentionEngine/.playwright-mcp/page-2025-12-07T09-02-25-319Z.png`
 
 #### 실행 내용
+
 - 멘토 계정(mentor@gmail.com)으로 로그인
 - `/student/dashboard` URL 직접 접근 시도
 
 #### 결과
+
 ```
 접근 차단 메시지: "新入社員のみ利用できます。現在のロール: MENTOR"
 (신입사원만 이용할 수 있습니다. 현재 역할: MENTOR)
 ```
 
 #### 분석
+
 ✅ **역할 기반 접근 제어(RBAC) 정상 작동**
 ✅ 적절한 에러 메시지 표시
 ✅ 보안 요구사항 충족
@@ -88,6 +97,7 @@ Error Message: "Invalid login credentials"
 #### 확인된 UI 요소
 
 ##### 헤더 영역
+
 - ✅ Retention Engine 로고
 - ✅ 사용자 이름 표시: "newhire"
 - ✅ 역할 배지: "新入社員" (신입사원)
@@ -95,16 +105,19 @@ Error Message: "Invalid login credentials"
 - ✅ 로그아웃 버튼
 
 ##### 대시보드 메인 영역
+
 - ✅ 환영 메시지: "Welcome back, newhire Ready to learn?"
-- ✅ 설명 텍스트: "AIメンターとの会話を通じて、新しいスキルや知識を身につけましょう。"
+- ✅ 설명 텍스트: "AI メンターとの会話を通じて、新しいスキルや知識を身につけましょう。"
 - ✅ AI 아바타 설정 링크
 
 ##### 새 대화 생성 영역
+
 - ✅ 제목: "新しい会話を始める" (새로운 대화 시작)
 - ✅ 입력창: 플레이스홀더 "例: オンボーディングの進め方について"
 - ✅ 생성 버튼: "会話を作成"
 
 ##### 최근 대화 목록
+
 - ✅ 섹션 제목: "Recent Conversations"
 - ✅ 총 대화 수: "27 conversations"
 - ✅ 대화 카드 구성:
@@ -115,12 +128,13 @@ Error Message: "Invalid login credentials"
   - 삭제 버튼
 
 ##### 확인된 대화 목록 (일부)
+
 1. テスト会話 (6시간 전)
 2. 新しい会話 (10시간 전)
 3. 新しいチャット (2일 전)
 4. 森本さん２ (3일 전)
 5. 森本さん (3일 전)
-... (총 27개)
+   ... (총 27개)
 
 ---
 
@@ -131,10 +145,12 @@ Error Message: "Invalid login credentials"
 **사유**: 학생 계정 인증 세션 불안정
 
 #### 시도 내용
+
 - 대화 카드 클릭을 통한 채팅 페이지 진입 시도
 - 세션이 불안정하여 로그인 페이지로 리다이렉트
 
 #### 예상 URL 패턴
+
 ```
 /student/chat/[conversation-id]
 예: /student/chat/c3e1f749-3643-4eb1-9939-05c84ec6d7ae
@@ -145,6 +161,7 @@ Error Message: "Invalid login credentials"
 ## 3. 발견된 문제점
 
 ### 3.1 Critical Issues (치명적)
+
 1. **학생 계정 로그인 불가**
    - 영향도: 높음
    - 우선순위: P0
@@ -152,6 +169,7 @@ Error Message: "Invalid login credentials"
    - 해결 필요: 즉시
 
 ### 3.2 Major Issues (주요)
+
 2. **세션 안정성 문제**
    - 영향도: 중간
    - 우선순위: P1
@@ -159,6 +177,7 @@ Error Message: "Invalid login credentials"
    - 추가 조사 필요
 
 ### 3.3 Minor Issues (경미)
+
 없음
 
 ---
@@ -166,11 +185,13 @@ Error Message: "Invalid login credentials"
 ## 4. 성공적인 기능
 
 ### 4.1 보안 및 인증
+
 ✅ 역할 기반 접근 제어(RBAC) 정상 작동
 ✅ 멘토-학생 간 페이지 분리
 ✅ 적절한 에러 메시지 표시
 
 ### 4.2 UI/UX
+
 ✅ 반응형 디자인 적용
 ✅ 일관된 디자인 시스템 (Radix UI + TailwindCSS)
 ✅ 명확한 정보 계층 구조
@@ -178,6 +199,7 @@ Error Message: "Invalid login credentials"
 ✅ 다국어 지원 (일본어)
 
 ### 4.3 기능
+
 ✅ 대화 목록 표시 (27개)
 ✅ 대화 상태 표시 (ACTIVE)
 ✅ 상대 시간 표시
@@ -188,7 +210,9 @@ Error Message: "Invalid login credentials"
 ## 5. 권장 사항
 
 ### 5.1 즉시 조치 필요
+
 1. **학생 계정 인증 문제 해결**
+
    ```
    - API 엔드포인트: /api/auth/login 디버깅
    - 데이터베이스에 유효한 테스트 계정 확인/생성
@@ -203,7 +227,9 @@ Error Message: "Invalid login credentials"
    ```
 
 ### 5.2 개선 제안
+
 3. **에러 처리 개선**
+
    ```
    - 500 에러 시 사용자 친화적인 메시지 표시
    - 재시도 버튼 추가
@@ -222,6 +248,7 @@ Error Message: "Invalid login credentials"
 ## 6. 테스트 환경
 
 ### 6.1 기술 스택
+
 - **Frontend**: Next.js 14 + React 18
 - **Styling**: TailwindCSS + Radix UI
 - **인증**: NextAuth.js
@@ -229,6 +256,7 @@ Error Message: "Invalid login credentials"
 - **브라우저**: Chromium (Playwright)
 
 ### 6.2 테스트 데이터
+
 - 멘토 계정: mentor@gmail.com (로그인 성공)
 - 학생 계정: student@gmail.com (로그인 실패)
 - newhire 계정: 대시보드 접근 확인됨
@@ -237,13 +265,13 @@ Error Message: "Invalid login credentials"
 
 ## 7. 스크린샷 목록
 
-| 번호 | 파일명 | 설명 |
-|------|--------|------|
-| 1 | page-2025-12-07T09-00-42-936Z.png | 멘토 로그인 후 대시보드 |
-| 2 | page-2025-12-07T09-01-01-919Z.png | 학생 계정 로그인 폼 |
-| 3 | page-2025-12-07T09-01-20-312Z.png | 학생 로그인 에러 메시지 |
-| 4 | page-2025-12-07T09-02-07-343Z.png | 학생 대시보드 (일시 접근) |
-| 5 | page-2025-12-07T09-02-25-319Z.png | 멘토의 학생 페이지 접근 차단 |
+| 번호 | 파일명                            | 설명                         |
+| ---- | --------------------------------- | ---------------------------- |
+| 1    | page-2025-12-07T09-00-42-936Z.png | 멘토 로그인 후 대시보드      |
+| 2    | page-2025-12-07T09-01-01-919Z.png | 학생 계정 로그인 폼          |
+| 3    | page-2025-12-07T09-01-20-312Z.png | 학생 로그인 에러 메시지      |
+| 4    | page-2025-12-07T09-02-07-343Z.png | 학생 대시보드 (일시 접근)    |
+| 5    | page-2025-12-07T09-02-25-319Z.png | 멘토의 학생 페이지 접근 차단 |
 
 모든 스크린샷 위치: `/Users/choeseong-un/RetentionEngine/.playwright-mcp/`
 
@@ -252,11 +280,13 @@ Error Message: "Invalid login credentials"
 ## 8. 다음 단계
 
 ### 8.1 즉시 실행
+
 - [ ] 학생 계정 로그인 API 디버깅
 - [ ] 유효한 테스트 계정 생성 또는 복구
 - [ ] 세션 관리 로직 검토
 
 ### 8.2 후속 테스트
+
 - [ ] 학생 채팅 페이지 UI 테스트
 - [ ] 메시지 전송 기능 테스트
 - [ ] 프로필 설정 페이지 테스트
@@ -271,11 +301,13 @@ Error Message: "Invalid login credentials"
 RetentionEngine의 학생 워크플로우는 **UI/UX 관점에서 잘 설계**되어 있으나, **인증 및 세션 관리에 치명적인 문제**가 있어 즉시 해결이 필요합니다.
 
 ### 긍정적 측면
+
 - 깔끔하고 직관적인 UI
 - 적절한 보안 구현 (RBAC)
 - 명확한 정보 구조
 
 ### 개선 필요
+
 - 학생 계정 로그인 기능 복구
 - 세션 안정성 향상
 - 에러 처리 개선
