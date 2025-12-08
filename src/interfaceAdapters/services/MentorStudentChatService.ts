@@ -107,16 +107,18 @@ export class MentorStudentChatService {
   }
 
   /**
-   * 新しいフィードバックでデータを更新
+   * 新しいフィードバックでデータを更新（複数フィードバック対応）
    */
   updateWithNewFeedback(
     currentData: MentorChatBootstrapData,
     messageId: string,
     result: CreateFeedbackResult
   ): MentorChatBootstrapData {
+    // 既存のフィードバックに新しいフィードバックを追加
+    const existingFeedbacks = currentData.feedbackByMessageId[messageId] ?? [];
     const nextFeedbacks = {
       ...currentData.feedbackByMessageId,
-      [messageId]: [result.feedback],
+      [messageId]: [...existingFeedbacks, result.feedback],
     };
 
     const nextAuthorNames = {

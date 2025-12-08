@@ -46,7 +46,7 @@ export class MentorStudentChatUseCase {
   }
 
   /**
-   * フィードバック作成/更新
+   * フィードバック作成（複数フィードバック対応、更新なし）
    */
   async createFeedback(
     input: CreateFeedbackInput

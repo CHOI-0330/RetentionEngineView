@@ -350,11 +350,8 @@ const ConversationCard = memo(function ConversationCard({
           {conversation.title}
         </h3>
 
-        <div className="mt-auto pt-4 flex items-center justify-between text-xs text-muted-foreground border-t border-border/30">
+        <div className="mt-auto pt-4 flex items-center text-xs text-muted-foreground border-t border-border/30">
           <span>{conversation.displayDate}</span>
-          <span className="font-mono opacity-50">
-            ID: {conversation.id.slice(0, 4)}...
-          </span>
         </div>
 
         <div className="mt-3 flex justify-end">

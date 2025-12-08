@@ -45,7 +45,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <div id="content" className="relative">
+          <div id="content" className="relative overflow-hidden">
             {children}
           </div>
           <Toaster richColors position="top-center" />

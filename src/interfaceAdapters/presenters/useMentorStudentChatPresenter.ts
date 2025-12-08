@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type { MentorChatBootstrapData } from "../../application/entitle/ports/MentorStudentChatPort";
@@ -179,17 +180,10 @@ export function useMentorStudentChatPresenter(
           editingFlags: { ...prev.editingFlags, [messageId]: next },
         };
 
-        // 編集開始時：既存フィードバックがあれば下書きにセット
-        if (next && prev.bootstrapData) {
-          const existingFeedback =
-            prev.bootstrapData.feedbackByMessageId[messageId]?.[0];
-          if (existingFeedback) {
-            newState.drafts = {
-              ...newState.drafts,
-              [messageId]: existingFeedback.content,
-            };
-          }
+        // 編集開始時：エラーをクリア、下書きは空のまま（複数フィードバック対応）
+        if (next) {
           newState.formErrors = { ...newState.formErrors, [messageId]: null };
+          // 既存フィードバック内容をセットしない（新規作成専用）
         }
 
         return newState;
@@ -204,9 +198,8 @@ export function useMentorStudentChatPresenter(
 
       if (!bootstrapData) return;
 
-      const existingFeedback =
-        bootstrapData.feedbackByMessageId[messageId]?.[0] ?? null;
-      const rawDraft = drafts[messageId] ?? existingFeedback?.content ?? "";
+      // 複数フィードバック対応: 常に新規作成（既存フィードバックは参照しない）
+      const rawDraft = drafts[messageId] ?? "";
       const trimmed = rawDraft.trim();
 
       if (!trimmed) {
@@ -225,10 +218,10 @@ export function useMentorStudentChatPresenter(
         submitting: { ...prev.submitting, [messageId]: true },
       }));
 
+      // feedbackIdを渡さない = 常に新規作成
       const result = await service.createFeedback({
         messageId,
         content: trimmed,
-        feedbackId: existingFeedback?.fbId,
       });
 
       if (result.kind === "failure") {
@@ -247,7 +240,10 @@ export function useMentorStudentChatPresenter(
         return;
       }
 
-      // 成功時：データ更新
+      // 成功時：データ更新、下書きクリア
+      const existingCount = bootstrapData.feedbackByMessageId[messageId]?.length ?? 0;
+      const newCount = existingCount + 1;
+
       setState((prev) => {
         if (!prev.bootstrapData) return prev;
 
@@ -260,15 +256,30 @@ export function useMentorStudentChatPresenter(
         const nextSubmitting = { ...prev.submitting };
         delete nextSubmitting[messageId];
 
+        // 複数フィードバック対応: 送信後は下書きをクリア
+        const nextDrafts = { ...prev.drafts };
+        delete nextDrafts[messageId];
+
         return {
           ...prev,
           bootstrapData: updatedData,
-          drafts: { ...prev.drafts, [messageId]: trimmed },
+          drafts: nextDrafts,
           submitting: nextSubmitting,
           formErrors: { ...prev.formErrors, [messageId]: null },
           editingFlags: { ...prev.editingFlags, [messageId]: false },
         };
       });
+
+      // 成功トースト表示
+      toast.success(
+        newCount > 1
+          ? `フィードバックを追加しました (${newCount}件目)`
+          : "フィードバックを送信しました",
+        {
+          duration: 3000,
+          icon: "✅",
+        }
+      );
     },
     [state, service]
   );

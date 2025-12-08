@@ -214,7 +214,7 @@ export async function GET(
     const messages = (messagesResponse.data ?? []).map(mapMessageDto);
 
     const feedbackByMessageId: Record<string, Feedback[]> = {};
-    const authorNames: Record<string, string> = {};
+    const authorIds = new Set<string>();
 
     await Promise.all(
       messages.map(async (message) => {
@@ -223,16 +223,39 @@ export async function GET(
         if (mapped.length) {
           feedbackByMessageId[message.msgId] = mapped;
           mapped.forEach((item) => {
-            authorNames[item.authorId] = authorNames[item.authorId] ?? item.authorId;
+            authorIds.add(item.authorId);
           });
         }
       })
     );
 
+    // フィードバック作成者の表示名を取得
+    const authorNames: Record<string, string> = {};
+    if (authorIds.size > 0) {
+      const adminClient = getAdminClient();
+      const { data: authors } = await adminClient
+        .from("user")
+        .select("user_id, display_name")
+        .in("user_id", Array.from(authorIds));
+
+      if (authors) {
+        authors.forEach((author: { user_id: string; display_name?: string }) => {
+          authorNames[author.user_id] = author.display_name || "メンター";
+        });
+      }
+
+      // DBにない場合のフォールバック
+      authorIds.forEach((id) => {
+        if (!authorNames[id]) {
+          authorNames[id] = "メンター";
+        }
+      });
+    }
+
     const mentor: User = {
       userId: authUser.userId,
       role: "MENTOR",
-      displayName: authUser.userId,
+      displayName: authUser.displayName || "メンター",
       email: "",
       createdAt: "",
     };
@@ -301,16 +324,8 @@ export async function POST(
       return NextResponse.json({ error: "Message not found or not accessible." }, { status: 404 });
     }
 
-    // 既存メンターフィードバック存在有無確認（バックエンドには更新エンドポイントがないため重複作成防止のみ実行）
-    const feedbackRes = await callBackend<{ data: FeedbackDto[] }>(
-      `/feedback?messageId=${encodeURIComponent(targetMessage.msgId)}`,
-      undefined,
-      accessToken
-    );
-    const existingFeedback = (feedbackRes.data ?? []).find((fb) => fb.author_id === authUser.userId);
-    if (existingFeedback) {
-      return NextResponse.json({ error: "既にこのメッセージへフィードバック済みです。" }, { status: 400 });
-    }
+    // 複数フィードバック対応: 既存フィードバックの重複チェックを削除
+    // メンターは同じメッセージに複数のフィードバックを作成可能
 
     const createRes = await createFeedback(
       {
@@ -326,7 +341,7 @@ export async function POST(
       {
         data: {
           feedback,
-          authorName: authUser.userId,
+          authorName: authUser.displayName || "メンター",
         },
       },
       { status: 201 }

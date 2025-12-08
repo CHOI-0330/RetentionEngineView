@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   authorName?: string;
   feedback?: FeedbackActions;
   authorNames?: Record<string, string>;
+  canWriteFeedback?: boolean; // フィードバック入力可否（MEINTORのみtrue）
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -26,6 +27,7 @@ export const MessageBubble = memo(function MessageBubble({
   authorName,
   feedback,
   authorNames = {},
+  canWriteFeedback = false,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isStreaming = message.status === "partial" || message.status === "draft";
@@ -117,8 +119,11 @@ export const MessageBubble = memo(function MessageBubble({
               minute: "2-digit",
             })}
           </span>
-          {/* フィードバックボタン（AI応答のみ） */}
-          {!isUser && feedback && !isStreaming && message.content && (
+          {/* フィードバックボタン（AI応答のみ）
+              - MENTOR: 常に表示（入力可能）
+              - NEW_HIRE: フィードバックがある場合のみ表示（閲覧専用）
+          */}
+          {!isUser && feedback && !isStreaming && message.content && (canWriteFeedback || hasFeedback) && (
             <button
               onClick={() => setShowFeedback(!showFeedback)}
               className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-blue-600 hover:bg-blue-100 transition-colors"
@@ -308,28 +313,30 @@ export const MessageBubble = memo(function MessageBubble({
                 </p>
               )}
 
-              {/* フィードバック入力 */}
-              <div className="flex gap-2">
-                <Textarea
-                  value={inputValue}
-                  onChange={(e) => feedback.setInput(msgId, e.target.value)}
-                  placeholder="フィードバックを入力..."
-                  className="min-h-[60px] text-sm resize-none"
-                  disabled={isSubmitting}
-                />
-                <Button
-                  size="sm"
-                  onClick={handleSubmitFeedback}
-                  disabled={isSubmitting || !inputValue.trim()}
-                  className="shrink-0 self-end"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "送信"
-                  )}
-                </Button>
-              </div>
+              {/* フィードバック入力（MENTORのみ表示） */}
+              {canWriteFeedback && (
+                <div className="flex gap-2">
+                  <Textarea
+                    value={inputValue}
+                    onChange={(e) => feedback.setInput(msgId, e.target.value)}
+                    placeholder="フィードバックを入力..."
+                    className="min-h-[60px] text-sm resize-none"
+                    disabled={isSubmitting}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSubmitFeedback}
+                    disabled={isSubmitting || !inputValue.trim()}
+                    className="shrink-0 self-end"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "送信"
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}

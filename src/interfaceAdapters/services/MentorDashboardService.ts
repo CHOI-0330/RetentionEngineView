@@ -21,6 +21,7 @@ export interface StudentViewModel {
   name: string;
   avatar?: string;
   lastActivity: Date;
+  createdAt: Date;
   status: StudentStatus;
   conversationId: string;
   recentChat: {
@@ -32,6 +33,8 @@ export interface StudentViewModel {
   };
   totalChats: number;
 }
+
+export type SortOption = "lastActivity" | "createdDate" | "name";
 
 export interface MentorDashboardViewModel {
   students: StudentViewModel[];
@@ -89,7 +92,8 @@ export class MentorDashboardService {
   toViewModel(
     summaries: StudentSummary[],
     newhireOptions: NewhireOption[],
-    searchQuery: string = ""
+    searchQuery: string = "",
+    sortOption: SortOption = "lastActivity"
   ): MentorDashboardViewModel {
     // 検索フィルタリング
     const query = searchQuery.trim().toLowerCase();
@@ -132,13 +136,35 @@ export class MentorDashboardService {
           needsReview,
         },
         totalChats,
+        createdAt: new Date(conversation.createdAt),
       };
     });
 
+    // ソート適用
+    const sortedStudents = this.sortStudents(students, sortOption);
+
     return {
-      students,
+      students: sortedStudents,
       newhireOptions,
     };
+  }
+
+  /**
+   * ソートロジック
+   */
+  private sortStudents(students: StudentViewModel[], sortOption: SortOption): StudentViewModel[] {
+    return [...students].sort((a, b) => {
+      switch (sortOption) {
+        case "lastActivity":
+          return b.lastActivity.getTime() - a.lastActivity.getTime();
+        case "createdDate":
+          return b.createdAt.getTime() - a.createdAt.getTime();
+        case "name":
+          return a.name.localeCompare(b.name, "ja");
+        default:
+          return 0;
+      }
+    });
   }
 
   /**

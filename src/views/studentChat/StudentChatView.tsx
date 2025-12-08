@@ -70,7 +70,7 @@ export const StudentChatView = memo(function StudentChatView({
   const selectedConvId = viewModel.conversation?.convId ?? "";
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
       {/* ヘッダー */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">

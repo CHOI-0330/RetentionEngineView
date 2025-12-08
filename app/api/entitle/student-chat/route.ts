@@ -440,13 +440,35 @@ export async function POST(request: NextRequest) {
         const authorIds = Array.from(
           new Set(items.map((feedback) => feedback.authorId))
         );
+
+        // フィードバック作成者の表示名を取得
+        const authorNames: Record<string, string> = {};
+        if (authorIds.length > 0) {
+          const adminClient = getAdminClient();
+          const { data: authors } = await adminClient
+            .from("user")
+            .select("user_id, display_name")
+            .in("user_id", authorIds);
+
+          if (authors) {
+            authors.forEach((author: { user_id: string; display_name?: string }) => {
+              authorNames[author.user_id] = author.display_name || "メンター";
+            });
+          }
+
+          // DBにない場合のフォールバック
+          authorIds.forEach((id) => {
+            if (!authorNames[id]) {
+              authorNames[id] = "メンター";
+            }
+          });
+        }
+
         return NextResponse.json({
           data: {
             items,
             nextCursor,
-            authorNames: Object.fromEntries(
-              authorIds.map((id) => [id, id] as const)
-            ),
+            authorNames,
           },
         });
       }
@@ -625,6 +647,29 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // フィードバック作成者の表示名を取得
+    const authorNames: Record<string, string> = {};
+    if (authorIds.size > 0) {
+      const adminClient = getAdminClient();
+      const { data: authors } = await adminClient
+        .from("user")
+        .select("user_id, display_name")
+        .in("user_id", Array.from(authorIds));
+
+      if (authors) {
+        authors.forEach((author: { user_id: string; display_name?: string }) => {
+          authorNames[author.user_id] = author.display_name || "メンター";
+        });
+      }
+
+      // DBにない場合のフォールバック
+      authorIds.forEach((id) => {
+        if (!authorNames[id]) {
+          authorNames[id] = "メンター";
+        }
+      });
+    }
+
     return NextResponse.json({
       data: {
         conversation: selectedConversation,
@@ -638,9 +683,7 @@ export async function GET(request: NextRequest) {
         },
         initialMessages,
         initialFeedbacks: feedbackByMessageId,
-        authorNames: Object.fromEntries(
-          Array.from(authorIds).map((id) => [id, id] as const)
-        ),
+        authorNames,
         mentorAssignments: [],
         availableConversations: conversations.map((conv) => ({
           convId: conv.convId,

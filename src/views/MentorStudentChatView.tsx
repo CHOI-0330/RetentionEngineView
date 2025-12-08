@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { Loader2, MessageCircle, ChevronLeft, Edit3 } from "lucide-react";
+import { Loader2, MessageCircle, ChevronLeft } from "lucide-react";
 import MarkdownRendererView from "../components/MarkdownRenderer";
 
 interface MentorChatMessage {
@@ -86,7 +86,7 @@ const MentorStudentChatView = ({
   }, [messages.length]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">
           <Button
@@ -126,12 +126,10 @@ const MentorStudentChatView = ({
             const isAssistantDraft =
               message.role === "ASSISTANT" &&
               (message.status === "DRAFT" || message.status === "PARTIAL");
-            const draftValue =
-              feedbackDrafts[message.id] ??
-              (hasFeedback ? message.feedbacks[0]?.content ?? "" : "");
-            const submitLabel = hasFeedback
-              ? "フィードバックを更新"
-              : "フィードバックを送信";
+            // 複数フィードバック対応: 入力欄は常に空、既存内容は表示しない
+            const draftValue = feedbackDrafts[message.id] ?? "";
+            const feedbackCount = message.feedbacks.length;
+            const isAdditionalFeedback = feedbackCount > 0;
             const prev = index > 0 ? messages[index - 1] : null;
             const isTurnChange = !prev || prev.role !== message.role;
 
@@ -176,23 +174,30 @@ const MentorStudentChatView = ({
                       )}
 
                       {!isStudent && (
-                        <div className="absolute -right-10 top-0 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="absolute -right-12 top-0 opacity-0 transition-opacity group-hover:opacity-100">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full bg-background shadow-sm hover:bg-accent"
+                                className="h-8 w-8 rounded-full shadow-sm relative bg-blue-50 hover:bg-blue-100"
                                 onClick={() =>
                                   onToggleEditing(message.id, true)
                                 }
                               >
-                                <Edit3 className="h-4 w-4 text-muted-foreground" />
+                                <MessageCircle className="h-4 w-4 text-blue-600" />
+                                {isAdditionalFeedback && (
+                                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                                    {feedbackCount}
+                                  </span>
+                                )}
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="right">
-                              {hasFeedback ? "編集" : "フィードバックを書く"}
+                              {isAdditionalFeedback
+                                ? `フィードバックを追加 (${feedbackCount}件済)`
+                                : "フィードバックを書く"}
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -242,13 +247,69 @@ const MentorStudentChatView = ({
                       open={isEditing}
                       onOpenChange={(open) => onToggleEditing(message.id, open)}
                     >
-                      <DialogContent className="sm:max-w-lg">
+                      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                         <DialogHeader>
-                          <DialogTitle>学生へのフィードバック</DialogTitle>
+                          <DialogTitle className="flex items-center gap-2">
+                            <MessageCircle className="h-5 w-5 text-blue-600" />
+                            フィードバック
+                            {isAdditionalFeedback && (
+                              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                                {feedbackCount + 1}件目
+                              </Badge>
+                            )}
+                          </DialogTitle>
                           <DialogDescription>
-                            このメッセージに対する具体的なアドバイスや修正案を入力してください。
+                            このメッセージに対するフィードバックを入力してください。
                           </DialogDescription>
                         </DialogHeader>
+
+                        {/* 既存フィードバック一覧（追加時のみ表示） */}
+                        {isAdditionalFeedback && (
+                          <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 mt-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageCircle className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-semibold text-blue-800">
+                                既存のフィードバック ({feedbackCount}件)
+                              </span>
+                            </div>
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {message.feedbacks.map((fb, idx) => (
+                                <div
+                                  key={fb.id}
+                                  className="rounded-lg bg-white/80 p-3 border border-blue-100"
+                                >
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
+                                        {fb.authorName.slice(0, 1)}
+                                      </div>
+                                      <div className="leading-tight">
+                                        <span className="block text-foreground font-semibold text-xs">
+                                          {fb.authorName}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {fb.createdAt.toLocaleString("ja-JP", {
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[9px] h-4 px-1.5">
+                                      {idx + 1}件目
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-foreground/80 line-clamp-2 pl-7">
+                                    {fb.content}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <form
                           className="space-y-4 mt-2"
                           onSubmit={(event) => {
@@ -259,8 +320,9 @@ const MentorStudentChatView = ({
                           <div className="space-y-2">
                             <Label
                               htmlFor={`mentor-feedback-${message.id}`}
-                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                              className="text-xs font-semibold uppercase tracking-wide text-blue-700 flex items-center gap-2"
                             >
+                              <MessageCircle className="h-3 w-3" />
                               フィードバック内容
                             </Label>
                             <Textarea
@@ -275,7 +337,7 @@ const MentorStudentChatView = ({
                               rows={6}
                               placeholder="例: この部分はもう少し具体的に説明すると良いでしょう..."
                               autoFocus
-                              className="resize-none text-base leading-relaxed"
+                              className="resize-none text-base leading-relaxed border-blue-200 focus:border-blue-400 focus:ring-blue-400"
                               onKeyDown={(e) => {
                                 if (
                                   (e.metaKey || e.ctrlKey) &&
@@ -306,15 +368,18 @@ const MentorStudentChatView = ({
                             <Button
                               type="submit"
                               disabled={feedbackSubmitting[message.id] ?? false}
-                              className="min-w-[100px]"
+                              className="min-w-[100px] bg-blue-600 hover:bg-blue-700"
                             >
                               {feedbackSubmitting[message.id] ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   送信中
                                 </>
                               ) : (
-                                submitLabel
+                                <>
+                                  <MessageCircle className="mr-1.5 h-4 w-4" />
+                                  送信
+                                </>
                               )}
                             </Button>
                           </DialogFooter>
@@ -389,52 +454,48 @@ function MentorFeedbackSection({
 
       <CollapsibleContent
         id={contentId}
-        className="space-y-3 pt-2 animate-in slide-in-from-top-2 fade-in duration-200"
+        className="space-y-2 pt-2 animate-in slide-in-from-top-2 fade-in duration-200"
       >
-        <div className="relative rounded-xl border border-blue-100 bg-blue-50/50 p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-600">
-                {feedbacks[0]?.authorName.slice(0, 1)}
+        {/* 統一されたフィードバック表示 */}
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 shadow-sm">
+          <div className="space-y-3">
+            {feedbacks.map((fb, idx) => (
+              <div
+                key={fb.id}
+                className={`rounded-lg bg-white/80 p-3 border border-blue-100 ${
+                  idx > 0 ? "mt-2" : ""
+                }`}
+              >
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-600">
+                      {fb.authorName.slice(0, 1)}
+                    </div>
+                    <div className="leading-tight">
+                      <span className="block text-foreground font-semibold text-sm">
+                        {fb.authorName}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {fb.createdAt.toLocaleString("ja-JP", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px]">
+                    {idx + 1}件目
+                  </Badge>
+                </div>
+                <div className="prose prose-sm max-w-none text-foreground/90">
+                  <MarkdownRendererView content={fb.content} className="space-y-2" />
+                </div>
               </div>
-              <div className="leading-tight">
-                <span className="block text-foreground font-semibold text-sm">
-                  {feedbacks[0]?.authorName}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {feedbacks[0]?.createdAt.toLocaleString()}
-                </span>
-              </div>
-            </div>
-            <Badge variant="secondary" className="text-[10px]">
-              フィードバック
-            </Badge>
-          </div>
-          <div className="prose prose-sm max-w-none text-foreground/90">
-            <MarkdownRendererView content={feedbacks[0]?.content ?? ""} className="space-y-2" />
+            ))}
           </div>
         </div>
-
-        {feedbacks.length > 1 ? (
-          <Collapsible>
-            <CollapsibleTrigger className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground hover:text-foreground">
-              <span>他 {feedbacks.length - 1} 件のフィードバックを表示</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-2 pl-4 border-l-2 border-border/50">
-              {feedbacks.slice(1).map((fb) => (
-                <div key={fb.id} className="rounded-lg bg-muted/30 p-3 shadow-sm">
-                  <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-medium">{fb.authorName}</span>
-                    <span className="text-[11px]">{fb.createdAt.toLocaleString()}</span>
-                  </div>
-                  <div className="prose prose-sm max-w-none text-foreground/90">
-                    <MarkdownRendererView content={fb.content} className="space-y-1.5" />
-                  </div>
-                </div>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        ) : null}
       </CollapsibleContent>
     </Collapsible>
   );

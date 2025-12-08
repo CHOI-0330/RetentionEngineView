@@ -19,6 +19,7 @@ import {
 import type {
   MentorDashboardViewModel,
   StudentViewModel,
+  SortOption,
 } from "../services/MentorDashboardService";
 
 // ============================================
@@ -29,6 +30,7 @@ interface PresenterState {
   summaries: StudentSummary[];
   newhireOptions: NewhireOption[];
   searchQuery: string;
+  sortOption: SortOption;
   isLoading: boolean;
   isLoadingNewhires: boolean;
   error: UseCaseFailure | null;
@@ -64,6 +66,7 @@ export interface MentorDashboardPresenterV2Output {
   isLoadingNewhires: boolean;
   error: UseCaseFailure | null;
   searchQuery: string;
+  sortOption: SortOption;
   selectedStudentId: string | null;
   selectedNewhireId: string;
   isAssigning: boolean;
@@ -73,6 +76,8 @@ export interface MentorDashboardPresenterV2Output {
   actions: {
     // 検索
     setSearchQuery: (value: string) => void;
+    // ソート
+    setSortOption: (option: SortOption) => void;
     // 学生選択
     selectStudent: (studentId: string | null) => void;
     // 新入社員選択
@@ -98,6 +103,7 @@ const initialState: PresenterState = {
   summaries: [],
   newhireOptions: [],
   searchQuery: "",
+  sortOption: "lastActivity",
   isLoading: true,
   isLoadingNewhires: false,
   error: null,
@@ -204,6 +210,10 @@ export function useMentorDashboardPresenter(
 
   const setSearchQuery = useCallback((value: string) => {
     setState((prev) => ({ ...prev, searchQuery: value }));
+  }, []);
+
+  const setSortOption = useCallback((option: SortOption) => {
+    setState((prev) => ({ ...prev, sortOption: option }));
   }, []);
 
   const selectStudent = useCallback((studentId: string | null) => {
@@ -314,9 +324,10 @@ export function useMentorDashboardPresenter(
     return service.toViewModel(
       state.summaries,
       state.newhireOptions,
-      state.searchQuery
+      state.searchQuery,
+      state.sortOption
     );
-  }, [service, state.summaries, state.newhireOptions, state.searchQuery]);
+  }, [service, state.summaries, state.newhireOptions, state.searchQuery, state.sortOption]);
 
   // ============================================
   // 返却
@@ -328,6 +339,7 @@ export function useMentorDashboardPresenter(
     isLoadingNewhires: state.isLoadingNewhires,
     error: state.error,
     searchQuery: state.searchQuery,
+    sortOption: state.sortOption,
     selectedStudentId: state.selectedStudentId,
     selectedNewhireId: state.selectedNewhireId,
     isAssigning: state.isAssigning,
@@ -335,6 +347,7 @@ export function useMentorDashboardPresenter(
     qualitySubmitting: state.qualitySubmitting,
     actions: {
       setSearchQuery,
+      setSortOption,
       selectStudent,
       selectNewhire,
       refresh,

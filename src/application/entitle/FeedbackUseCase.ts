@@ -111,10 +111,7 @@ export class FeedbackUseCase {
       return failure("ValidationError", "Feedback can be written only for assistant messages.");
     }
 
-    // 検証: 既存フィードバック
-    if ((args.existingFeedbackCount ?? 0) > 0) {
-      return failure("ValidationError", "Feedback already exists for this message.");
-    }
+    // 複数フィードバック作成を許可（既存フィードバック検証を削除）
 
     // 検証: 空内容
     const trimmed = args.content.trim();

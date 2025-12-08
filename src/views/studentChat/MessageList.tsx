@@ -20,6 +20,7 @@ interface MessageListProps {
   webSearchPending?: WebSearchPendingState | null;
   onConfirmWebSearch?: () => void;
   onCancelWebSearch?: () => void;
+  canWriteFeedback?: boolean; // フィードバック入力可否
 }
 
 export const MessageList = memo(function MessageList({
@@ -30,6 +31,7 @@ export const MessageList = memo(function MessageList({
   webSearchPending,
   onConfirmWebSearch,
   onCancelWebSearch,
+  canWriteFeedback = false,
 }: MessageListProps) {
   if (messages.length === 0 && !isAwaitingAssistant) {
     return (
@@ -51,6 +53,7 @@ export const MessageList = memo(function MessageList({
               authorName={authorNames[msg.msgId]}
               feedback={feedback}
               authorNames={authorNames}
+              canWriteFeedback={canWriteFeedback}
             />
           </div>
         );

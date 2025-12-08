@@ -65,7 +65,7 @@ export class MentorStudentChatGateway implements MentorStudentChatPort {
   }
 
   /**
-   * フィードバック作成/更新
+   * フィードバック作成（複数フィードバック対応）
    */
   async createFeedback(input: CreateFeedbackInput): Promise<CreateFeedbackResult> {
     // apiFetchは { data: T } レスポンスからdataを自動抽出する

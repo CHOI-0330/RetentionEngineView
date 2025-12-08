@@ -191,6 +191,8 @@ export function useStudentChatPresenter(
         activeConversationId: result.value.conversation?.convId ?? null,
         isLoading: false,
         error: null,
+        // 初期フィードバックを状態に反映
+        feedbacks: result.value.initialFeedbacks ?? {},
       }));
     },
     [requester, service]

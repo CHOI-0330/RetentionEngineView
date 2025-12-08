@@ -79,40 +79,41 @@ const MentorDashboardPage = () => {
   );
 
   return (
-    <div className="space-y-4">
-      <MentorAssignmentView
-        newhireOptions={presenter.viewModel.newhireOptions}
-        selectedNewhireId={presenter.selectedNewhireId}
-        onSelectNewhire={presenter.actions.selectNewhire}
-        onCreateAssignment={presenter.actions.createAssignment}
-        onRefreshNewhires={presenter.actions.refreshNewhires}
-        isLoadingNewhires={presenter.isLoadingNewhires}
-        isAssigning={presenter.isAssigning}
-        assignmentError={presenter.assignmentError}
-      />
-
-      <MentorDashboardView
-        viewModel={{
-          students: presenter.viewModel.students,
-          searchQuery: presenter.searchQuery,
-          onChangeSearch: presenter.actions.setSearchQuery,
-        }}
-        status={{
-          isLoading: presenter.isLoading,
-          error: presenter.error,
-        }}
-        meta={{
-          qualitySubmitting: presenter.qualitySubmitting,
-          selectedStudentId: presenter.selectedStudentId,
-        }}
-        interactions={{
-          requestRefresh: presenter.actions.refresh,
-          acknowledgeEffect: () => {},
-          clearError: presenter.actions.clearError,
-          selectStudent: presenter.actions.selectStudent,
-        }}
-      />
-    </div>
+    <MentorDashboardView
+      viewModel={{
+        students: presenter.viewModel.students,
+        searchQuery: presenter.searchQuery,
+        sortOption: presenter.sortOption,
+        onChangeSearch: presenter.actions.setSearchQuery,
+        onSortChange: presenter.actions.setSortOption,
+      }}
+      status={{
+        isLoading: presenter.isLoading,
+        error: presenter.error,
+      }}
+      meta={{
+        qualitySubmitting: presenter.qualitySubmitting,
+        selectedStudentId: presenter.selectedStudentId,
+      }}
+      interactions={{
+        requestRefresh: presenter.actions.refresh,
+        acknowledgeEffect: () => {},
+        clearError: presenter.actions.clearError,
+        selectStudent: presenter.actions.selectStudent,
+      }}
+      assignmentSection={
+        <MentorAssignmentView
+          newhireOptions={presenter.viewModel.newhireOptions}
+          selectedNewhireId={presenter.selectedNewhireId}
+          onSelectNewhire={presenter.actions.selectNewhire}
+          onCreateAssignment={presenter.actions.createAssignment}
+          onRefreshNewhires={presenter.actions.refreshNewhires}
+          isLoadingNewhires={presenter.isLoadingNewhires}
+          isAssigning={presenter.isAssigning}
+          assignmentError={presenter.assignmentError}
+        />
+      }
+    />
   );
 };
 
