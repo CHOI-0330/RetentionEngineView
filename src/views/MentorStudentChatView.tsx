@@ -87,7 +87,7 @@ const MentorStudentChatView = ({
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-6 py-3">
         <div className="flex items-center gap-4">
           <Button
             asChild
@@ -153,11 +153,11 @@ const MentorStudentChatView = ({
                     )}
 
                     <div
-                      className={`group relative rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm ${
+                      className={`group relative rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
                         isStudent
                           ? "bg-primary text-primary-foreground rounded-tr-sm"
                           : "bg-muted/50 text-foreground rounded-tl-sm hover:bg-muted/80"
-                      } ${hasFeedback ? "ring-2 ring-blue-400/50 ring-offset-2" : ""}`}
+                      } ${hasFeedback ? "ring-2 ring-blue-400/50" : ""}`}
                     >
                       {isAssistantDraft ? (
                         <div className="flex items-center gap-2 text-muted-foreground">
@@ -174,14 +174,14 @@ const MentorStudentChatView = ({
                       )}
 
                       {!isStudent && (
-                        <div className="absolute -right-12 top-0 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="absolute -right-12 top-0 opacity-0 group-hover:opacity-100">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full shadow-sm relative bg-blue-50 hover:bg-blue-100"
+                                className="h-8 w-8 rounded-full relative bg-blue-50 hover:bg-blue-100"
                                 onClick={() =>
                                   onToggleEditing(message.id, true)
                                 }
@@ -454,10 +454,10 @@ function MentorFeedbackSection({
 
       <CollapsibleContent
         id={contentId}
-        className="space-y-2 pt-2 animate-in slide-in-from-top-2 fade-in duration-200"
+        className="space-y-2 pt-2"
       >
         {/* 統一されたフィードバック表示 */}
-        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 shadow-sm">
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
           <div className="space-y-3">
             {feedbacks.map((fb, idx) => (
               <div

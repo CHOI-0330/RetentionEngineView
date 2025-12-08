@@ -72,13 +72,13 @@ export const StudentChatView = memo(function StudentChatView({
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
       {/* ヘッダー */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-6 py-3">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
             <div className="flex items-center gap-3">
               <a
                 href="/student/dashboard"
-                className="inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/70"
               >
                 <span className="text-lg leading-none">←</span>
                 <span>戻る</span>

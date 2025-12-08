@@ -4,70 +4,96 @@
 
 @layer base {
   :root {
-    /* ドボクリエイト ブランドカラー - 現代的・革新的バージョン */
-    --background: 140 40% 98%;
-    --foreground: 150 30% 15%;
+    /* ドボクリエイト ブランドカラー - B2B SaaS専用 */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 150 30% 15%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 150 30% 15%;
-    /* Primary: 鮮やかなエメラルドグリーン #22c55e */
-    --primary: 142 71% 45%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: ブランドグリーン #22A559 */
+    --primary: 145 65% 39%;
     --primary-foreground: 0 0% 100%;
-    /* Secondary: 落ち着いたグリーン背景 */
-    --secondary: 140 40% 96%;
-    --secondary-foreground: 150 30% 20%;
-    /* Muted: 薄いグリーントーン */
-    --muted: 140 30% 94%;
-    --muted-foreground: 150 15% 45%;
-    /* Accent: 明るいミントグリーン #4ade80 */
-    --accent: 142 69% 58%;
-    --accent-foreground: 150 30% 15%;
-    /* Destructive: 落ち着いた赤 */
-    --destructive: 0 65% 50%;
+
+    /* Secondary: ニュートラルグレー */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 9% 46%;
+
+    /* Muted: 薄いグレー */
+    --muted: 210 40% 98%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent: 控えめなグリーン */
+    --accent: 145 30% 95%;
+    --accent-foreground: 145 65% 39%;
+
+    /* Success: Primary と同一 #22A559 */
+    --success: 145 65% 39%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning: 注意喚起オレンジ #F59E0B */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Error: 明確な赤 #DC2626 */
+    --error: 0 72% 51%;
+    --error-foreground: 0 0% 100%;
+
+    /* Info: 情報ブルー #3B82F6 */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Destructive: Error と同一 */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    /* Border/Input: グリーントーン */
-    --border: 140 20% 88%;
-    --input: 140 20% 88%;
-    --ring: 142 71% 45%;
+
+    /* Border/Input: ニュートラルグレー */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 145 65% 39%;
     --radius: 0.5rem;
-    /* Chart: グリーン系パレット */
-    --chart-1: 142 71% 45%;
-    --chart-2: 142 50% 55%;
-    --chart-3: 142 35% 65%;
-    --chart-4: 45 80% 55%;
-    --chart-5: 0 60% 50%;
+
+    /* Gray Scale - 体系化された中立カラー */
+    --gray-50: 210 40% 98%;    /* #F9FAFB - 背景 */
+    --gray-100: 220 14% 96%;   /* #F3F4F6 - Secondary 背景 */
+    --gray-200: 214 32% 91%;   /* #E5E7EB - 境界線 */
+    --gray-400: 218 11% 65%;   /* #9CA3AF - 非活性 */
+    --gray-600: 215 16% 47%;   /* #4B5563 - サブテキスト */
+    --gray-900: 222 47% 11%;   /* #111827 - メインテキスト */
+
+    /* Chart: ビジネス向けカラーパレット */
+    --chart-1: 145 65% 39%;    /* Primary Green */
+    --chart-2: 217 91% 60%;    /* Info Blue */
+    --chart-3: 38 92% 50%;     /* Warning Orange */
+    --chart-4: 280 60% 50%;    /* Purple */
+    --chart-5: 0 72% 51%;      /* Error Red */
   }
 
+  /* Dark Mode - B2B では通常不要のため簡略化 */
+  /* 必要に応じて下記のコメントを解除してください
   .dark {
-    /* ダークモード - グリーン系 */
-    --background: 150 20% 8%;
-    --foreground: 140 30% 95%;
-    --card: 150 15% 12%;
-    --card-foreground: 140 30% 95%;
-    --popover: 150 15% 12%;
-    --popover-foreground: 140 30% 95%;
-    /* Primary: エメラルドグリーン */
-    --primary: 142 71% 45%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 15%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 15%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 145 65% 39%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 150 15% 18%;
-    --secondary-foreground: 140 30% 90%;
-    --muted: 150 15% 18%;
-    --muted-foreground: 140 15% 60%;
-    --accent: 142 60% 40%;
-    --accent-foreground: 140 30% 95%;
-    --destructive: 0 60% 45%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 150 15% 20%;
-    --input: 150 15% 20%;
-    --ring: 142 71% 45%;
-    /* Chart: ダークモード用グリーン系 */
-    --chart-1: 142 65% 50%;
-    --chart-2: 142 50% 60%;
-    --chart-3: 142 40% 70%;
-    --chart-4: 45 75% 60%;
-    --chart-5: 0 55% 55%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 223 47% 11%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 145 65% 39%;
   }
+  */
 }
 
 @layer base {
@@ -84,28 +110,4 @@
   }
 }
 
-@layer utilities {
-  .text-gradient {
-    background: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 50% 35%) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .btn-gradient {
-    background: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 60% 38%) 100%);
-  }
-
-  .btn-gradient:hover {
-    background: linear-gradient(135deg, hsl(142 71% 40%) 0%, hsl(142 60% 33%) 100%);
-  }
-
-  .card-hover {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px -5px rgba(34, 197, 94, 0.15);
-  }
-}
+/* AI風のグラデーション効果を削除 - B2B SaaSには不適切 */

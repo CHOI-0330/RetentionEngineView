@@ -57,7 +57,7 @@ const ProfileView = ({
       {errorMessage && (
         <Alert
           variant="destructive"
-          className="flex items-start justify-between gap-3 animate-in fade-in zoom-in-95"
+          className="flex items-start justify-between gap-3"
         >
           <span>{errorMessage}</span>
           <Button
@@ -105,7 +105,7 @@ const ProfileView = ({
           <Button
             onClick={actions.saveMbti}
             disabled={isLoading || isSaving || !viewModel.canSave}
-            className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+            className="transition-colors"
           >
             {isSaving ? "保存中..." : "保存"}
           </Button>

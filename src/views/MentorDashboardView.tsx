@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Loader2, MessageCircle, User, Sparkles, Search, ArrowUpDown } from "lucide-react";
+import { Loader2, MessageCircle, User, Search, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 
 // ============================================
@@ -124,24 +124,19 @@ const HeroSection = memo(function HeroSection() {
   return (
     <section className="relative overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24">
       <div className="container px-4 sm:px-6 relative z-10">
-        <div className="max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary backdrop-blur-sm">
-            <Sparkles className="mr-1 h-3 w-3" />
+        <div className="max-w-3xl space-y-6">
+          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
             メンターダッシュボード
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             担当新入社員
-            <span className="block text-gradient mt-2">モニタリング＆サポート</span>
+            <span className="block text-primary mt-2">モニタリング＆サポート</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             新入社員とAIメンターの会話を確認し、質の高い学習体験を提供します。
           </p>
         </div>
       </div>
-
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 -z-10 h-[500px] w-[500px] bg-primary/5 blur-[100px] rounded-full translate-x-1/3 -translate-y-1/4" />
-      <div className="absolute bottom-0 left-0 -z-10 h-[300px] w-[300px] bg-secondary/20 blur-[80px] rounded-full -translate-x-1/3 translate-y-1/4" />
     </section>
   );
 });
@@ -199,7 +194,7 @@ const SearchSection = memo(function SearchSection({
               onChange={(e) => onChangeSearch(e.target.value)}
               placeholder="新入社員名またはテーマで検索..."
               autoComplete="off"
-              className="h-12 text-base bg-background border-input focus:ring-2 transition-all pl-4"
+              className="h-12 text-base bg-background border-input focus:ring-2 transition-colors pl-4"
             />
           </div>
         </div>
@@ -258,14 +253,14 @@ const ConversationsSection = memo(function ConversationsSection({
   isLoading,
 }: ConversationsSectionProps) {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">
           最近の会話
         </h2>
         <Badge
           variant="outline"
-          className="px-3 py-1 bg-background/50 backdrop-blur-sm"
+          className="px-3 py-1 bg-background/50"
         >
           {students.length} 件
         </Badge>
@@ -332,17 +327,16 @@ const MentorDashboardStudentCard = ({
   return (
     <Link href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}>
       <Card
-        className={`group relative overflow-hidden border bg-card hover:shadow-md transition-all duration-300 cursor-pointer ${
+        className={`group relative overflow-hidden border bg-card hover:shadow-md transition-colors cursor-pointer ${
           isSelected
             ? "border-primary ring-1 ring-primary"
             : ""
         }`}
-        style={{ animationDelay: `${index * 50}ms` }}
       >
         <CardContent className="p-6 flex flex-col h-full">
           {/* 상단: 아이콘과 상태 배지 */}
           <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
               <MessageCircle className="h-5 w-5" />
             </div>
             <div className="flex items-center gap-2">
@@ -353,7 +347,7 @@ const MentorDashboardStudentCard = ({
               )}
               <Badge
                 variant="secondary"
-                className="bg-secondary/50 backdrop-blur-sm text-xs font-normal"
+                className="bg-secondary/50 text-xs font-normal"
               >
                 対応中
               </Badge>
@@ -373,9 +367,6 @@ const MentorDashboardStudentCard = ({
             </div>
             <span className="text-xs text-muted-foreground">{student.lastActivity.toLocaleDateString()}</span>
           </div>
-
-          {/* 호버 시 테두리 효과 */}
-          <div className="absolute inset-0 pointer-events-none border-2 border-primary/0 group-hover:border-primary/10 rounded-xl transition-all duration-300" />
         </CardContent>
       </Card>
     </Link>

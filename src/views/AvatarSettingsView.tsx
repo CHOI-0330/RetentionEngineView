@@ -142,8 +142,8 @@ const AvatarPreview = memo(function AvatarPreview({
   if (isGenerating) {
     return (
       <div className="flex flex-col items-center gap-4 py-8">
-        <div className="size-24 rounded-full bg-muted animate-pulse flex items-center justify-center">
-          <span className="text-2xl animate-bounce">🎨</span>
+        <div className="size-24 rounded-full bg-muted flex items-center justify-center">
+          <span className="text-2xl">🎨</span>
         </div>
         <div className="w-full max-w-xs space-y-2">
           <Progress value={(progress / total) * 100} />

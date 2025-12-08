@@ -16,7 +16,6 @@ import {
   MessageSquarePlus,
   MessageCircle,
   ArrowRight,
-  Sparkles,
   Trash2,
   User,
 } from "lucide-react";
@@ -126,14 +125,13 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24">
       <div className="container px-4 sm:px-6 relative z-10">
-        <div className="max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary backdrop-blur-sm">
-            <Sparkles className="mr-1 h-3 w-3" />
+        <div className="max-w-3xl space-y-6">
+          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
             新入社員ダッシュボード
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             {heading}
-            <span className="block text-gradient mt-2">学習を始めましょう</span>
+            <span className="block text-primary mt-2">学習を始めましょう</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             AIメンターとの会話を通じて、新しいスキルや知識を身につけましょう。過去の会話履歴を確認したり、新しいトピックについて相談できます。
@@ -149,10 +147,6 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
           </div>
         </div>
       </div>
-
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 -z-10 h-[500px] w-[500px] bg-primary/5 blur-[100px] rounded-full translate-x-1/3 -translate-y-1/4" />
-      <div className="absolute bottom-0 left-0 -z-10 h-[300px] w-[300px] bg-secondary/20 blur-[80px] rounded-full -translate-x-1/3 translate-y-1/4" />
     </section>
   );
 });
@@ -200,7 +194,7 @@ const CreateConversationSection = memo(function CreateConversationSection({
               onChange={(e) => onChangeNewTitle(e.target.value)}
               placeholder="例: オンボーディングの進め方について"
               autoComplete="off"
-              className="h-12 text-base bg-background border-input focus:ring-2 transition-all pl-4"
+              className="h-12 text-base bg-background border-input focus:ring-2 transition-colors pl-4"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !isCreating) {
                   onCreateConversation();
@@ -210,7 +204,7 @@ const CreateConversationSection = memo(function CreateConversationSection({
           </div>
         </div>
         <Button
-          className="h-12 px-8 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="h-12 px-8 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-colors"
           disabled={isCreating}
           onClick={onCreateConversation}
         >
@@ -250,14 +244,14 @@ const ConversationsSection = memo(function ConversationsSection({
   onDeleteConversation,
 }: ConversationsSectionProps) {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">
           最近の会話
         </h2>
         <Badge
           variant="outline"
-          className="px-3 py-1 bg-background/50 backdrop-blur-sm"
+          className="px-3 py-1 bg-background/50"
         >
           {conversationCount} 件
         </Badge>
@@ -329,18 +323,17 @@ const ConversationCard = memo(function ConversationCard({
 }: ConversationCardProps) {
   return (
     <Card
-      className="group relative overflow-hidden border bg-card hover:shadow-md transition-all duration-300 cursor-pointer"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="group relative overflow-hidden border bg-card hover:shadow-md transition-colors cursor-pointer"
       onClick={() => onNavigate(conversation.id)}
     >
       <CardContent className="p-6 flex flex-col h-full">
         <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <MessageCircle className="h-5 w-5" />
           </div>
           <Badge
             variant="secondary"
-            className="bg-secondary/50 backdrop-blur-sm text-xs font-normal"
+            className="bg-secondary/50 text-xs font-normal"
           >
             対応中
           </Badge>
@@ -374,8 +367,6 @@ const ConversationCard = memo(function ConversationCard({
             <span className="sr-only">会話を削除</span>
           </Button>
         </div>
-
-        <div className="absolute inset-0 pointer-events-none border-2 border-primary/0 group-hover:border-primary/10 rounded-xl transition-all duration-300" />
       </CardContent>
     </Card>
   );

@@ -52,18 +52,15 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
   const [isMbtiModalOpen, setIsMbtiModalOpen] = useState(false);
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2 text-center lg:text-left">
-        <h1 className="text-3xl font-bold tracking-tight">おかえりなさい</h1>
-        <p className="text-muted-foreground">
-          アカウントにログインするか、新しく作成してください。
-        </p>
+    <div className="space-y-6">
+      <header className="text-center lg:text-left">
+        <h1 className="text-2xl font-semibold tracking-tight">認証</h1>
       </header>
 
       {status.error ? (
         <Alert
           variant="destructive"
-          className="flex items-start justify-between gap-3 animate-in fade-in zoom-in-95"
+          className="flex items-start justify-between gap-3"
         >
           <span>{status.error.message}</span>
           <Button
@@ -79,7 +76,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
 
       {status.successMessage ? (
         <Alert
-          className="flex items-start justify-between gap-3 animate-in fade-in zoom-in-95 border-green-200 bg-green-50 text-green-800"
+          className="flex items-start justify-between gap-3 border-green-200 bg-green-50 text-green-800"
         >
           <span>{status.successMessage}</span>
           <Button
@@ -94,16 +91,16 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
       ) : null}
 
       <Tabs defaultValue="login" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8 h-12 bg-muted/50 p-1">
+        <TabsList className="grid w-full grid-cols-2 mb-6 h-11 p-1">
           <TabsTrigger
             value="login"
-            className="text-base data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+            className="text-sm data-[state=active]:bg-background transition-colors"
           >
             ログイン
           </TabsTrigger>
           <TabsTrigger
             value="register"
-            className="text-base data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+            className="text-sm data-[state=active]:bg-background transition-colors"
           >
             新規登録
           </TabsTrigger>
@@ -111,10 +108,10 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
 
         <TabsContent
           value="register"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
+          className="space-y-4"
         >
           <form
-            className="space-y-5"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               interactions.submitRegistration();
@@ -218,7 +215,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 text-base font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+              className="w-full h-10 text-sm font-medium transition-colors"
               disabled={status.isSubmitting}
             >
               {status.isSubmitting ? "処理中..." : "アカウント作成"}
@@ -228,10 +225,10 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
 
         <TabsContent
           value="login"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
+          className="space-y-4"
         >
           <form
-            className="space-y-5"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               interactions.submitLogin();
@@ -276,10 +273,10 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
                 className="h-11"
               />
             </div>
-            <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-col gap-2">
               <Button
                 type="submit"
-                className="w-full h-11 text-base font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                className="w-full h-10 text-sm font-medium transition-colors"
                 disabled={status.isSubmitting}
               >
                 {status.isSubmitting ? "処理中..." : "ログイン"}
@@ -288,7 +285,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
               {viewModel.session && (
                 <Button
                   type="button"
-                  className="w-full h-11"
+                  className="w-full h-10"
                   variant="outline"
                   onClick={interactions.submitLogout}
                   disabled={status.isSubmitting}
@@ -299,8 +296,8 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
             </div>
 
             {viewModel.session ? (
-              <div className="rounded-lg border bg-muted/50 p-4 text-sm space-y-1 mt-4">
-                <p className="font-semibold text-foreground">
+              <div className="rounded-lg border bg-gray-50 p-3 text-sm space-y-1">
+                <p className="font-medium text-foreground">
                   現在のセッション
                 </p>
                 <div className="grid grid-cols-[80px_1fr] gap-1 text-muted-foreground">
