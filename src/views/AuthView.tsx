@@ -54,7 +54,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
   return (
     <div className="space-y-8">
       <header className="space-y-2 text-center lg:text-left">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+        <h1 className="text-3xl font-bold tracking-tight">おかえりなさい</h1>
         <p className="text-muted-foreground">
           アカウントにログインするか、新しく作成してください。
         </p>
@@ -131,7 +131,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
                 onChange={(event) =>
                   interactions.setRegisterField("email", event.target.value)
                 }
-                placeholder="you@example.com"
+                placeholder="example@email.com"
                 className="h-11"
               />
             </div>
@@ -248,7 +248,7 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
                 onChange={(event) =>
                   interactions.setLoginField("email", event.target.value)
                 }
-                placeholder="you@example.com"
+                placeholder="example@email.com"
                 className="h-11"
               />
             </div>

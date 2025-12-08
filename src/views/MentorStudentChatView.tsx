@@ -447,7 +447,7 @@ function MentorFeedbackSection({
           >
             <MessageCircle className="h-3 w-3" />
             フィードバック ({feedbacks.length})
-            <span className="sr-only">Toggle feedback</span>
+            <span className="sr-only">フィードバック表示</span>
           </Button>
         </CollapsibleTrigger>
       </div>

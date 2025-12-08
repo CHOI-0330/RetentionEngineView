@@ -127,14 +127,14 @@ const HeroSection = memo(function HeroSection() {
         <div className="max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary backdrop-blur-sm">
             <Sparkles className="mr-1 h-3 w-3" />
-            Mentor Dashboard
+            メンターダッシュボード
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            Assigned New Hires
-            <span className="block text-gradient mt-2">Monitor & Support</span>
+            担当新入社員
+            <span className="block text-gradient mt-2">モニタリング＆サポート</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-            Review conversations between new hires and AI mentors. Provide feedback and guidance to ensure quality learning experiences.
+            新入社員とAIメンターの会話を確認し、質の高い学習体験を提供します。
           </p>
         </div>
       </div>
@@ -156,7 +156,7 @@ const ErrorBanner = memo(function ErrorBanner({ message, onClose }: ErrorBannerP
     <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive animate-in fade-in zoom-in-95 flex items-center justify-between">
       <span>{message}</span>
       <Button variant="ghost" size="sm" onClick={onClose} className="h-6 px-2">
-        Close
+        閉じる
       </Button>
     </div>
   );
@@ -191,13 +191,13 @@ const SearchSection = memo(function SearchSection({
         <div className="flex-1 space-y-3">
           <label className="text-base font-medium flex items-center gap-2">
             <Search className="h-4 w-4 text-primary" />
-            Search Conversations
+            会話を検索
           </label>
           <div className="relative">
             <Input
               value={searchQuery}
               onChange={(e) => onChangeSearch(e.target.value)}
-              placeholder="Search by new hire name or subject..."
+              placeholder="新入社員名またはテーマで検索..."
               autoComplete="off"
               className="h-12 text-base bg-background border-input focus:ring-2 transition-all pl-4"
             />
@@ -207,7 +207,7 @@ const SearchSection = memo(function SearchSection({
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ArrowUpDown className="h-3 w-3" />
-              Sort
+              並び替え
             </label>
             <Select value={sortOption} onValueChange={(value) => onSortChange(value as SortOption)}>
               <SelectTrigger className="w-[160px] h-12">
@@ -233,10 +233,10 @@ const SearchSection = memo(function SearchSection({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
+                  読込中...
                 </>
               ) : (
-                "Refresh"
+                "更新"
               )}
             </Button>
           </div>
@@ -261,13 +261,13 @@ const ConversationsSection = memo(function ConversationsSection({
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">
-          Recent Conversations
+          最近の会話
         </h2>
         <Badge
           variant="outline"
           className="px-3 py-1 bg-background/50 backdrop-blur-sm"
         >
-          {students.length} conversations
+          {students.length} 件
         </Badge>
       </div>
 
@@ -310,9 +310,9 @@ const EmptyState = memo(function EmptyState() {
       <div className="rounded-full bg-muted p-4 mb-4">
         <MessageCircle className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-medium">No conversations yet</h3>
+      <h3 className="text-lg font-medium">会話がまだありません</h3>
       <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-        Assign new hires or adjust your search criteria.
+        新入社員を割り当てるか、検索条件を変更してください。
       </p>
     </div>
   );
@@ -355,7 +355,7 @@ const MentorDashboardStudentCard = ({
                 variant="secondary"
                 className="bg-secondary/50 backdrop-blur-sm text-xs font-normal"
               >
-                ACTIVE
+                対応中
               </Badge>
             </div>
           </div>

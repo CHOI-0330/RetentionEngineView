@@ -178,7 +178,7 @@ export const StudentChatView = memo(function StudentChatView({
           </Dialog>
           <Avatar className="h-8 w-8 border">
             <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
-              ME
+              自分
             </AvatarFallback>
           </Avatar>
         </div>

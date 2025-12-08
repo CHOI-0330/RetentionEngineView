@@ -1,7 +1,15 @@
+import { Noto_Sans_JP } from "next/font/google";
+
 export const metadata = {
-  title: "Retention Engine UI",
-  description: "View-only components prepared for Next.js",
+  title: "Retention Engine",
+  description: "AIメンターシッププラットフォーム",
 };
+
+const notoSansJP = Noto_Sans_JP({
+  weight: ['400', '500', '700'],
+  subsets: ['latin'],
+  variable: '--font-noto-sans-jp',
+});
 
 import "../src/index.css";
 import React from "react";
@@ -20,7 +28,8 @@ export default function RootLayout({
     <html lang="ja">
       <body
         className={cn(
-          "min-h-screen bg-background font-sans text-foreground antialiased"
+          "min-h-screen bg-background font-sans text-foreground antialiased",
+          notoSansJP.variable
         )}
       >
         <SessionProvider>

@@ -54,9 +54,9 @@ const AssignedNewhireList = ({ newhires }: AssignedNewhireListProps) => {
   return (
     <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
       <div>
-        <p className="text-base font-medium">Assigned New Hires</p>
+        <p className="text-base font-medium">担当中の新入社員</p>
         <p className="text-sm text-muted-foreground">
-          New hires currently assigned to you.
+          現在あなたが担当している新入社員です。
         </p>
       </div>
       <div className="grid gap-2">
@@ -73,7 +73,7 @@ const AssignedNewhireList = ({ newhires }: AssignedNewhireListProps) => {
                 </span>
               )}
             </div>
-            <span className="text-xs text-muted-foreground">Assigned</span>
+            <span className="text-xs text-muted-foreground">担当中</span>
           </div>
         ))}
       </div>
@@ -105,22 +105,22 @@ const NewhireSelectForm = ({
   error,
 }: NewhireSelectFormProps) => {
   const getPlaceholder = () => {
-    if (isLoading) return "Loading...";
-    if (availableNewhires.length === 0) return "No new hires available";
-    return "Select a new hire";
+    if (isLoading) return "読込中...";
+    if (availableNewhires.length === 0) return "割り当て可能な新入社員がいません";
+    return "新入社員を選択してください";
   };
 
   return (
     <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
       <div>
-        <p className="text-base font-medium">Create Assignment</p>
+        <p className="text-base font-medium">担当を追加</p>
         <p className="text-sm text-muted-foreground">
-          Assign a new hire to yourself as their mentor.
+          新入社員をあなたのメンティーとして追加します。
         </p>
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-muted-foreground">
-          Select New Hire
+          新入社員を選択
         </label>
         <Select
           value={selectedNewhireId}
@@ -153,7 +153,7 @@ const NewhireSelectForm = ({
           disabled={isAssigning || !selectedNewhireId}
           className="h-10"
         >
-          {isAssigning ? "Creating..." : "Add Assignment"}
+          {isAssigning ? "追加中..." : "担当を追加"}
         </Button>
         <Button
           variant="outline"
@@ -161,12 +161,12 @@ const NewhireSelectForm = ({
           disabled={isLoading}
           className="h-10"
         >
-          {isLoading ? "Refreshing..." : "Refresh List"}
+          {isLoading ? "更新中..." : "リストを更新"}
         </Button>
       </div>
       {totalCount > 0 && (
         <p className="text-xs text-muted-foreground">
-          {availableNewhires.length} of {totalCount} available for assignment
+          {totalCount}名中{availableNewhires.length}名が割り当て可能
         </p>
       )}
     </div>

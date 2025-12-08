@@ -25,7 +25,7 @@ export default function Page() {
 
         <div className="relative z-10 space-y-6 max-w-lg">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            Empower your growth with AI mentorship.
+            AIメンターシップで成長を支援
           </h1>
           <p className="text-lg text-white/80 leading-relaxed">
             新入社員のオンボーディングからスキルアップまで。
@@ -46,7 +46,7 @@ export default function Page() {
             <h1 className="text-2xl font-bold text-primary">
               Retention Engine
             </h1>
-            <p className="text-muted-foreground">AI Mentorship Platform</p>
+            <p className="text-muted-foreground">AIメンターシッププラットフォーム</p>
           </div>
           <AuthPage />
         </div>

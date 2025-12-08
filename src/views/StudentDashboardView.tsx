@@ -129,11 +129,11 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
         <div className="max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary backdrop-blur-sm">
             <Sparkles className="mr-1 h-3 w-3" />
-            New Hire Dashboard
+            新入社員ダッシュボード
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             {heading}
-            <span className="block text-gradient mt-2">Ready to learn?</span>
+            <span className="block text-gradient mt-2">学習を始めましょう</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             AIメンターとの会話を通じて、新しいスキルや知識を身につけましょう。過去の会話履歴を確認したり、新しいトピックについて相談できます。
@@ -253,13 +253,13 @@ const ConversationsSection = memo(function ConversationsSection({
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">
-          Recent Conversations
+          最近の会話
         </h2>
         <Badge
           variant="outline"
           className="px-3 py-1 bg-background/50 backdrop-blur-sm"
         >
-          {conversationCount} conversations
+          {conversationCount} 件
         </Badge>
       </div>
 
@@ -342,7 +342,7 @@ const ConversationCard = memo(function ConversationCard({
             variant="secondary"
             className="bg-secondary/50 backdrop-blur-sm text-xs font-normal"
           >
-            ACTIVE
+            対応中
           </Badge>
         </div>
 
@@ -371,7 +371,7 @@ const ConversationCard = memo(function ConversationCard({
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            <span className="sr-only">Delete conversation</span>
+            <span className="sr-only">会話を削除</span>
           </Button>
         </div>
 
