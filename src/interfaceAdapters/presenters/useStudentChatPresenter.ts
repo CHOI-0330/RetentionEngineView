@@ -8,14 +8,24 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { toast } from "sonner";
 
-import type { User, Conversation, Message, Feedback, MentorAssignment } from "../../domain/core";
+import type {
+  User,
+  Conversation,
+  Message,
+  Feedback,
+  MentorAssignment,
+} from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
-import type { StudentChatBootstrap, SearchSettings, LLMGenerateResponse, WebSearchConfirmationLabels } from "../gateways/api/types";
+import type {
+  StudentChatBootstrap,
+  SearchSettings,
+  LLMGenerateResponse,
+  WebSearchConfirmationLabels,
+} from "../gateways/api/types";
 import { ResponseType } from "../gateways/api/types";
-import {
-  createStudentChatService,
-} from "../../application/entitle/factories/StudentChatFactory";
+import { createStudentChatService } from "../../application/entitle/factories/StudentChatFactory";
 import type {
   StudentChatViewModel,
   MessageViewModel,
@@ -215,7 +225,11 @@ export function useStudentChatPresenter(
 
   const sendMessage = useCallback(async () => {
     const { bootstrap, newMessage, searchSettings } = state;
-    if (!bootstrap?.conversation || !bootstrap.currentUser || !newMessage.trim()) {
+    if (
+      !bootstrap?.conversation ||
+      !bootstrap.currentUser ||
+      !newMessage.trim()
+    ) {
       return;
     }
 
@@ -248,10 +262,7 @@ export function useStudentChatPresenter(
         isAwaitingAssistant: true,
         bootstrap: {
           ...prev.bootstrap,
-          initialMessages: [
-            ...prev.bootstrap.initialMessages,
-            result.value,
-          ],
+          initialMessages: [...prev.bootstrap.initialMessages, result.value],
         },
       };
     });
@@ -280,7 +291,9 @@ export function useStudentChatPresenter(
         isAwaitingAssistant: false,
         webSearchPending: {
           questionText,
-          reason: llmResult.value.webSearchReason ?? "社内ドキュメントで回答が見つかりませんでした。",
+          reason:
+            llmResult.value.webSearchReason ??
+            "社内ドキュメントで回答が見つかりませんでした。",
           labels: llmResult.value.confirmationLabels ?? {
             confirm: "ウェブ検索を許可",
             cancel: "キャンセル",
@@ -312,11 +325,18 @@ export function useStudentChatPresenter(
     );
 
     // アシスタントメッセージをローカル状態に追加（リロードなし）
+    // NOTE: サーバー応答にはsourcesが含まれないため、LLM応答から取得したsourcesを必ず付与する
     setState((prev) => {
       if (!prev.bootstrap) return prev;
-      const assistantMessage = finalizeResult.kind === "success"
-        ? finalizeResult.value
-        : { ...beginResult.value, content: llmResult.value.answer, status: "DONE" as const, sources: llmResult.value.sources };
+      const assistantMessage =
+        finalizeResult.kind === "success"
+          ? { ...finalizeResult.value, sources: llmResult.value.sources }
+          : {
+              ...beginResult.value,
+              content: llmResult.value.answer,
+              status: "DONE" as const,
+              sources: llmResult.value.sources,
+            };
 
       return {
         ...prev,
@@ -366,16 +386,17 @@ export function useStudentChatPresenter(
     async (convId: string) => {
       if (!requester || !state.bootstrap) return;
 
-      const conversation = state.bootstrap.conversation?.convId === convId
-        ? state.bootstrap.conversation
-        : {
-            convId,
-            ownerId: requester.userId,
-            title: "",
-            state: "ACTIVE" as const,
-            createdAt: "",
-            lastActiveAt: "",
-          };
+      const conversation =
+        state.bootstrap.conversation?.convId === convId
+          ? state.bootstrap.conversation
+          : {
+              convId,
+              ownerId: requester.userId,
+              title: "",
+              state: "ACTIVE" as const,
+              createdAt: "",
+              lastActiveAt: "",
+            };
 
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -416,7 +437,11 @@ export function useStudentChatPresenter(
 
   const confirmWebSearch = useCallback(async () => {
     const { bootstrap, webSearchPending, searchSettings } = state;
-    if (!bootstrap?.conversation || !bootstrap.currentUser || !webSearchPending) {
+    if (
+      !bootstrap?.conversation ||
+      !bootstrap.currentUser ||
+      !webSearchPending
+    ) {
       return;
     }
 
@@ -464,11 +489,18 @@ export function useStudentChatPresenter(
       llmResult.value.sources
     );
 
+    // NOTE: サーバー応答にはsourcesが含まれないため、LLM応答から取得したsourcesを必ず付与する
     setState((prev) => {
       if (!prev.bootstrap) return prev;
-      const assistantMessage = finalizeResult.kind === "success"
-        ? finalizeResult.value
-        : { ...beginResult.value, content: llmResult.value.answer, status: "DONE" as const, sources: llmResult.value.sources };
+      const assistantMessage =
+        finalizeResult.kind === "success"
+          ? { ...finalizeResult.value, sources: llmResult.value.sources }
+          : {
+              ...beginResult.value,
+              content: llmResult.value.answer,
+              status: "DONE" as const,
+              sources: llmResult.value.sources,
+            };
 
       return {
         ...prev,
@@ -523,7 +555,9 @@ export function useStudentChatPresenter(
       if (!bootstrap?.currentUser || !bootstrap.conversation) return;
 
       // 対象メッセージを取得
-      const targetMessage = bootstrap.initialMessages.find((m) => m.msgId === msgId);
+      const targetMessage = bootstrap.initialMessages.find(
+        (m) => m.msgId === msgId
+      );
       if (!targetMessage) return;
 
       setState((prev) => ({
@@ -560,10 +594,13 @@ export function useStudentChatPresenter(
     async (msgId: string) => {
       const { bootstrap, feedbackInput, feedbacks } = state;
       const content = feedbackInput[msgId]?.trim();
-      if (!bootstrap?.currentUser || !bootstrap.conversation || !content) return;
+      if (!bootstrap?.currentUser || !bootstrap.conversation || !content)
+        return;
 
       // 対象メッセージを取得
-      const targetMessage = bootstrap.initialMessages.find((m) => m.msgId === msgId);
+      const targetMessage = bootstrap.initialMessages.find(
+        (m) => m.msgId === msgId
+      );
       if (!targetMessage) return;
 
       setState((prev) => ({
@@ -588,6 +625,10 @@ export function useStudentChatPresenter(
           feedbackSubmitting: { ...prev.feedbackSubmitting, [msgId]: false },
           error: result.error,
         }));
+        toast.error("フィードバックの送信に失敗しました", {
+          description: result.error.message,
+          duration: 4000,
+        });
         return;
       }
 
@@ -601,6 +642,12 @@ export function useStudentChatPresenter(
           [msgId]: [...(prev.feedbacks[msgId] ?? []), result.value],
         },
       }));
+
+      // 성공 알림 표시
+      toast.success("フィードバックを送信しました", {
+        description: "新人にフィードバックが届きました",
+        duration: 3000,
+      });
     },
     [state, service]
   );
@@ -611,7 +658,10 @@ export function useStudentChatPresenter(
 
   const viewModel = useMemo(() => {
     if (!state.bootstrap) return null;
-    return service.toViewModel(state.bootstrap, state.activeConversationId ?? undefined);
+    return service.toViewModel(
+      state.bootstrap,
+      state.activeConversationId ?? undefined
+    );
   }, [service, state.bootstrap, state.activeConversationId]);
 
   // ============================================

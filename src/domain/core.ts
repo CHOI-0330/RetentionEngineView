@@ -44,10 +44,30 @@ export interface WebSource {
 }
 
 /**
+ * ファイル検索のチャンク情報
+ */
+export interface FileSearchChunk {
+  chunkId?: string;
+  text: string;
+  pageStart?: number;
+  pageEnd?: number;
+  confidence?: number;
+}
+
+/**
+ * ファイル検索ソース (ファイル単位)
+ */
+export interface FileSearchSource {
+  fileName: string;
+  documentId?: string;
+  chunks: FileSearchChunk[];
+}
+
+/**
  * メッセージソース (Hybrid RAG 検索結果)
  */
 export interface MessageSources {
-  fileSearch?: string[]; // ["onboarding-tips.txt", ...]
+  fileSearch?: FileSearchSource[]; // [{ fileName: "...", chunks: [...] }]
   webSearch?: WebSource[]; // [{ title: "...", url: "..." }]
 }
 
@@ -100,11 +120,25 @@ export interface ModelConfig {
 
 export type AvatarGender = "female" | "male" | "neutral";
 
-export type AvatarPersonality = "friendly" | "professional" | "caring" | "energetic";
+export type AvatarPersonality =
+  | "friendly"
+  | "professional"
+  | "caring"
+  | "energetic";
 
-export type AvatarEmotion = "neutral" | "happy" | "thinking" | "surprised" | "concerned" | "proud";
+export type AvatarEmotion =
+  | "neutral"
+  | "happy"
+  | "thinking"
+  | "surprised"
+  | "concerned"
+  | "proud";
 
-export type AvatarGenerationStatus = "pending" | "generating" | "completed" | "failed";
+export type AvatarGenerationStatus =
+  | "pending"
+  | "generating"
+  | "completed"
+  | "failed";
 
 export const AVATAR_EMOTIONS: AvatarEmotion[] = [
   "neutral",
@@ -136,4 +170,3 @@ export interface AvatarUrls {
   concerned: string;
   proud: string;
 }
-

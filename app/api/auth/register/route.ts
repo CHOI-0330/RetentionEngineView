@@ -4,10 +4,7 @@ import { registerUserUseCase } from "../../../../src/application/entitle/authUse
 import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 
 class HttpError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(public readonly status: number, message: string) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -69,7 +66,10 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       // メールアドレス重複エラーの場合
-      if (error.message?.includes("already") || error.message?.includes("exists")) {
+      if (
+        error.message?.includes("already") ||
+        error.message?.includes("exists")
+      ) {
         throw new HttpError(409, "このメールアドレスは既に登録されています。");
       }
       throw new HttpError(500, error.message ?? "Failed to create user.");
@@ -95,21 +95,38 @@ export async function POST(request: NextRequest) {
     }
     console.log("[register] Upserting to user table:", upsertData);
 
-    const { error: upsertError } = await adminClient.from("user").upsert(
-      upsertData,
-      { onConflict: "user_id" }
-    );
+    const { error: upsertError } = await adminClient
+      .from("user")
+      .upsert(upsertData, { onConflict: "user_id" });
 
     if (upsertError) {
       console.error("[register] Upsert error:", upsertError);
-      throw new HttpError(500, upsertError.message ?? "Failed to persist user profile.");
+
+      console.warn(`[register] Rolling back Auth user: ${userId}`);
+      try {
+        await adminClient.auth.admin.deleteUser(userId);
+        console.log(`[register] Auth user rolled back successfully: ${userId}`);
+      } catch (rollbackError) {
+        console.error(
+          `[register] Failed to rollback Auth user: ${userId}`,
+          rollbackError
+        );
+      }
+
+      throw new HttpError(
+        500,
+        "会員登録に失敗しました。もう一度お試しください。"
+      );
     }
     console.log("[register] Upsert successful");
 
     return NextResponse.json({ data: { userId } });
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
     const message = error instanceof Error ? error.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });

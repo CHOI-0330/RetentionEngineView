@@ -6,10 +6,7 @@ import { createAdminSupabaseClient } from "../../../../src/lib/supabaseClient";
 import { setAuthCookies } from "../utils";
 
 class HttpError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(public readonly status: number, message: string) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -26,16 +23,46 @@ const getAnonClient = () => {
   return createClient(url, anonKey);
 };
 
-const fetchUserProfile = async (userId: string): Promise<{ role: string; displayName: string }> => {
+const fetchUserProfile = async (
+  userId: string,
+  email: string
+): Promise<{ role: string; displayName: string }> => {
   const adminClient = getAdminClient();
   const { data, error } = await adminClient
     .from("user")
     .select("role, display_name")
     .eq("user_id", userId)
-    .single();
-  if (error || !data) {
-    throw new HttpError(500, error?.message ?? "User profile not found.");
+    .maybeSingle();
+
+  // DB 에러 처리
+  if (error) {
+    throw new HttpError(500, error.message ?? "Failed to fetch user profile.");
   }
+
+  // user 테이블에 레코드가 없는 경우 자동 생성 (유령 계정 복구)
+  if (!data) {
+    console.warn(
+      `[login] User record not found, auto-creating for userId: ${userId}`
+    );
+    const { error: insertError } = await adminClient.from("user").insert({
+      user_id: userId,
+      email: email,
+      display_name: email.split("@")[0], // 이메일 앞부분을 기본 이름으로 사용
+      role: "NEW_HIRE", // 기본 역할
+      created_at: new Date().toISOString(),
+    });
+
+    if (insertError) {
+      console.error(`[login] Failed to auto-create user record:`, insertError);
+      throw new HttpError(500, "Failed to initialize user profile.");
+    }
+
+    return {
+      role: "NEW_HIRE",
+      displayName: email.split("@")[0],
+    };
+  }
+
   const profile = data as { role: string; display_name?: string };
   return {
     role: profile.role,
@@ -67,7 +94,7 @@ export async function POST(request: NextRequest) {
     if (error || !data.user || !data.session) {
       throw error ?? new Error("Failed to sign in.");
     }
-    const profile = await fetchUserProfile(data.user.id);
+    const profile = await fetchUserProfile(data.user.id, data.user.email ?? "");
     const response = NextResponse.json({
       data: {
         accessToken: data.session.access_token,
@@ -88,7 +115,10 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
     const message = error instanceof Error ? error.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });

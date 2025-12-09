@@ -2,7 +2,14 @@
  * API Gateway 공통 타입 정의
  */
 
-import type { User, Message, Feedback, Conversation, MentorAssignment } from "../../../domain/core";
+import type {
+  User,
+  Message,
+  Feedback,
+  Conversation,
+  MentorAssignment,
+  FileSearchSource,
+} from "../../../domain/core";
 
 // ============================================
 // Gateway 설정
@@ -65,7 +72,7 @@ export interface WebSource {
  * 응답 소스
  */
 export interface ResponseSources {
-  fileSearch?: string[]; // ["onboarding-tips.txt", ...]
+  fileSearch?: FileSearchSource[]; // [{ fileName: "...", chunks: [...] }]
   webSearch?: WebSource[]; // [{ title: "...", url: "..." }]
 }
 

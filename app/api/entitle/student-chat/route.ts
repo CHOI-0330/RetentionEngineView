@@ -451,9 +451,11 @@ export async function POST(request: NextRequest) {
             .in("user_id", authorIds);
 
           if (authors) {
-            authors.forEach((author: { user_id: string; display_name?: string }) => {
-              authorNames[author.user_id] = author.display_name || "メンター";
-            });
+            authors.forEach(
+              (author: { user_id: string; display_name?: string }) => {
+                authorNames[author.user_id] = author.display_name || "メンター";
+              }
+            );
           }
 
           // DBにない場合のフォールバック
@@ -493,7 +495,7 @@ export async function POST(request: NextRequest) {
           accessToken
         );
         const mapped = mapFeedbackRow(mapApiFeedbackRow(response.data));
-        return NextResponse.json({ data: mapped });
+        return NextResponse.json(mapped);
       }
       case "createConversation": {
         const input = (payload ?? {}) as { title?: string };
@@ -657,9 +659,11 @@ export async function GET(request: NextRequest) {
         .in("user_id", Array.from(authorIds));
 
       if (authors) {
-        authors.forEach((author: { user_id: string; display_name?: string }) => {
-          authorNames[author.user_id] = author.display_name || "メンター";
-        });
+        authors.forEach(
+          (author: { user_id: string; display_name?: string }) => {
+            authorNames[author.user_id] = author.display_name || "メンター";
+          }
+        );
       }
 
       // DBにない場合のフォールバック
