@@ -60,6 +60,7 @@ export class AuthGateway implements AuthPort {
     password: string;
     displayName: string;
     role: User["role"];
+    mbti?: string;
   }): Promise<{ userId: string }> {
     const result = await apiFetch<{ userId: string }>("/api/auth/register", {
       method: "POST",
@@ -68,6 +69,7 @@ export class AuthGateway implements AuthPort {
         password: input.password,
         displayName: input.displayName,
         role: input.role,
+        mbti: input.mbti,
       },
     });
 
@@ -185,6 +187,7 @@ export class AuthGateway implements AuthPort {
       password: request.password,
       displayName: request.displayName,
       role: request.role,
+      mbti: request.mbti,
     });
   }
 

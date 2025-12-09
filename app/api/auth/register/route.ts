@@ -21,12 +21,14 @@ export async function POST(request: NextRequest) {
     password?: string;
     displayName?: string;
     role?: string;
+    mbti?: string;
   };
 
   console.log("[register] Received payload:", {
     email: payload.email,
     displayName: payload.displayName,
     role: payload.role,
+    mbti: payload.mbti,
     hasPassword: !!payload.password,
   });
 
@@ -80,12 +82,17 @@ export async function POST(request: NextRequest) {
     const userId = data.user.id;
 
     // 3. user テーブルに upsert (競合時は更新)
-    const upsertData = {
+    const upsertData: Record<string, string | undefined> = {
       user_id: userId,
       display_name: result.value.displayName,
       email: result.value.email,
       role: result.value.role,
     };
+
+    // MBTIが指定されている場合のみ追加
+    if (payload.mbti) {
+      upsertData.mbti = payload.mbti;
+    }
     console.log("[register] Upserting to user table:", upsertData);
 
     const { error: upsertError } = await adminClient.from("user").upsert(
