@@ -60,7 +60,7 @@ export interface SearchSettings {
 }
 
 /**
- * 웹 검색 소스
+ * ウェブ検索ソース
  */
 export interface WebSource {
   title: string;
@@ -69,7 +69,7 @@ export interface WebSource {
 }
 
 /**
- * 응답 소스
+ * レスポンスソース
  */
 export interface ResponseSources {
   fileSearch?: FileSearchSource[]; // [{ fileName: "...", chunks: [...] }]

@@ -22,9 +22,9 @@ export function SourceDetailModal({
   ): string | null => {
     if (pageStart === undefined) return null;
     if (pageEnd === undefined || pageEnd === pageStart) {
-      return `페이지: ${pageStart}`;
+      return `ページ: ${pageStart}`;
     }
-    return `페이지: ${pageStart}-${pageEnd}`;
+    return `ページ: ${pageStart}-${pageEnd}`;
   };
 
   const getConfidenceBadge = (confidence?: number) => {
@@ -43,7 +43,7 @@ export function SourceDetailModal({
 
     return (
       <Badge variant={variant} className="text-xs">
-        신뢰도: {percentage}%
+        信頼度: {percentage}%
       </Badge>
     );
   };
@@ -62,14 +62,14 @@ export function SourceDetailModal({
           <div className="space-y-4 py-4">
             {/* Chunk Count */}
             <div className="text-sm text-muted-foreground mb-4">
-              참조된 내용 ({source.chunks.length}개 섹션)
+              参照内容 ({source.chunks.length}件のセクション)
             </div>
 
             {/* Empty State */}
             {source.chunks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <FileText className="h-12 w-12 mb-3 opacity-50" />
-                <p>참조된 내용이 없습니다</p>
+                <p>参照内容がありません</p>
               </div>
             ) : (
               /* Chunks List */
@@ -90,7 +90,7 @@ export function SourceDetailModal({
                         <div className="flex items-center gap-2 min-w-0">
                           <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <span className="font-medium text-sm">
-                            섹션 {index + 1}
+                            セクション {index + 1}
                           </span>
                           {pageRange && (
                             <span className="text-sm text-muted-foreground">
