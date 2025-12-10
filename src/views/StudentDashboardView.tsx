@@ -136,7 +136,8 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             AIメンターとの会話を通じて、新しいスキルや知識を身につけましょう。過去の会話履歴を確認したり、新しいトピックについて相談できます。
           </p>
-          <div className="pt-2">
+          {/* TODO: AIアバター機能が完成したら以下のボタンを有効化する */}
+          {/* <div className="pt-2">
             <a
               href="/student/profile"
               className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
@@ -144,7 +145,7 @@ const HeroSection = memo(function HeroSection({ heading }: HeroSectionProps) {
               <User className="h-4 w-4" />
               AIアバターを設定する
             </a>
-          </div>
+          </div> */}
         </div>
       </div>
     </section>
