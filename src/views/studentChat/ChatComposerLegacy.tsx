@@ -45,24 +45,15 @@ export const ChatComposerLegacy = memo(function ChatComposerLegacy({
         {searchSettings && onSearchSettingsChange && (
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* FileSearch トグル */}
-              <button
-                type="button"
-                onClick={() =>
-                  onSearchSettingsChange({
-                    enableFileSearch: !searchSettings.enableFileSearch,
-                  })
-                }
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  searchSettings.enableFileSearch
-                    ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
+              {/* FileSearch - 常にONで固定 */}
+              <div
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium bg-emerald-100 text-emerald-700 cursor-not-allowed opacity-90"
+                title="社内検索は常に有効です"
               >
                 <FileText className="h-3 w-3" />
                 社内検索
-                {searchSettings.enableFileSearch ? " ON" : " OFF"}
-              </button>
+                <span className="text-[10px] font-semibold">常時ON</span>
+              </div>
 
               {/* WebSearch トグル */}
               <button
@@ -108,6 +99,7 @@ export const ChatComposerLegacy = memo(function ChatComposerLegacy({
                 <div>
                   <span className="font-medium text-foreground">社内検索:</span>{" "}
                   アップロードされた社内ドキュメントから回答を検索します。
+                  <span className="text-emerald-700 font-medium">（常に有効）</span>
                 </div>
               </div>
               <div className="flex items-start gap-2">
