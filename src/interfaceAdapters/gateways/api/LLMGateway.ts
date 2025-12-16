@@ -7,7 +7,7 @@
 import type { LLMPort } from "../../../application/entitle/ports/LLMPort";
 import { apiFetch } from "../../../lib/api";
 import { createErrorFromStatus } from "../../errors";
-import type { GatewayConfig, SearchSettings, LLMGenerateResponse } from "./types";
+import type { GatewayConfig, LLMGenerateResponse } from "./types";
 
 export class LLMGateway implements LLMPort {
   private accessToken?: string;
@@ -25,7 +25,7 @@ export class LLMGateway implements LLMPort {
     conversationId: string;
     modelId?: string;
     runtimeId?: string;
-    searchSettings?: SearchSettings;
+    requireWebSearch?: boolean;
   }): Promise<LLMGenerateResponse> {
     const result = await apiFetch<LLMGenerateResponse>("/api/llm/generate", {
       method: "POST",

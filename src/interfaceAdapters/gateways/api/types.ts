@@ -54,9 +54,7 @@ export interface StudentChatBootstrap {
  * 검색 설정 (Hybrid RAG)
  */
 export interface SearchSettings {
-  enableFileSearch?: boolean; // 파일 검색 활성화 (기본값: true)
-  allowWebSearch?: boolean; // 웹 검색 허용 (기본값: false)
-  executeWebSearch?: boolean; // 웹 검색 실행 (사용자 승인 후)
+  requireWebSearch: boolean; // Web検索を要求するか (기본값: false)
 }
 
 /**
@@ -81,15 +79,6 @@ export interface ResponseSources {
  */
 export enum ResponseType {
   ANSWER = "ANSWER",
-  WEB_SEARCH_CONFIRMATION = "WEB_SEARCH_CONFIRMATION",
-}
-
-/**
- * 웹 검색 확인 버튼 라벨
- */
-export interface WebSearchConfirmationLabels {
-  confirm: string;
-  cancel: string;
 }
 
 /**
@@ -98,8 +87,5 @@ export interface WebSearchConfirmationLabels {
 export interface LLMGenerateResponse {
   type: ResponseType;
   answer: string;
-  needsWebSearch?: boolean;
-  webSearchReason?: string;
-  confirmationLabels?: WebSearchConfirmationLabels;
   sources?: ResponseSources;
 }

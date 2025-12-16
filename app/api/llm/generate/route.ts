@@ -140,7 +140,7 @@ const callBackend = async <T>(path: string, init?: RequestInit, accessToken?: st
 };
 
 // Align with backend controller intent.
-const generateAnswer = (payload: { question: string; conversationId: string; modelId?: string; runtimeId?: string; searchSettings?: { enableFileSearch?: boolean; allowWebSearch?: boolean; executeWebSearch?: boolean } }, accessToken: string) =>
+const generateAnswer = (payload: { question: string; conversationId: string; modelId?: string; runtimeId?: string; requireWebSearch?: boolean }, accessToken: string) =>
   callBackend<GenerateAnswerResponseDto>(
     "/llm/generate",
     {
@@ -150,6 +150,20 @@ const generateAnswer = (payload: { question: string; conversationId: string; mod
     accessToken
   );
 
+// リクエストの重複チェック用の簡易的なメモリキャッシュ
+const recentRequests = new Map<string, number>();
+const REQUEST_DUPLICATE_WINDOW = 1000; // 1秒以内の同一リクエストを重複とみなす
+
+// 古いエントリを定期的にクリーンアップ
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of recentRequests.entries()) {
+    if (now - timestamp > REQUEST_DUPLICATE_WINDOW * 2) {
+      recentRequests.delete(key);
+    }
+  }
+}, 10000); // 10秒ごとにクリーンアップ
+
 export async function POST(request: NextRequest) {
   try {
     const { accessToken } = await requireAuth(request);
@@ -158,11 +172,8 @@ export async function POST(request: NextRequest) {
       conversationId?: string;
       modelId?: string;
       runtimeId?: string;
-      searchSettings?: {
-        enableFileSearch?: boolean;
-        allowWebSearch?: boolean;
-        executeWebSearch?: boolean;
-      };
+      requireWebSearch?: boolean;
+      requestId?: string; // フロントエンドから送られるユニークID
     };
     const question = (body.question ?? "").trim();
     if (!question) {
@@ -173,14 +184,27 @@ export async function POST(request: NextRequest) {
       throw new HttpError(400, "conversationId is required.");
     }
 
-    logRequest("POST", { conversationId, questionLength: question.length });
+    // 重複リクエストチェック
+    const requestKey = `${conversationId}:${question}:${body.requireWebSearch}`;
+    const lastRequestTime = recentRequests.get(requestKey);
+    const now = Date.now();
+    
+    if (lastRequestTime && (now - lastRequestTime) < REQUEST_DUPLICATE_WINDOW) {
+      console.warn("[llm-generate][DUPLICATE] Duplicate request detected, ignoring", { requestKey });
+      throw new HttpError(429, "Duplicate request detected. Please wait before sending again.");
+    }
+    
+    // リクエストを記録
+    recentRequests.set(requestKey, now);
+
+    logRequest("POST", { conversationId, questionLength: question.length, requireWebSearch: body.requireWebSearch });
 
     const payload = {
       question,
       conversationId,
       modelId: body.modelId,
       runtimeId: body.runtimeId,
-      searchSettings: body.searchSettings,
+      requireWebSearch: body.requireWebSearch,
     };
     const backendResponse = await generateAnswer(payload, accessToken);
     return NextResponse.json(backendResponse);

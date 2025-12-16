@@ -29,7 +29,6 @@ export type {
   SearchSettings,
   WebSource,
   ResponseSources,
-  WebSearchConfirmationLabels,
   LLMGenerateResponse,
 } from "./types";
 

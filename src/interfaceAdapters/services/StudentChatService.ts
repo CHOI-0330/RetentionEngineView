@@ -18,7 +18,7 @@ import type { ConversationUseCase } from "../../application/entitle/Conversation
 import type { MessageUseCase } from "../../application/entitle/MessageUseCase";
 import type { LLMUseCase } from "../../application/entitle/LLMUseCase";
 import type { FeedbackUseCase } from "../../application/entitle/FeedbackUseCase";
-import type { SearchSettings, LLMGenerateResponse } from "../gateways/api/types";
+import type { LLMGenerateResponse } from "../gateways/api/types";
 import type { Feedback, MentorAssignment } from "../../domain/core";
 
 // ============================================
@@ -182,8 +182,18 @@ export class StudentChatService {
     user: User,
     conversation: Conversation,
     question: string,
-    searchSettings?: SearchSettings
+    requireWebSearch: boolean = false
   ): Promise<UseCaseResult<LLMGenerateResponse>> {
+    // デバッグ: API呼び出しを追跡
+    const requestId = `fe-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    console.log(`[StudentChatService] generateLLMResponse called [${requestId}]`, {
+      conversationId: conversation.convId,
+      question: question.substring(0, 50),
+      requireWebSearch,
+      timestamp: new Date().toISOString(),
+      stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
+    });
+    
     if (!this.llmUseCase) {
       return {
         kind: "failure",
@@ -194,12 +204,18 @@ export class StudentChatService {
       };
     }
 
-    return this.llmUseCase.generate({
+    console.log(`[StudentChatService] Calling llmUseCase.generate [${requestId}]`);
+    const result = await this.llmUseCase.generate({
       requester: user,
       conversation,
       question,
-      searchSettings,
+      requireWebSearch,
     });
+    console.log(`[StudentChatService] llmUseCase.generate completed [${requestId}]`, {
+      resultKind: result.kind,
+      hasAnswer: result.kind === "success" ? !!result.value.answer : false
+    });
+    return result;
   }
 
   // ============================================

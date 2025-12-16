@@ -34,9 +34,8 @@ export const StudentChatView = memo(function StudentChatView({
   newMessage,
   status,
   actions,
-  searchSettings,
-  onSearchSettingsChange,
-  webSearchPending,
+  requireWebSearch,
+  onRequireWebSearchChange,
   feedback,
 }: StudentChatViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -239,9 +238,6 @@ export const StudentChatView = memo(function StudentChatView({
                 authorNames={viewModel.authorNames}
                 isAwaitingAssistant={status.isAwaitingAssistant}
                 feedback={feedback}
-                webSearchPending={webSearchPending}
-                onConfirmWebSearch={() => void actions.confirmWebSearch()}
-                onCancelWebSearch={actions.cancelWebSearch}
               />
               <div ref={bottomRef} className="h-px" />
             </div>
@@ -256,8 +252,8 @@ export const StudentChatView = memo(function StudentChatView({
         onSend={() => void actions.sendMessage()}
         canSend={!status.isSending && !status.isAwaitingAssistant && newMessage.trim().length > 0}
         isSending={status.isSending}
-        searchSettings={searchSettings}
-        onSearchSettingsChange={onSearchSettingsChange}
+        requireWebSearch={requireWebSearch}
+        onRequireWebSearchChange={onRequireWebSearchChange}
       />
     </div>
   );

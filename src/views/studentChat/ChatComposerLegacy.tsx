@@ -5,10 +5,9 @@
  */
 
 import { memo, useState } from "react";
-import { Loader2, FileText, Globe, Settings2, ChevronDown } from "lucide-react";
+import { Loader2, Globe } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
-import type { SearchSettings } from "../../interfaceAdapters/gateways/api/types";
 
 interface ChatComposerLegacyProps {
   value: string;
@@ -16,8 +15,8 @@ interface ChatComposerLegacyProps {
   onSend: () => void;
   canSend: boolean;
   isSending: boolean;
-  searchSettings?: SearchSettings;
-  onSearchSettingsChange?: (settings: Partial<SearchSettings>) => void;
+  requireWebSearch?: boolean;
+  onRequireWebSearchChange?: (value: boolean) => void;
 }
 
 export const ChatComposerLegacy = memo(function ChatComposerLegacy({
@@ -26,11 +25,10 @@ export const ChatComposerLegacy = memo(function ChatComposerLegacy({
   onSend,
   canSend,
   isSending,
-  searchSettings,
-  onSearchSettingsChange,
+  requireWebSearch = false,
+  onRequireWebSearchChange,
 }: ChatComposerLegacyProps) {
   const [isComposing, setIsComposing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   const handleSend = () => {
     if (canSend && !isSending && value.trim()) {
@@ -41,77 +39,22 @@ export const ChatComposerLegacy = memo(function ChatComposerLegacy({
   return (
     <div className="border-t bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-3xl">
-        {/* 検索設定トグルバー */}
-        {searchSettings && onSearchSettingsChange && (
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {/* FileSearch - 常にONで固定 */}
-              <div
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium bg-emerald-100 text-emerald-700 cursor-not-allowed opacity-90"
-                title="社内検索は常に有効です"
-              >
-                <FileText className="h-3 w-3" />
-                社内検索
-                <span className="text-[10px] font-semibold">常時ON</span>
-              </div>
-
-              {/* WebSearch トグル */}
-              <button
-                type="button"
-                onClick={() =>
-                  onSearchSettingsChange({
-                    allowWebSearch: !searchSettings.allowWebSearch,
-                  })
-                }
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  searchSettings.allowWebSearch
-                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                <Globe className="h-3 w-3" />
-                ウェブ検索
-                {searchSettings.allowWebSearch ? " 許可" : " OFF"}
-              </button>
-            </div>
-
+        {/* Web検索トグル */}
+        {onRequireWebSearchChange && (
+          <div className="mb-2 flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+              onClick={() => onRequireWebSearchChange(!requireWebSearch)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                requireWebSearch
+                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
             >
-              <Settings2 className="h-3 w-3" />
-              <ChevronDown
-                className={`h-3 w-3 transition-transform ${
-                  showSettings ? "rotate-180" : ""
-                }`}
-              />
+              <Globe className="h-3 w-3" />
+              Web検索で補強
+              {requireWebSearch ? " ON" : " OFF"}
             </button>
-          </div>
-        )}
-
-        {/* 検索設定説明 (折りたたみ領域) */}
-        {showSettings && searchSettings && (
-          <div className="mb-3 rounded-lg border bg-muted/30 p-3 text-[11px] text-muted-foreground">
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <FileText className="h-3.5 w-3.5 mt-0.5 text-emerald-600" />
-                <div>
-                  <span className="font-medium text-foreground">社内検索:</span>{" "}
-                  アップロードされた社内ドキュメントから回答を検索します。
-                  <span className="text-emerald-700 font-medium">（常に有効）</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Globe className="h-3.5 w-3.5 mt-0.5 text-blue-600" />
-                <div>
-                  <span className="font-medium text-foreground">
-                    ウェブ検索:
-                  </span>{" "}
-                  社内ドキュメントで回答が見つからない場合、ウェブ検索を許可します（確認あり）。
-                </div>
-              </div>
-            </div>
           </div>
         )}
 

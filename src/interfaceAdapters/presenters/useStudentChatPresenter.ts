@@ -20,9 +20,7 @@ import type {
 import type { UseCaseFailure } from "../../application/entitle/models";
 import type {
   StudentChatBootstrap,
-  SearchSettings,
   LLMGenerateResponse,
-  WebSearchConfirmationLabels,
 } from "../gateways/api/types";
 import { ResponseType } from "../gateways/api/types";
 import { createStudentChatService } from "../../application/entitle/factories/StudentChatFactory";
@@ -35,12 +33,6 @@ import type {
 // 状態型定義
 // ============================================
 
-interface WebSearchPendingState {
-  questionText: string;
-  reason: string;
-  labels: WebSearchConfirmationLabels;
-}
-
 interface PresenterState {
   bootstrap: StudentChatBootstrap | null;
   activeConversationId: string | null;
@@ -50,10 +42,8 @@ interface PresenterState {
   isSending: boolean;
   isAwaitingAssistant: boolean;
   newMessage: string;
-  // 検索設定
-  searchSettings: SearchSettings;
-  // ウェブ検索確認状態
-  webSearchPending: WebSearchPendingState | null;
+  // Web検索設定（シンプルなboolean）
+  requireWebSearch: boolean;
   // フィードバック状態
   feedbacks: Record<string, Feedback[]>; // msgId -> Feedback[]
   feedbackLoading: Record<string, boolean>; // msgId -> loading
@@ -98,15 +88,10 @@ export interface StudentChatPresenterOutput {
     clearError: () => void;
     // リロード
     reload: () => Promise<void>;
-    // ウェブ検索確認
-    confirmWebSearch: () => Promise<void>;
-    cancelWebSearch: () => void;
   };
-  // 検索設定
-  searchSettings: SearchSettings;
-  setSearchSettings: (settings: Partial<SearchSettings>) => void;
-  // ウェブ検索確認状態
-  webSearchPending: WebSearchPendingState | null;
+  // Web検索設定
+  requireWebSearch: boolean;
+  setRequireWebSearch: (value: boolean) => void;
   // フィードバック
   feedback: {
     feedbacks: Record<string, Feedback[]>;
@@ -131,12 +116,7 @@ const initialState: PresenterState = {
   isSending: false,
   isAwaitingAssistant: false,
   newMessage: "",
-  searchSettings: {
-    enableFileSearch: true,
-    allowWebSearch: false,
-    executeWebSearch: false,
-  },
-  webSearchPending: null,
+  requireWebSearch: false,
   feedbacks: {},
   feedbackLoading: {},
   feedbackInput: {},
@@ -224,7 +204,14 @@ export function useStudentChatPresenter(
   }, []);
 
   const sendMessage = useCallback(async () => {
-    const { bootstrap, newMessage, searchSettings } = state;
+    const { bootstrap, newMessage, requireWebSearch, isSending, isAwaitingAssistant } = state;
+    
+    // 既に送信中または応答待ちの場合は何もしない（重複防止）
+    if (isSending || isAwaitingAssistant) {
+      console.warn('Message sending already in progress, ignoring duplicate request');
+      return;
+    }
+    
     if (
       !bootstrap?.conversation ||
       !bootstrap.currentUser ||
@@ -267,12 +254,12 @@ export function useStudentChatPresenter(
       };
     });
 
-    // 2. LLM応答生成
+    // 2. LLM応答生成 (Web検索も含む)
     const llmResult = await service.generateLLMResponse(
       bootstrap.currentUser,
       bootstrap.conversation,
       questionText,
-      searchSettings
+      requireWebSearch
     );
 
     if (llmResult.kind === "failure") {
@@ -284,26 +271,7 @@ export function useStudentChatPresenter(
       return;
     }
 
-    // 3. ウェブ検索確認が必要な場合
-    if (llmResult.value.type === ResponseType.WEB_SEARCH_CONFIRMATION) {
-      setState((prev) => ({
-        ...prev,
-        isAwaitingAssistant: false,
-        webSearchPending: {
-          questionText,
-          reason:
-            llmResult.value.webSearchReason ??
-            "社内ドキュメントで回答が見つかりませんでした。",
-          labels: llmResult.value.confirmationLabels ?? {
-            confirm: "ウェブ検索を許可",
-            cancel: "キャンセル",
-          },
-        },
-      }));
-      return;
-    }
-
-    // 4. アシスタントメッセージ保存
+    // 3. アシスタントメッセージ保存
     const beginResult = await service.beginAssistantMessage(
       bootstrap.conversation,
       bootstrap.currentUser
@@ -424,104 +392,13 @@ export function useStudentChatPresenter(
     await loadInitialData(state.activeConversationId ?? undefined);
   }, [loadInitialData, state.activeConversationId]);
 
-  const setSearchSettings = useCallback((settings: Partial<SearchSettings>) => {
+  const setRequireWebSearch = useCallback((value: boolean) => {
     setState((prev) => ({
       ...prev,
-      searchSettings: { ...prev.searchSettings, ...settings },
+      requireWebSearch: value,
     }));
   }, []);
 
-  // ============================================
-  // ウェブ検索確認操作
-  // ============================================
-
-  const confirmWebSearch = useCallback(async () => {
-    const { bootstrap, webSearchPending, searchSettings } = state;
-    if (
-      !bootstrap?.conversation ||
-      !bootstrap.currentUser ||
-      !webSearchPending
-    ) {
-      return;
-    }
-
-    setState((prev) => ({
-      ...prev,
-      webSearchPending: null,
-      isAwaitingAssistant: true,
-    }));
-
-    // executeWebSearch: true でLLM再呼び出し
-    const llmResult = await service.generateLLMResponse(
-      bootstrap.currentUser,
-      bootstrap.conversation,
-      webSearchPending.questionText,
-      { ...searchSettings, executeWebSearch: true }
-    );
-
-    if (llmResult.kind === "failure") {
-      setState((prev) => ({
-        ...prev,
-        isAwaitingAssistant: false,
-        error: llmResult.error,
-      }));
-      return;
-    }
-
-    // アシスタントメッセージ保存
-    const beginResult = await service.beginAssistantMessage(
-      bootstrap.conversation,
-      bootstrap.currentUser
-    );
-
-    if (beginResult.kind === "failure") {
-      setState((prev) => ({
-        ...prev,
-        isAwaitingAssistant: false,
-        error: beginResult.error,
-      }));
-      return;
-    }
-
-    const finalizeResult = await service.finalizeAssistantMessage(
-      beginResult.value,
-      llmResult.value.answer,
-      llmResult.value.sources
-    );
-
-    // NOTE: サーバー応答にはsourcesが含まれないため、LLM応答から取得したsourcesを必ず付与する
-    setState((prev) => {
-      if (!prev.bootstrap) return prev;
-      const assistantMessage =
-        finalizeResult.kind === "success"
-          ? { ...finalizeResult.value, sources: llmResult.value.sources }
-          : {
-              ...beginResult.value,
-              content: llmResult.value.answer,
-              status: "DONE" as const,
-              sources: llmResult.value.sources,
-            };
-
-      return {
-        ...prev,
-        isAwaitingAssistant: false,
-        bootstrap: {
-          ...prev.bootstrap,
-          initialMessages: [
-            ...prev.bootstrap.initialMessages,
-            assistantMessage,
-          ],
-        },
-      };
-    });
-  }, [state, service]);
-
-  const cancelWebSearch = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      webSearchPending: null,
-    }));
-  }, []);
 
   // ============================================
   // フィードバック操作
@@ -683,12 +560,9 @@ export function useStudentChatPresenter(
       deleteConversation,
       clearError,
       reload,
-      confirmWebSearch,
-      cancelWebSearch,
     },
-    searchSettings: state.searchSettings,
-    setSearchSettings,
-    webSearchPending: state.webSearchPending,
+    requireWebSearch: state.requireWebSearch,
+    setRequireWebSearch,
     feedback: {
       feedbacks: state.feedbacks,
       isLoading: isFeedbackLoading,

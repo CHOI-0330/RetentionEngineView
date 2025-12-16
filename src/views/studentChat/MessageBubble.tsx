@@ -218,26 +218,41 @@ export const MessageBubble = memo(function MessageBubble({
               {hasWebSources && (
                 <div className={hasFileSources ? "mt-2.5 pt-2.5 border-t" : ""}>
                   <div className="space-y-1.5">
-                    {sources!.webSearch!.map((source: WebSource, i: number) => (
-                      <a
-                        key={`web-${i}`}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-2 rounded-md border bg-muted/50 px-2 py-1.5 transition-colors hover:bg-muted"
-                      >
-                        <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[11px] font-medium text-foreground/80 group-hover:text-foreground">
-                            {source.title || "ウェブページ"}
-                          </p>
-                          <p className="truncate text-[10px] text-muted-foreground">
-                            {new URL(source.url).hostname}
-                          </p>
-                        </div>
-                        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" />
-                      </a>
-                    ))}
+                    {sources!.webSearch!.map((source: WebSource, i: number) => {
+                      // URLのホスト名を安全に取得
+                      let hostname = "";
+                      try {
+                        if (source.url && source.url.startsWith("http")) {
+                          hostname = new URL(source.url).hostname;
+                        } else {
+                          hostname = source.url || "不明なURL";
+                        }
+                      } catch (e) {
+                        console.warn("Invalid URL:", source.url, e);
+                        hostname = "不明なURL";
+                      }
+                      
+                      return (
+                        <a
+                          key={`web-${i}`}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group flex items-center gap-2 rounded-md border bg-muted/50 px-2 py-1.5 transition-colors hover:bg-muted"
+                        >
+                          <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-medium text-foreground/80 group-hover:text-foreground">
+                              {source.title || "ウェブページ"}
+                            </p>
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {hostname}
+                            </p>
+                          </div>
+                          <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}
