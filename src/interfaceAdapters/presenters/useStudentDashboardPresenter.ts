@@ -266,6 +266,22 @@ export function useStudentDashboardPresenter(
   }, [service, state.conversations, state.searchQuery]);
 
   // ============================================
+  // Actions メモ化（子コンポーネントの不要な再レンダリング防止）
+  // ============================================
+
+  const actions = useMemo(
+    () => ({
+      setSearchQuery,
+      setNewTitle,
+      refresh,
+      createConversation,
+      deleteConversation,
+      clearError,
+    }),
+    [setSearchQuery, setNewTitle, refresh, createConversation, deleteConversation, clearError]
+  );
+
+  // ============================================
   // 返却
   // ============================================
 
@@ -277,13 +293,6 @@ export function useStudentDashboardPresenter(
     searchQuery: state.searchQuery,
     newTitle: state.newTitle,
     isDeleting: state.isDeleting,
-    actions: {
-      setSearchQuery,
-      setNewTitle,
-      refresh,
-      createConversation,
-      deleteConversation,
-      clearError,
-    },
+    actions,
   };
 }

@@ -330,6 +330,37 @@ export function useMentorDashboardPresenter(
   }, [service, state.summaries, state.newhireOptions, state.searchQuery, state.sortOption]);
 
   // ============================================
+  // Actions メモ化（子コンポーネントの不要な再レンダリング防止）
+  // ============================================
+
+  const actions = useMemo(
+    () => ({
+      setSearchQuery,
+      setSortOption,
+      selectStudent,
+      selectNewhire,
+      refresh,
+      refreshNewhires,
+      createAssignment,
+      submitFeedbackQuality,
+      clearError,
+      clearAssignmentError,
+    }),
+    [
+      setSearchQuery,
+      setSortOption,
+      selectStudent,
+      selectNewhire,
+      refresh,
+      refreshNewhires,
+      createAssignment,
+      submitFeedbackQuality,
+      clearError,
+      clearAssignmentError,
+    ]
+  );
+
+  // ============================================
   // 返却
   // ============================================
 
@@ -345,17 +376,6 @@ export function useMentorDashboardPresenter(
     isAssigning: state.isAssigning,
     assignmentError: state.assignmentError,
     qualitySubmitting: state.qualitySubmitting,
-    actions: {
-      setSearchQuery,
-      setSortOption,
-      selectStudent,
-      selectNewhire,
-      refresh,
-      refreshNewhires,
-      createAssignment,
-      submitFeedbackQuality,
-      clearError,
-      clearAssignmentError,
-    },
+    actions,
   };
 }

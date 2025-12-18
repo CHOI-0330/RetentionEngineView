@@ -665,6 +665,56 @@ export function useStudentChatPresenter(
   }, [service, state.bootstrap, state.activeConversationId]);
 
   // ============================================
+  // Actions メモ化（子コンポーネントの不要な再レンダリング防止）
+  // ============================================
+
+  const actions = useMemo(
+    () => ({
+      setNewMessage,
+      sendMessage,
+      selectConversation,
+      createConversation,
+      deleteConversation,
+      clearError,
+      reload,
+      confirmWebSearch,
+      cancelWebSearch,
+    }),
+    [
+      setNewMessage,
+      sendMessage,
+      selectConversation,
+      createConversation,
+      deleteConversation,
+      clearError,
+      reload,
+      confirmWebSearch,
+      cancelWebSearch,
+    ]
+  );
+
+  const feedback = useMemo(
+    () => ({
+      feedbacks: state.feedbacks,
+      isLoading: isFeedbackLoading,
+      isSubmitting: isFeedbackSubmitting,
+      getInput: getFeedbackInput,
+      setInput: setFeedbackInput,
+      loadFeedbacks,
+      submitFeedback,
+    }),
+    [
+      state.feedbacks,
+      isFeedbackLoading,
+      isFeedbackSubmitting,
+      getFeedbackInput,
+      setFeedbackInput,
+      loadFeedbacks,
+      submitFeedback,
+    ]
+  );
+
+  // ============================================
   // 返却
   // ============================================
 
@@ -675,28 +725,10 @@ export function useStudentChatPresenter(
     isSending: state.isSending,
     isAwaitingAssistant: state.isAwaitingAssistant,
     newMessage: state.newMessage,
-    actions: {
-      setNewMessage,
-      sendMessage,
-      selectConversation,
-      createConversation,
-      deleteConversation,
-      clearError,
-      reload,
-      confirmWebSearch,
-      cancelWebSearch,
-    },
+    actions,
     searchSettings: state.searchSettings,
     setSearchSettings,
     webSearchPending: state.webSearchPending,
-    feedback: {
-      feedbacks: state.feedbacks,
-      isLoading: isFeedbackLoading,
-      isSubmitting: isFeedbackSubmitting,
-      getInput: getFeedbackInput,
-      setInput: setFeedbackInput,
-      loadFeedbacks,
-      submitFeedback,
-    },
+    feedback,
   };
 }
