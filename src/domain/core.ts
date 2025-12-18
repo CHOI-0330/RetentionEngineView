@@ -170,3 +170,23 @@ export interface AvatarUrls {
   concerned: string;
   proud: string;
 }
+
+// ===== AI Personality Preset Types =====
+
+/**
+ * AI性格プリセット
+ * AIのコミュニケーションスタイル（口調・説明の深さ・スタンス）を決定
+ */
+export interface PersonalityPreset {
+  id: string;
+  displayName: string;
+  description: string;
+  sampleDialogue: string;
+}
+
+/**
+ * ユーザーの性格プリセット設定
+ */
+export interface UserPersonalityPresetSetting {
+  presetId: string | null;
+}

@@ -37,3 +37,4 @@ export { MentorStudentChatGateway } from "./MentorStudentChatGateway";
 export { StudentDashboardGateway } from "./StudentDashboardGateway";
 export { ProfileGateway } from "./ProfileGateway";
 export { AvatarGateway } from "./AvatarGateway";
+export { PersonalityPresetGateway } from "./PersonalityPresetGateway";

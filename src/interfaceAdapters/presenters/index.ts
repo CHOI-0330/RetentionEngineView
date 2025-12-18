@@ -24,3 +24,7 @@ export { useProfilePresenter } from "./useProfilePresenter";
 // Avatar
 export { useAvatarPresenter } from "./useAvatarPresenter";
 export type { AvatarPresenterOutput } from "./useAvatarPresenter";
+
+// Personality Preset
+export { usePersonalityPresetPresenter } from "./usePersonalityPresetPresenter";
+export type { PersonalityPresetPresenterOutput } from "./usePersonalityPresetPresenter";

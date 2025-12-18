@@ -222,8 +222,7 @@ export const AvatarSettingsView = memo(function AvatarSettingsView({
   const canGenerate = gender !== null && personalityPreset !== null && !isGenerating;
 
   return (
-    <div className="container max-w-2xl py-8 space-y-6">
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>AIメンターアバター設定</CardTitle>
           <CardDescription>
@@ -303,8 +302,7 @@ export const AvatarSettingsView = memo(function AvatarSettingsView({
             </p>
           )}
         </CardContent>
-      </Card>
-    </div>
+    </Card>
   );
 });
 

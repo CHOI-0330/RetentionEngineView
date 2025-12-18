@@ -39,3 +39,10 @@ export type {
 // Profile Service
 export { ProfileService } from "./ProfileService";
 export type { MbtiInfoViewModel, ProfileViewModel } from "./ProfileService";
+
+// Personality Preset Service
+export { PersonalityPresetService } from "./PersonalityPresetService";
+export type {
+  PresetOptionViewModel,
+  PersonalityPresetViewModel,
+} from "./PersonalityPresetService";
