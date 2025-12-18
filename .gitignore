@@ -101,3 +101,16 @@ dist/
 
 # OS-specific files
 .DS_Store
+
+# Claude Code / AI Agent files
+.claude-flow/
+.swarm/
+.serena/memories/
+
+# Playwright
+.playwright-auth.json
+.playwright-mcp/
+.screenshots/
+
+# Local development
+*.local.json
