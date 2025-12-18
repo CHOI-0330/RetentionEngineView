@@ -31,19 +31,25 @@ export const getAuthenticatedSession = async (): Promise<AuthenticatedSession | 
 
   try {
     const adminClient = createAdminSupabaseClient();
+
+    // 1. 먼저 유저 인증 검증 (userId가 필요하므로 선행 필수)
     const { data, error } = await adminClient.auth.getUser(accessToken);
     if (error || !data.user) {
       return null;
     }
     const userId = data.user.id;
+
+    // 2. role 조회 (userId 확보 후)
     const { data: profile, error: profileError } = await adminClient
       .from("user")
-      .select("role")
+      .select("role")  // 필요한 컬럼만 선택
       .eq("user_id", userId)
       .single();
+
     if (profileError || !profile) {
       return null;
     }
+
     return { userId, role: (profile as { role: User["role"] }).role };
   } catch {
     return null;

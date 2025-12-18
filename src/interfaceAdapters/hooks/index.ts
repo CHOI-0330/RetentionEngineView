@@ -15,3 +15,18 @@ export type {
   UseAvatarPreloaderOptions,
   UseAvatarPreloaderResult,
 } from "./useAvatarPreloader";
+
+// React Query Hooks (새로운 데이터 페칭 패턴)
+export {
+  // Conversations
+  useConversationsQuery,
+  useCreateConversation,
+  useDeleteConversation,
+  conversationKeys,
+  // Messages
+  useMessagesQuery,
+  useSendMessage,
+  useBootstrapQuery,
+  messageKeys,
+  bootstrapKeys,
+} from "./queries";
