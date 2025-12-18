@@ -12,6 +12,8 @@ export { useAuthPresenter } from "./useAuthPresenter";
 
 // Student
 export { useStudentDashboardPresenter } from "./useStudentDashboardPresenter";
+export { useStudentDashboardPresenterV3 } from "./useStudentDashboardPresenterV3";
+export type { StudentDashboardPresenterV3Output } from "./useStudentDashboardPresenterV3";
 export { useStudentChatPresenter } from "./useStudentChatPresenter";
 
 // Mentor
