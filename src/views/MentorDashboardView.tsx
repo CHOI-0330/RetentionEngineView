@@ -319,11 +319,11 @@ interface MentorDashboardStudentCardProps {
   index: number;
 }
 
-const MentorDashboardStudentCard = ({
+const MentorDashboardStudentCard = memo(function MentorDashboardStudentCard({
   student,
   isSelected,
   index,
-}: MentorDashboardStudentCardProps) => {
+}: MentorDashboardStudentCardProps) {
   return (
     <Link href={`/mentor/chat/${encodeURIComponent(student.conversationId)}`}>
       <Card
@@ -371,5 +371,5 @@ const MentorDashboardStudentCard = ({
       </Card>
     </Link>
   );
-};
+});
 
