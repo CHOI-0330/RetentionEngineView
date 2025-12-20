@@ -41,6 +41,15 @@ export interface StudentChatViewActions {
 }
 
 /**
+ * 無限スクロール制御
+ */
+export interface InfiniteScrollState {
+  hasOlderMessages: boolean;
+  isLoadingOlder: boolean;
+  loadOlderMessages: () => void;
+}
+
+/**
  * フィードバック操作
  */
 export interface FeedbackActions {
@@ -65,4 +74,5 @@ export interface StudentChatViewProps {
   onSearchSettingsChange: (settings: Partial<SearchSettings>) => void;
   webSearchPending: WebSearchPendingState | null;
   feedback: FeedbackActions;
+  infiniteScroll?: InfiniteScrollState;
 }

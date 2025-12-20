@@ -21,6 +21,8 @@ interface MessageListProps {
   onConfirmWebSearch?: () => void;
   onCancelWebSearch?: () => void;
   canWriteFeedback?: boolean; // フィードバック入力可否
+  isLoadingOlder?: boolean; // 過去メッセージ読み込み中
+  hasOlderMessages?: boolean; // さらに過去のメッセージがあるか
 }
 
 export const MessageList = memo(function MessageList({
@@ -32,6 +34,8 @@ export const MessageList = memo(function MessageList({
   onConfirmWebSearch,
   onCancelWebSearch,
   canWriteFeedback = false,
+  isLoadingOlder = false,
+  hasOlderMessages = true,
 }: MessageListProps) {
   if (messages.length === 0 && !isAwaitingAssistant) {
     return (
@@ -43,6 +47,27 @@ export const MessageList = memo(function MessageList({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* 過去メッセージ読み込み中インジケータ */}
+      {isLoadingOlder && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">
+            過去のメッセージを読み込み中...
+          </span>
+        </div>
+      )}
+
+      {/* 会話の始まり表示 */}
+      {!hasOlderMessages && messages.length > 0 && !isLoadingOlder && (
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2">
+            <span className="text-xs text-muted-foreground">
+              会話の始まりです
+            </span>
+          </div>
+        </div>
+      )}
+
       {messages.map((msg, index) => {
         const prev = index > 0 ? messages[index - 1] : null;
         const isTurnChange = !prev || prev.role !== msg.role;

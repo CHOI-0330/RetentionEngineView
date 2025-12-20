@@ -30,6 +30,7 @@ import type {
   StudentChatViewModel,
   MessageViewModel,
 } from "../services/StudentChatService";
+import { useInfiniteMessagesQuery } from "../hooks/queries/useMessagesQuery";
 
 // ============================================
 // 状態型定義
@@ -116,6 +117,12 @@ export interface StudentChatPresenterOutput {
     setInput: (msgId: string, value: string) => void;
     loadFeedbacks: (msgId: string) => Promise<void>;
     submitFeedback: (msgId: string) => Promise<void>;
+  };
+  // 無限スクロール
+  infiniteScroll: {
+    hasOlderMessages: boolean;
+    isLoadingOlder: boolean;
+    loadOlderMessages: () => void;
   };
 }
 
@@ -653,16 +660,68 @@ export function useStudentChatPresenter(
   );
 
   // ============================================
+  // 無限スクロール（過去メッセージ読み込み）
+  // ============================================
+
+  const infiniteMessages = useInfiniteMessagesQuery({
+    convId: state.activeConversationId ?? "",
+    accessToken,
+    enabled: !!state.activeConversationId && !!accessToken && !state.isLoading,
+    pageSize: 30,
+    initialMessages: state.bootstrap?.initialMessages?.map((m) => ({
+      msgId: m.msgId,
+      convId: m.convId,
+      role: m.role,
+      content: m.content,
+      status: m.status ?? undefined,
+      createdAt: m.createdAt,
+      sources: m.sources,
+    })),
+  });
+
+  // ============================================
   // ViewModel生成
   // ============================================
 
   const viewModel = useMemo(() => {
     if (!state.bootstrap) return null;
+
+    // 無限スクロールのメッセージと新規メッセージを統合
+    // infiniteMessages: React Query キャッシュ（ページロード時のデータ）
+    // state.bootstrap.initialMessages: ローカル状態（新規送信メッセージ含む）
+    let messagesForViewModel: Message[];
+
+    if (infiniteMessages.messages.length > 0) {
+      // infiniteMessagesの最新メッセージのタイムスタンプを取得
+      const infiniteMaxCreatedAt =
+        infiniteMessages.messages[infiniteMessages.messages.length - 1]?.createdAt;
+
+      // ローカル状態から新しく追加されたメッセージを抽出
+      // (infiniteMessagesより新しい、またはinfiniteMessagesに存在しないメッセージ)
+      const infiniteMsgIds = new Set(infiniteMessages.messages.map(m => m.msgId));
+      const newMessages = state.bootstrap.initialMessages.filter(
+        (m) => !infiniteMsgIds.has(m.msgId) &&
+               (!infiniteMaxCreatedAt || m.createdAt >= infiniteMaxCreatedAt)
+      );
+
+      // 統合してソート
+      messagesForViewModel = [...infiniteMessages.messages, ...newMessages].sort((a, b) => {
+        const timeCompare = a.createdAt.localeCompare(b.createdAt);
+        if (timeCompare !== 0) return timeCompare;
+        return a.msgId.localeCompare(b.msgId);
+      });
+    } else {
+      messagesForViewModel = state.bootstrap.initialMessages;
+    }
+
     return service.toViewModel(
-      state.bootstrap,
+      {
+        ...state.bootstrap,
+        initialMessages: messagesForViewModel,
+      },
       state.activeConversationId ?? undefined
     );
-  }, [service, state.bootstrap, state.activeConversationId]);
+  }, [service, state.bootstrap, state.activeConversationId, infiniteMessages.messages]);
 
   // ============================================
   // Actions メモ化（子コンポーネントの不要な再レンダリング防止）
@@ -718,6 +777,19 @@ export function useStudentChatPresenter(
   // 返却
   // ============================================
 
+  // ============================================
+  // 無限スクロール制御のメモ化
+  // ============================================
+
+  const infiniteScroll = useMemo(
+    () => ({
+      hasOlderMessages: infiniteMessages.hasOlderMessages ?? false,
+      isLoadingOlder: infiniteMessages.isLoadingOlder ?? false,
+      loadOlderMessages: infiniteMessages.loadOlderMessages ?? (() => {}),
+    }),
+    [infiniteMessages.hasOlderMessages, infiniteMessages.isLoadingOlder, infiniteMessages.loadOlderMessages]
+  );
+
   return {
     viewModel,
     isLoading: state.isLoading,
@@ -730,5 +802,6 @@ export function useStudentChatPresenter(
     setSearchSettings,
     webSearchPending: state.webSearchPending,
     feedback,
+    infiniteScroll,
   };
 }

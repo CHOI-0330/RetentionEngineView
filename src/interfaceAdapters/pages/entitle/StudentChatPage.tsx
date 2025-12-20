@@ -107,6 +107,7 @@ const StudentChatPage = ({ convId }: StudentChatPageProps) => {
         onSearchSettingsChange={presenter.setSearchSettings}
         webSearchPending={presenter.webSearchPending}
         feedback={presenter.feedback}
+        infiniteScroll={presenter.infiniteScroll}
       />
     </div>
   );

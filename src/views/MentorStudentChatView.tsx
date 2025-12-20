@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -408,13 +408,7 @@ const MentorStudentChatView = ({
 
 export default MentorStudentChatView;
 
-function MentorFeedbackSection({
-  messageId,
-  isAssistant,
-  feedbacks,
-  isEditing,
-  onToggleEditing,
-}: {
+interface MentorFeedbackSectionProps {
   messageId: string;
   isAssistant: boolean;
   feedbacks: {
@@ -425,7 +419,15 @@ function MentorFeedbackSection({
   }[];
   isEditing: boolean;
   onToggleEditing: (next: boolean) => void;
-}) {
+}
+
+const MentorFeedbackSection = memo(function MentorFeedbackSection({
+  messageId,
+  isAssistant,
+  feedbacks,
+  isEditing,
+  onToggleEditing,
+}: MentorFeedbackSectionProps) {
   const [open, setOpen] = useState<boolean>(false);
   const contentId = `mentor-fb-content-${messageId}`;
 
@@ -499,4 +501,4 @@ function MentorFeedbackSection({
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});

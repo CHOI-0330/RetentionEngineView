@@ -4,7 +4,7 @@
  * レガシースタイルの個別メッセージ表示（フィードバック機能付き）
  */
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, lazy, Suspense } from "react";
 import {
   Loader2,
   MessageCircle,
@@ -16,7 +16,13 @@ import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
 import MarkdownRendererView from "../../components/MarkdownRenderer";
-import { SourceDetailModal } from "../../components/SourceDetailModal";
+
+// Dynamic Import: SourceDetailModal (モーダルは必要時のみロード)
+const SourceDetailModal = lazy(() =>
+  import("../../components/SourceDetailModal").then((m) => ({
+    default: m.SourceDetailModal,
+  }))
+);
 import type { Feedback, WebSource, FileSearchSource } from "../../domain/core";
 import type { MessageViewModel } from "../../interfaceAdapters/services/StudentChatService";
 import type { FeedbackActions } from "./types";
@@ -328,12 +334,16 @@ export const MessageBubble = memo(function MessageBubble({
           </div>
         )}
 
-        {/* ソース詳細モーダル */}
-        <SourceDetailModal
-          open={isSourceModalOpen}
-          onOpenChange={setIsSourceModalOpen}
-          source={selectedSource}
-        />
+        {/* ソース詳細モーダル (Dynamic Import) */}
+        {isSourceModalOpen && (
+          <Suspense fallback={null}>
+            <SourceDetailModal
+              open={isSourceModalOpen}
+              onOpenChange={setIsSourceModalOpen}
+              source={selectedSource}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
