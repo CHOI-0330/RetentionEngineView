@@ -14,6 +14,7 @@ type StudentChatAction =
   | "finalizeAssistantMessage"
   | "cancelAssistantMessage"
   | "listConversationMessages"
+  | "listConversationMessagesPaginated" // 無限スクロール用ページネーション
   | "listFeedbacks"
   | "createFeedback"
   | "createConversation"
@@ -251,6 +252,24 @@ const getMessages = (convId: string, accessToken: string) =>
     accessToken
   );
 
+// ページネーション付きメッセージ取得
+const getMessagesPaginated = (
+  convId: string,
+  options: { cursor?: string; limit?: number },
+  accessToken: string
+) => {
+  const params = new URLSearchParams();
+  params.set("convId", convId);
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.limit) params.set("limit", String(options.limit));
+
+  return callBackend<{
+    items: MessageDto[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }>(`/messages/paginated?${params.toString()}`, undefined, accessToken);
+};
+
 const createMessage = (
   input: { convId: string; role: string; content: string },
   accessToken: string
@@ -395,6 +414,36 @@ export async function POST(request: NextRequest) {
 
         const items = paged.map(mapMessageRow);
         return NextResponse.json({ data: { items, nextCursor } });
+      }
+      case "listConversationMessagesPaginated": {
+        // 無限スクロール用: バックエンドのページネーションAPIを直接使用
+        const input = (payload ?? {}) as {
+          convId?: string;
+          cursor?: string; // created_at ベースのカーソル (ISO文字列)
+          limit?: number;
+        };
+        if (!input.convId || typeof input.convId !== "string") {
+          throw new HttpError(400, "convId is required.");
+        }
+        const pageSize = Math.min(Math.max(input.limit ?? 30, 1), 100);
+
+        // バックエンドのページネーションAPIを呼び出し
+        const result = await getMessagesPaginated(
+          input.convId,
+          { cursor: input.cursor, limit: pageSize },
+          accessToken
+        );
+
+        // MessageRowにマッピング
+        const items = result.items.map(mapApiMessageRow).map(mapMessageRow);
+
+        return NextResponse.json({
+          data: {
+            items,
+            nextCursor: result.nextCursor,
+            hasMore: result.hasMore,
+          },
+        });
       }
       case "listFeedbacks": {
         const input = (payload ?? {}) as {

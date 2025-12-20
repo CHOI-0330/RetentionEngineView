@@ -110,4 +110,24 @@ export class MessageGateway implements MessagePort {
       lastSeqNo?: number;
     }>("listConversationMessages", input);
   }
+
+  /**
+   * 無限スクロール用ページネーション
+   * created_atベースのカーソルでバックエンドAPIを直接使用
+   */
+  async listConversationMessagesPaginated(input: {
+    convId: string;
+    cursor?: string; // created_at ISO文字列
+    limit?: number;
+  }): Promise<{
+    items: Message[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    return this.callApi<{
+      items: Message[];
+      nextCursor?: string;
+      hasMore: boolean;
+    }>("listConversationMessagesPaginated", input);
+  }
 }
