@@ -4,17 +4,7 @@
 
 import type { Feedback } from "../../domain/core";
 import type { StudentChatViewModel } from "../../interfaceAdapters/services/StudentChatService";
-import type { SearchSettings, WebSearchConfirmationLabels } from "../../interfaceAdapters/gateways/api/types";
 import type { UseCaseFailure } from "../../application/entitle/models";
-
-/**
- * ウェブ検索確認状態
- */
-export interface WebSearchPendingState {
-  questionText: string;
-  reason: string;
-  labels: WebSearchConfirmationLabels;
-}
 
 /**
  * View 状態
@@ -36,8 +26,6 @@ export interface StudentChatViewActions {
   deleteConversation: (convId: string) => Promise<void>;
   clearError: () => void;
   reload: () => Promise<void>;
-  confirmWebSearch: () => Promise<void>;
-  cancelWebSearch: () => void;
 }
 
 /**
@@ -70,9 +58,8 @@ export interface StudentChatViewProps {
   newMessage: string;
   status: StudentChatViewStatus;
   actions: StudentChatViewActions;
-  searchSettings: SearchSettings;
-  onSearchSettingsChange: (settings: Partial<SearchSettings>) => void;
-  webSearchPending: WebSearchPendingState | null;
+  requireWebSearch: boolean;
+  onRequireWebSearchChange: (value: boolean) => void;
   feedback: FeedbackActions;
   infiniteScroll?: InfiniteScrollState;
 }

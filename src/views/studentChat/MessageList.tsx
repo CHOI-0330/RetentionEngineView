@@ -5,21 +5,17 @@
  */
 
 import { memo } from "react";
-import { Loader2, Globe } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
-import { Button } from "../../components/ui/button";
 import { MessageBubble } from "./MessageBubble";
 import type { MessageViewModel } from "../../interfaceAdapters/services/StudentChatService";
-import type { FeedbackActions, WebSearchPendingState } from "./types";
+import type { FeedbackActions } from "./types";
 
 interface MessageListProps {
   messages: MessageViewModel[];
   authorNames?: Record<string, string>;
   isAwaitingAssistant?: boolean;
   feedback?: FeedbackActions;
-  webSearchPending?: WebSearchPendingState | null;
-  onConfirmWebSearch?: () => void;
-  onCancelWebSearch?: () => void;
   canWriteFeedback?: boolean; // フィードバック入力可否
   isLoadingOlder?: boolean; // 過去メッセージ読み込み中
   hasOlderMessages?: boolean; // さらに過去のメッセージがあるか
@@ -30,9 +26,6 @@ export const MessageList = memo(function MessageList({
   authorNames = {},
   isAwaitingAssistant = false,
   feedback,
-  webSearchPending,
-  onConfirmWebSearch,
-  onCancelWebSearch,
   canWriteFeedback = false,
   isLoadingOlder = false,
   hasOlderMessages = true,
@@ -83,46 +76,6 @@ export const MessageList = memo(function MessageList({
           </div>
         );
       })}
-
-      {/* ウェブ検索確認メッセージ */}
-      {webSearchPending && (
-        <div className="flex w-full justify-start mt-4">
-          <div className="flex max-w-[85%] flex-col items-start">
-            <div className="flex items-end gap-2">
-              <Avatar className="h-8 w-8 border bg-primary/5">
-                <AvatarFallback className="text-[10px] text-primary">
-                  AI
-                </AvatarFallback>
-              </Avatar>
-              <div className="relative rounded-2xl rounded-tl-sm bg-muted/50 px-5 py-4 text-sm leading-relaxed shadow-sm">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-2">
-                    <Globe className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-foreground">{webSearchPending.reason}</p>
-                  </div>
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      onClick={onConfirmWebSearch}
-                      className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs"
-                    >
-                      {webSearchPending.labels.confirm}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={onCancelWebSearch}
-                      className="h-8 text-xs"
-                    >
-                      {webSearchPending.labels.cancel}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* アシスタント応答待ちインジケータ */}
       {isAwaitingAssistant && (

@@ -103,9 +103,8 @@ const StudentChatPage = ({ convId }: StudentChatPageProps) => {
           error: presenter.error,
         }}
         actions={presenter.actions}
-        searchSettings={presenter.searchSettings}
-        onSearchSettingsChange={presenter.setSearchSettings}
-        webSearchPending={presenter.webSearchPending}
+        requireWebSearch={presenter.requireWebSearch}
+        onRequireWebSearchChange={presenter.setRequireWebSearch}
         feedback={presenter.feedback}
         infiniteScroll={presenter.infiniteScroll}
       />

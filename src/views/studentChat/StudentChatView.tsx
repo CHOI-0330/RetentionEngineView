@@ -4,7 +4,7 @@
  * 新アーキテクチャ：レガシーUIスタイルを維持
  */
 
-import { memo, useRef, useEffect, useState, useCallback } from "react";
+import { memo, useRef, useEffect, useState } from "react";
 import { AlertTriangle, Loader2, ChevronUp } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
@@ -34,71 +34,22 @@ export const StudentChatView = memo(function StudentChatView({
   newMessage,
   status,
   actions,
-  searchSettings,
-  onSearchSettingsChange,
-  webSearchPending,
+  requireWebSearch,
+  onRequireWebSearchChange,
   feedback,
-  infiniteScroll,
 }: StudentChatViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const previousScrollHeightRef = useRef<number>(0);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [newConversationTitle, setNewConversationTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
 
-  // 上方向スクロールで過去メッセージ読み込み
-  const handleScroll = useCallback(() => {
-    const viewport = scrollAreaRef.current;
-    if (!viewport || !infiniteScroll) return;
-
-    const { scrollTop } = viewport;
-
-    // 上端100px以内でトリガー
-    if (
-      scrollTop < 100 &&
-      infiniteScroll.hasOlderMessages &&
-      !infiniteScroll.isLoadingOlder
-    ) {
-      // 現在のスクロール高さを保存（位置復元用）
-      previousScrollHeightRef.current = viewport.scrollHeight;
-      setShouldScrollToBottom(false);
-      infiniteScroll.loadOlderMessages();
-    }
-  }, [infiniteScroll]);
-
-  // スクロールイベントリスナー登録
+  // 新しいメッセージが追加されたらスクロール
   useEffect(() => {
     const viewport = scrollAreaRef.current;
-    if (!viewport) return;
-
-    viewport.addEventListener("scroll", handleScroll);
-    return () => viewport.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
-  // 過去メッセージ読み込み後のスクロール位置復元
-  useEffect(() => {
-    const viewport = scrollAreaRef.current;
-    if (!viewport || !infiniteScroll) return;
-
-    // ローディング完了後、スクロール位置を復元
-    if (!infiniteScroll.isLoadingOlder && previousScrollHeightRef.current > 0) {
-      const newScrollHeight = viewport.scrollHeight;
-      const heightDiff = newScrollHeight - previousScrollHeightRef.current;
-      viewport.scrollTop = heightDiff;
-      previousScrollHeightRef.current = 0;
-    }
-  }, [infiniteScroll?.isLoadingOlder, viewModel.messages.length]);
-
-  // 新しいメッセージが追加されたらスクロール（下方向のみ）
-  useEffect(() => {
-    const viewport = scrollAreaRef.current;
-    if (viewport && shouldScrollToBottom) {
+    if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
     }
-    // 新しいメッセージ追加時は下にスクロールするようリセット
-    setShouldScrollToBottom(true);
   }, [viewModel.messages.length, status.isAwaitingAssistant]);
 
   // 会話作成ハンドラ
@@ -287,11 +238,6 @@ export const StudentChatView = memo(function StudentChatView({
                 authorNames={viewModel.authorNames}
                 isAwaitingAssistant={status.isAwaitingAssistant}
                 feedback={feedback}
-                webSearchPending={webSearchPending}
-                onConfirmWebSearch={() => void actions.confirmWebSearch()}
-                onCancelWebSearch={actions.cancelWebSearch}
-                isLoadingOlder={infiniteScroll?.isLoadingOlder}
-                hasOlderMessages={infiniteScroll?.hasOlderMessages}
               />
               <div ref={bottomRef} className="h-px" />
             </div>
@@ -306,8 +252,8 @@ export const StudentChatView = memo(function StudentChatView({
         onSend={() => void actions.sendMessage()}
         canSend={!status.isSending && !status.isAwaitingAssistant && newMessage.trim().length > 0}
         isSending={status.isSending}
-        searchSettings={searchSettings}
-        onSearchSettingsChange={onSearchSettingsChange}
+        requireWebSearch={requireWebSearch}
+        onRequireWebSearchChange={onRequireWebSearchChange}
       />
     </div>
   );

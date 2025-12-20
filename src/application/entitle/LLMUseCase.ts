@@ -6,7 +6,7 @@
 
 import type { Conversation, User, Message } from "../../domain/core";
 import type { UseCaseResult } from "./models";
-import type { SearchSettings, LLMGenerateResponse } from "../../interfaceAdapters/gateways/api/types";
+import type { LLMGenerateResponse } from "../../interfaceAdapters/gateways/api/types";
 
 /**
  * LLM生成用Portインターフェース
@@ -17,7 +17,7 @@ export interface LLMPort {
     conversationId: string;
     modelId?: string;
     runtimeId?: string;
-    searchSettings?: SearchSettings;
+    requireWebSearch?: boolean;
   }): Promise<LLMGenerateResponse>;
 }
 
@@ -39,7 +39,7 @@ export class LLMUseCase {
     requester: User;
     conversation: Conversation;
     question: string;
-    searchSettings?: SearchSettings;
+    requireWebSearch?: boolean;
   }): Promise<UseCaseResult<LLMGenerateResponse>> {
     // 検証: 権限（会話オーナーのみ）
     if (args.requester.userId !== args.conversation.ownerId) {
@@ -68,7 +68,7 @@ export class LLMUseCase {
       const response = await this.port.generateResponse({
         question,
         conversationId: args.conversation.convId,
-        searchSettings: args.searchSettings,
+        requireWebSearch: args.requireWebSearch,
       });
 
       return { kind: "success", value: response };
