@@ -18,18 +18,28 @@ export default function QueryProvider({ children }: QueryProviderProps) {
             staleTime: 5 * 60 * 1000,
             // 30분 후 캐시에서 제거
             gcTime: 30 * 60 * 1000,
-            // 창 포커스 시 자동 리페치
-            refetchOnWindowFocus: true,
-            // 마운트 시 리페치 (stale 상태인 경우만)
-            refetchOnMount: true,
-            // 3회 재시도
-            retry: 3,
-            // 재시도 간 지수 백오프
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            // 🔥 FIX: 탭 전환 시 refetch 비활성화 (429 Rate Limit 방지)
+            refetchOnWindowFocus: false,
+            // 🔥 FIX: stale 상태일 때만 refetch (불필요한 API 호출 방지)
+            refetchOnMount: "always",
+            // 🔥 FIX: 429 에러 시 재시도 안 함
+            retry: (failureCount, error) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const status = (error as any)?.response?.status ?? (error as any)?.status;
+              if (status === 429) return false; // Rate Limit 에러는 재시도 안 함
+              return failureCount < 2; // 다른 에러는 2회까지 재시도
+            },
+            // 재시도 간 지수 백오프 (더 긴 간격)
+            retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 60000),
           },
           mutations: {
-            // 뮤테이션 실패 시 1회 재시도
-            retry: 1,
+            // 🔥 FIX: 429 에러 시 mutation도 재시도 안 함
+            retry: (failureCount, error) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const status = (error as any)?.response?.status ?? (error as any)?.status;
+              if (status === 429) return false;
+              return failureCount < 1;
+            },
           },
         },
       })
