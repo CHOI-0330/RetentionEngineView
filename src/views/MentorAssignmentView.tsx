@@ -7,6 +7,7 @@
 
 "use client";
 
+import { memo } from "react";
 import { Button } from "../components/ui/button";
 import {
   Select,
@@ -46,7 +47,7 @@ interface AssignedNewhireListProps {
   newhires: NewhireOption[];
 }
 
-const AssignedNewhireList = ({ newhires }: AssignedNewhireListProps) => {
+const AssignedNewhireList = memo(function AssignedNewhireList({ newhires }: AssignedNewhireListProps) {
   if (newhires.length === 0) {
     return null;
   }
@@ -79,7 +80,7 @@ const AssignedNewhireList = ({ newhires }: AssignedNewhireListProps) => {
       </div>
     </div>
   );
-};
+});
 
 interface NewhireSelectFormProps {
   availableNewhires: NewhireOption[];
@@ -93,7 +94,7 @@ interface NewhireSelectFormProps {
   error: string | null;
 }
 
-const NewhireSelectForm = ({
+const NewhireSelectForm = memo(function NewhireSelectForm({
   availableNewhires,
   totalCount,
   selectedNewhireId,
@@ -103,7 +104,7 @@ const NewhireSelectForm = ({
   isLoading,
   isAssigning,
   error,
-}: NewhireSelectFormProps) => {
+}: NewhireSelectFormProps) {
   const getPlaceholder = () => {
     if (isLoading) return "読込中...";
     if (availableNewhires.length === 0) return "割り当て可能な新入社員がいません";
@@ -171,13 +172,13 @@ const NewhireSelectForm = ({
       )}
     </div>
   );
-};
+});
 
 // ============================================
 // メインコンポーネント
 // ============================================
 
-export const MentorAssignmentView = ({
+export const MentorAssignmentView = memo(function MentorAssignmentView({
   newhireOptions,
   selectedNewhireId,
   onSelectNewhire,
@@ -186,7 +187,7 @@ export const MentorAssignmentView = ({
   isLoadingNewhires,
   isAssigning,
   assignmentError,
-}: MentorAssignmentViewProps) => {
+}: MentorAssignmentViewProps) {
   const availableNewhires = newhireOptions.filter((n) => !n.isAssigned);
   const assignedNewhires = newhireOptions.filter((n) => n.isAssigned);
 
@@ -206,6 +207,6 @@ export const MentorAssignmentView = ({
       />
     </>
   );
-};
+});
 
 export default MentorAssignmentView;

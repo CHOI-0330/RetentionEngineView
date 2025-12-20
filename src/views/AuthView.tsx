@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "../components/ui/dialog";
 import { MbtiCardSelector } from "../components/MbtiCardSelector";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { MBTI_LABELS } from "../domain/mbti.types";
 import type {
   AuthPresenterInteractions,
@@ -48,7 +48,7 @@ interface AuthViewProps {
   interactions: AuthPresenterInteractions;
 }
 
-const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
+const AuthView = memo(function AuthView({ viewModel, status, interactions }: AuthViewProps) {
   const [isMbtiModalOpen, setIsMbtiModalOpen] = useState(false);
 
   return (
@@ -314,6 +314,6 @@ const AuthView = ({ viewModel, status, interactions }: AuthViewProps) => {
       </Tabs>
     </div>
   );
-};
+});
 
 export default AuthView;

@@ -5,6 +5,7 @@
  * PresenterV2から受け取ったViewModelを表示
  */
 
+import { memo } from "react";
 import { Button } from "../components/ui/button";
 import { Alert } from "../components/ui/alert";
 import { MbtiCardSelector } from "../components/MbtiCardSelector";
@@ -33,13 +34,13 @@ interface ProfileViewProps {
 // Component
 // ============================================
 
-const ProfileView = ({
+const ProfileView = memo(function ProfileView({
   viewModel,
   isLoading,
   isSaving,
   error,
   actions,
-}: ProfileViewProps) => {
+}: ProfileViewProps) {
   // エラーメッセージ整形
   const errorMessage = error
     ? `${error.kind}: ${error.message}`
@@ -122,6 +123,6 @@ const ProfileView = ({
       </div>
     </div>
   );
-};
+});
 
 export default ProfileView;
