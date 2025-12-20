@@ -106,7 +106,6 @@ const StudentChatPage = ({ convId }: StudentChatPageProps) => {
         requireWebSearch={presenter.requireWebSearch}
         onRequireWebSearchChange={presenter.setRequireWebSearch}
         feedback={presenter.feedback}
-        infiniteScroll={presenter.infiniteScroll}
       />
     </div>
   );
