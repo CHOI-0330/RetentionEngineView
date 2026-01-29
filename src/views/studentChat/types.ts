@@ -62,4 +62,6 @@ export interface StudentChatViewProps {
   onRequireWebSearchChange: (value: boolean) => void;
   feedback: FeedbackActions;
   infiniteScroll?: InfiniteScrollState;
+  /** 知識抽出機能用のアクセストークン */
+  accessToken?: string;
 }

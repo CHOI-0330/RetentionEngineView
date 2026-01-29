@@ -1,0 +1,1 @@
+export { KnowledgeExtractionDialog } from "./KnowledgeExtractionDialog";

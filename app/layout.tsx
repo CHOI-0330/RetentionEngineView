@@ -43,12 +43,18 @@ export default function RootLayout({
             </a>
             <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between sm:px-6">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-6">
                   <Link
                     href="/"
                     className="text-sm font-bold tracking-tight hover:text-primary transition-colors"
                   >
                     Retention Engine
+                  </Link>
+                  <Link
+                    href="/student/knowledge"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ナレッジ
                   </Link>
                 </div>
                 <div className="flex items-center gap-4">
