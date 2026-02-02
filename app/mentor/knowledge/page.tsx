@@ -23,6 +23,6 @@ const KCLibraryPageComponent = dynamic(
   }
 );
 
-export default function KnowledgeListPage() {
+export default function MentorKnowledgeListPage() {
   return <KCLibraryPageComponent />;
 }
