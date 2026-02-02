@@ -27,7 +27,6 @@ import {
 } from "../../components/ui/select";
 import { MessageList } from "./MessageList";
 import { ChatComposerLegacy } from "./ChatComposerLegacy";
-import { KnowledgeExtractionDialog } from "../../components/KnowledgeExtraction";
 import type { StudentChatViewProps } from "./types";
 
 export const StudentChatView = memo(function StudentChatView({
@@ -115,15 +114,6 @@ export const StudentChatView = memo(function StudentChatView({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 知識抽出ボタン */}
-          {viewModel.conversation && (
-            <KnowledgeExtractionDialog
-              conversationId={viewModel.conversation.convId}
-              accessToken={accessToken}
-              messageCount={viewModel.messages.length}
-              disabled={status.isAwaitingAssistant || status.isSending}
-            />
-          )}
           {/* 会話削除ボタン */}
           {viewModel.conversation && (
             <Button

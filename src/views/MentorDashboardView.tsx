@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Loader2, MessageCircle, User, Search, ArrowUpDown } from "lucide-react";
+import { Loader2, MessageCircle, User, Search, ArrowUpDown, BotMessageSquare, BookOpen } from "lucide-react";
 import Link from "next/link";
 
 // ============================================
@@ -135,6 +135,22 @@ const HeroSection = memo(function HeroSection() {
           <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
             新入社員とAIメンターの会話を確認し、質の高い学習体験を提供します。
           </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/mentor/ai-chat"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+            >
+              <BotMessageSquare className="h-4 w-4" />
+              AIチャットで知識を抽出
+            </Link>
+            <Link
+              href="/mentor/knowledge"
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-background px-5 py-2.5 text-sm font-medium text-primary shadow-sm hover:bg-primary/10 transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              知識ライブラリ
+            </Link>
+          </div>
         </div>
       </div>
     </section>

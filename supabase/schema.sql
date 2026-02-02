@@ -8,11 +8,12 @@ create table if not exists "user" (
   disabled_at timestamptz
 );
 
--- Conversations owned by new hires
+-- Conversations (student chats & mentor AI chats)
 create table if not exists conversation (
   conv_id uuid primary key,
   owner_id uuid not null,
   title text not null,
+  type text not null default 'student_chat' check (type in ('student_chat','mentor_ai_chat')),
   state text not null check (state in ('ACTIVE','ARCHIVED')),
   created_at timestamptz not null default now(),
   last_active_at timestamptz not null default now(),
@@ -24,7 +25,7 @@ create index if not exists idx_conversation_owner_last_active on conversation(ow
 create table if not exists message (
   msg_id uuid primary key,
   conv_id uuid not null references conversation(conv_id) on delete cascade,
-  role text not null check (role in ('NEW_HIRE','ASSISTANT')),
+  role text not null check (role in ('NEW_HIRE','MENTOR','ASSISTANT')),
   status text check (status in ('DRAFT','PARTIAL','DONE','CANCELLED')),
   content text not null default '',
   created_at timestamptz not null default now()
