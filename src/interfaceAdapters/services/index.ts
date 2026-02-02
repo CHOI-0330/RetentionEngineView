@@ -46,3 +46,11 @@ export type {
   PresetOptionViewModel,
   PersonalityPresetViewModel,
 } from "./PersonalityPresetService";
+
+// Mentor AI Chat Service
+export { MentorAiChatService } from "./MentorAiChatService";
+export type {
+  MentorAiChatViewModel,
+  MentorAiMessageViewModel,
+  MentorAiConversationViewModel,
+} from "./MentorAiChatService";

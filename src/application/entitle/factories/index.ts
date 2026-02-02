@@ -17,6 +17,10 @@ export type { StudentChatFactoryConfig } from "./StudentChatFactory";
 export { createMentorStudentChatService } from "./MentorStudentChatFactory";
 export type { MentorStudentChatFactoryConfig } from "./MentorStudentChatFactory";
 
+// Mentor AI Chat Factory
+export { createMentorAiChatService } from "./MentorAiChatFactory";
+export type { MentorAiChatFactoryConfig } from "./MentorAiChatFactory";
+
 // Avatar Factory
 export { createAvatarSettingsService } from "./AvatarSettingsFactory";
 export type { AvatarSettingsFactoryConfig } from "./AvatarSettingsFactory";

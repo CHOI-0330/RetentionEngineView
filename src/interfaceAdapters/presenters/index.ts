@@ -19,6 +19,8 @@ export { useStudentChatPresenter } from "./useStudentChatPresenter";
 // Mentor
 export { useMentorDashboardPresenter } from "./useMentorDashboardPresenter";
 export { useMentorStudentChatPresenter } from "./useMentorStudentChatPresenter";
+export { useMentorAiChatPresenter } from "./useMentorAiChatPresenter";
+export type { MentorAiChatPresenterOutput } from "./useMentorAiChatPresenter";
 
 // Profile
 export { useProfilePresenter } from "./useProfilePresenter";

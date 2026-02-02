@@ -38,6 +38,7 @@ export type {
   MentorChatBootstrapData,
   CreateFeedbackInput,
   CreateFeedbackResult,
+  MentorAiChatPort,
 } from "./ports";
 
 // ============================================
@@ -53,6 +54,7 @@ export { ProfileUseCase } from "./ProfileUseCase";
 export { StudentDashboardUseCase } from "./StudentDashboardUseCase";
 export { MentorDashboardUseCase } from "./MentorDashboardUseCase";
 export { MentorStudentChatUseCase } from "./MentorStudentChatUseCase";
+export { MentorAiChatUseCase } from "./MentorAiChatUseCase";
 export { InitialDataUseCase, type InitialDataPort } from "./initialDataUseCase";
 
 // Auth UseCases (純粋検証関数)

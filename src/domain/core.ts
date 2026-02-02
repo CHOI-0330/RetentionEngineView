@@ -2,6 +2,8 @@ export type UserRole = "NEW_HIRE" | "MENTOR" | "ADMIN";
 
 export type ConvState = "ACTIVE" | "ARCHIVED";
 
+export type ConversationType = "student_chat" | "mentor_ai_chat";
+
 export type AssistantStatus = "DRAFT" | "PARTIAL" | "DONE" | "CANCELLED";
 
 export interface User {
@@ -26,13 +28,14 @@ export interface Conversation {
   convId: string;
   ownerId: string;
   title: string;
+  type?: ConversationType;
   state: ConvState;
   createdAt: string;
   lastActiveAt: string;
   archivedAt?: string | null;
 }
 
-export type MessageRole = "NEW_HIRE" | "ASSISTANT";
+export type MessageRole = "NEW_HIRE" | "MENTOR" | "ASSISTANT";
 
 /**
  * ウェブ検索ソース

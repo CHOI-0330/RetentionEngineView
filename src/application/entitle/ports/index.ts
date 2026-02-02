@@ -25,3 +25,4 @@ export type {
   CreateFeedbackInput,
   CreateFeedbackResult,
 } from "./MentorStudentChatPort";
+export type { MentorAiChatPort } from "./MentorAiChatPort";
