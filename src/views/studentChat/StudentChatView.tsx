@@ -45,13 +45,14 @@ export const StudentChatView = memo(function StudentChatView({
   const [newConversationTitle, setNewConversationTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // 新しいメッセージが追加されたらスクロール
+  // 新しいメッセージが追加されたらスクロール（ストリーミング中も最新メッセージ内容でスクロール）
+  const lastMessageContent = viewModel.messages[viewModel.messages.length - 1]?.content;
   useEffect(() => {
     const viewport = scrollAreaRef.current;
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
     }
-  }, [viewModel.messages.length, status.isAwaitingAssistant]);
+  }, [viewModel.messages.length, status.isAwaitingAssistant, lastMessageContent]);
 
   // 会話作成ハンドラ
   const handleCreateConversation = async () => {
@@ -216,7 +217,7 @@ export const StudentChatView = memo(function StudentChatView({
               {status.isAwaitingAssistant && (
                 <span className="flex items-center gap-1.5 text-primary text-sm font-medium">
                   <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                  AIが回答を準備しています...
+                  {status.streamingStep ?? "AIが回答を準備しています..."}
                 </span>
               )}
             </div>

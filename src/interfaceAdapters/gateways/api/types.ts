@@ -89,3 +89,46 @@ export interface LLMGenerateResponse {
   answer: string;
   sources?: ResponseSources;
 }
+
+// ============================================
+// SSE (Server-Sent Events) ストリーミング型
+// ============================================
+
+/**
+ * SSEイベントタイプ
+ */
+export type SSEEventType = "step" | "chunk" | "sources" | "done" | "error";
+
+/**
+ * パイプラインステップ識別子
+ */
+export type PipelineStep = "file_search" | "web_search" | "synthesis";
+
+/**
+ * SSEエラー情報
+ */
+export interface SSEEventError {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+/**
+ * SSEイベントメタデータ
+ */
+export interface SSEEventMetadata {
+  step?: PipelineStep;
+  sources?: ResponseSources;
+  error?: SSEEventError;
+}
+
+/**
+ * SSEイベント
+ *
+ * ストリーミングレスポンスで使用される個々のイベント
+ */
+export interface SSEEvent {
+  type: SSEEventType;
+  data: string;
+  metadata?: SSEEventMetadata;
+}

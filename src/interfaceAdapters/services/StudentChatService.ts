@@ -18,7 +18,7 @@ import type { ConversationUseCase } from "../../application/entitle/Conversation
 import type { MessageUseCase } from "../../application/entitle/MessageUseCase";
 import type { LLMUseCase } from "../../application/entitle/LLMUseCase";
 import type { FeedbackUseCase } from "../../application/entitle/FeedbackUseCase";
-import type { LLMGenerateResponse } from "../gateways/api/types";
+import type { LLMGenerateResponse, SSEEvent } from "../gateways/api/types";
 import type { Feedback, MentorAssignment } from "../../domain/core";
 
 // ============================================
@@ -216,6 +216,31 @@ export class StudentChatService {
       hasAnswer: result.kind === "success" ? !!result.value.answer : false
     });
     return result;
+  }
+
+  /**
+   * ストリーミング版 LLM応答を生成
+   */
+  async generateLLMResponseStream(
+    input: {
+      question: string;
+      conversationId: string;
+      requireWebSearch?: boolean;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (!this.llmUseCase) {
+      throw new Error("LLM機能が有効になっていません。");
+    }
+
+    // LLMUseCase の内部ポートを経由してストリーミング呼び出し
+    const llmPort = (this.llmUseCase as any).port;
+    if (llmPort && typeof llmPort.generateResponseStream === "function") {
+      return llmPort.generateResponseStream(input, onEvent, signal);
+    }
+
+    throw new Error("ストリーミングがサポートされていません。");
   }
 
   // ============================================

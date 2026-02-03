@@ -112,10 +112,20 @@ export const MessageBubble = memo(function MessageBubble({
                 : "bg-muted/50 text-foreground rounded-tl-sm"
             } ${hasFeedback ? "ring-2 ring-blue-400/50 ring-offset-2" : ""}`}
           >
-            {!isUser && isStreaming ? (
+            {!isUser && isStreaming && !message.content ? (
+              /* ストリーミング開始前：ステップインジケーター */
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span>生成中...</span>
+              </div>
+            ) : !isUser && isStreaming && message.content ? (
+              /* ストリーミング中：タイプライター効果 + 点滅カーソル */
+              <div>
+                <MarkdownRendererView
+                  content={message.content}
+                  className="space-y-2 break-words [&>pre]:mt-2 [&>pre]:bg-background/60 [&>pre]:text-xs [&>pre]:text-foreground"
+                />
+                <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
               </div>
             ) : (
               <>

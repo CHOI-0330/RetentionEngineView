@@ -7,7 +7,7 @@
  * - ViewModelをViewに提供
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 import type {
@@ -21,6 +21,7 @@ import type { UseCaseFailure } from "../../application/entitle/models";
 import type {
   StudentChatBootstrap,
   LLMGenerateResponse,
+  SSEEvent,
 } from "../gateways/api/types";
 import { ResponseType } from "../gateways/api/types";
 import { createStudentChatService } from "../../application/entitle/factories/StudentChatFactory";
@@ -44,6 +45,9 @@ interface PresenterState {
   newMessage: string;
   // Web検索設定（シンプルなboolean）
   requireWebSearch: boolean;
+  // ストリーミング状態
+  streamingContent: string;
+  streamingStep: string | null;
   // フィードバック状態
   feedbacks: Record<string, Feedback[]>; // msgId -> Feedback[]
   feedbackLoading: Record<string, boolean>; // msgId -> loading
@@ -75,6 +79,8 @@ export interface StudentChatPresenterOutput {
   isSending: boolean;
   isAwaitingAssistant: boolean;
   newMessage: string;
+  // ストリーミング状態
+  streamingStep: string | null;
   // アクション
   actions: {
     // メッセージ
@@ -117,6 +123,8 @@ const initialState: PresenterState = {
   isAwaitingAssistant: false,
   newMessage: "",
   requireWebSearch: false,
+  streamingContent: "",
+  streamingStep: null,
   feedbacks: {},
   feedbackLoading: {},
   feedbackInput: {},
@@ -140,6 +148,14 @@ export function useStudentChatPresenter(
 
   // 状態
   const [state, setState] = useState<PresenterState>(initialState);
+
+  // 送信中ガード（stale closure 回避のため useRef を使用）
+  const isBusyRef = useRef(false);
+  // ストリーミングAbortController
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // RAF バッチ処理用
+  const rafIdRef = useRef<number | null>(null);
+  const pendingContentRef = useRef<string>("");
 
   // リクエスター情報
   const requester = useMemo(() => {
@@ -204,14 +220,13 @@ export function useStudentChatPresenter(
   }, []);
 
   const sendMessage = useCallback(async () => {
-    const { bootstrap, newMessage, requireWebSearch, isSending, isAwaitingAssistant } = state;
-    
-    // 既に送信中または応答待ちの場合は何もしない（重複防止）
-    if (isSending || isAwaitingAssistant) {
-      console.warn('Message sending already in progress, ignoring duplicate request');
+    // useRef による同期ガード（stale closure でもすり抜けない）
+    if (isBusyRef.current) {
       return;
     }
-    
+
+    const { bootstrap, newMessage, requireWebSearch } = state;
+
     if (
       !bootstrap?.conversation ||
       !bootstrap.currentUser ||
@@ -220,6 +235,7 @@ export function useStudentChatPresenter(
       return;
     }
 
+    isBusyRef.current = true;
     const questionText = newMessage.trim();
     setState((prev) => ({ ...prev, isSending: true, error: null }));
 
@@ -231,6 +247,7 @@ export function useStudentChatPresenter(
     );
 
     if (result.kind === "failure") {
+      isBusyRef.current = false;
       setState((prev) => ({
         ...prev,
         isSending: false,
@@ -239,7 +256,18 @@ export function useStudentChatPresenter(
       return;
     }
 
-    // ユーザーメッセージをローカル状態に追加（リロードなし）
+    // ユーザーメッセージをローカル状態に追加 + プレースホルダーアシスタントメッセージを追加
+    const placeholderMsgId = `streaming-${Date.now()}`;
+    const placeholderAssistant: Message = {
+      msgId: placeholderMsgId,
+      convId: bootstrap.conversation.convId,
+      authorId: "assistant",
+      role: "MENTOR_AI",
+      content: "",
+      status: "PARTIAL",
+      createdAt: new Date().toISOString(),
+    };
+
     setState((prev) => {
       if (!prev.bootstrap) return prev;
       return {
@@ -247,75 +275,197 @@ export function useStudentChatPresenter(
         newMessage: "",
         isSending: false,
         isAwaitingAssistant: true,
+        streamingContent: "",
+        streamingStep: null,
         bootstrap: {
           ...prev.bootstrap,
-          initialMessages: [...prev.bootstrap.initialMessages, result.value],
+          initialMessages: [
+            ...prev.bootstrap.initialMessages,
+            result.value,
+            placeholderAssistant,
+          ],
         },
       };
     });
 
-    // 2. LLM応答生成 (Web検索も含む)
-    const llmResult = await service.generateLLMResponse(
-      bootstrap.currentUser,
-      bootstrap.conversation,
-      questionText,
-      requireWebSearch
-    );
+    // 2. ストリーミングLLM応答
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    pendingContentRef.current = "";
 
-    if (llmResult.kind === "failure") {
+    let accumulatedContent = "";
+    let accumulatedSources: Message["sources"] | undefined;
+
+    // RAF でバッチ更新するヘルパー
+    const flushContent = () => {
+      const content = pendingContentRef.current;
+      setState((prev) => {
+        if (!prev.bootstrap) return prev;
+        const msgs = [...prev.bootstrap.initialMessages];
+        const lastIdx = msgs.length - 1;
+        if (lastIdx >= 0 && msgs[lastIdx].msgId === placeholderMsgId) {
+          msgs[lastIdx] = { ...msgs[lastIdx], content };
+        }
+        return {
+          ...prev,
+          streamingContent: content,
+          bootstrap: { ...prev.bootstrap, initialMessages: msgs },
+        };
+      });
+      rafIdRef.current = null;
+    };
+
+    const scheduleFlush = () => {
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushContent);
+      }
+    };
+
+    const handleSSEEvent = (event: SSEEvent) => {
+      switch (event.type) {
+        case "chunk":
+          accumulatedContent += event.data;
+          pendingContentRef.current = accumulatedContent;
+          scheduleFlush();
+          break;
+
+        case "step":
+          setState((prev) => ({ ...prev, streamingStep: event.data }));
+          break;
+
+        case "sources":
+          if (event.metadata?.sources) {
+            accumulatedSources = event.metadata.sources;
+          }
+          break;
+
+        case "done":
+          // 最終フラッシュ
+          if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+          pendingContentRef.current = accumulatedContent;
+          flushContent();
+          break;
+
+        case "error": {
+          const errMsg = event.metadata?.error?.message ?? event.data ?? "ストリーミング中にエラーが発生しました";
+          setState((prev) => ({
+            ...prev,
+            streamingStep: null,
+            error: { kind: "UnexpectedError", message: errMsg },
+          }));
+          break;
+        }
+      }
+    };
+
+    try {
+      await service.generateLLMResponseStream(
+        {
+          question: questionText,
+          conversationId: bootstrap.conversation.convId,
+          requireWebSearch,
+        },
+        handleSSEEvent,
+        abortController.signal
+      );
+    } catch (err) {
+      // AbortErrorは無視（ユーザーキャンセル）
+      if (err instanceof Error && err.name === "AbortError") {
+        // 部分コンテンツは維持
+      } else {
+        const errMsg = err instanceof Error ? err.message : "ストリーミング中にエラーが発生しました";
+        setState((prev) => ({
+          ...prev,
+          error: { kind: "UnexpectedError", message: errMsg },
+        }));
+      }
+    }
+
+    // RAFクリーンアップ
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    abortControllerRef.current = null;
+
+    // 3. アシスタントメッセージ保存（ストリーミング完了後）
+    const finalContent = accumulatedContent || pendingContentRef.current;
+    if (!finalContent) {
+      // ストリーミングでコンテンツが取得できなかった場合
+      isBusyRef.current = false;
       setState((prev) => ({
         ...prev,
         isAwaitingAssistant: false,
-        error: llmResult.error,
+        streamingStep: null,
+        streamingContent: "",
       }));
       return;
     }
 
-    // 3. アシスタントメッセージ保存
     const beginResult = await service.beginAssistantMessage(
       bootstrap.conversation,
       bootstrap.currentUser
     );
 
     if (beginResult.kind === "failure") {
-      setState((prev) => ({
-        ...prev,
-        isAwaitingAssistant: false,
-        error: beginResult.error,
-      }));
+      // 保存は失敗したがストリーミングコンテンツは表示を維持
+      isBusyRef.current = false;
+      setState((prev) => {
+        if (!prev.bootstrap) return prev;
+        const msgs = [...prev.bootstrap.initialMessages];
+        const lastIdx = msgs.length - 1;
+        if (lastIdx >= 0 && msgs[lastIdx].msgId === placeholderMsgId) {
+          msgs[lastIdx] = {
+            ...msgs[lastIdx],
+            content: finalContent,
+            status: "DONE",
+            sources: accumulatedSources,
+          };
+        }
+        return {
+          ...prev,
+          isAwaitingAssistant: false,
+          streamingStep: null,
+          streamingContent: "",
+          bootstrap: { ...prev.bootstrap, initialMessages: msgs },
+        };
+      });
       return;
     }
 
     const finalizeResult = await service.finalizeAssistantMessage(
       beginResult.value,
-      llmResult.value.answer,
-      llmResult.value.sources
+      finalContent,
+      accumulatedSources
     );
 
-    // アシスタントメッセージをローカル状態に追加（リロードなし）
-    // NOTE: サーバー応答にはsourcesが含まれないため、LLM応答から取得したsourcesを必ず付与する
+    // プレースホルダーを実際のメッセージに置き換え
+    isBusyRef.current = false;
     setState((prev) => {
       if (!prev.bootstrap) return prev;
       const assistantMessage =
         finalizeResult.kind === "success"
-          ? { ...finalizeResult.value, sources: llmResult.value.sources }
+          ? { ...finalizeResult.value, sources: accumulatedSources }
           : {
               ...beginResult.value,
-              content: llmResult.value.answer,
+              content: finalContent,
               status: "DONE" as const,
-              sources: llmResult.value.sources,
+              sources: accumulatedSources,
             };
+
+      const msgs = prev.bootstrap.initialMessages.map((m) =>
+        m.msgId === placeholderMsgId ? assistantMessage : m
+      );
 
       return {
         ...prev,
         isAwaitingAssistant: false,
-        bootstrap: {
-          ...prev.bootstrap,
-          initialMessages: [
-            ...prev.bootstrap.initialMessages,
-            assistantMessage,
-          ],
-        },
+        streamingStep: null,
+        streamingContent: "",
+        bootstrap: { ...prev.bootstrap, initialMessages: msgs },
       };
     });
   }, [state, service]);
@@ -552,6 +702,7 @@ export function useStudentChatPresenter(
     isSending: state.isSending,
     isAwaitingAssistant: state.isAwaitingAssistant,
     newMessage: state.newMessage,
+    streamingStep: state.streamingStep,
     actions: {
       setNewMessage,
       sendMessage,

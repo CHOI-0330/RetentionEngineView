@@ -77,8 +77,10 @@ export const MessageList = memo(function MessageList({
         );
       })}
 
-      {/* アシスタント応答待ちインジケータ */}
-      {isAwaitingAssistant && (
+      {/* アシスタント応答待ちインジケータ
+          NOTE: プレースホルダーメッセージ（status: partial/draft）が既にある場合は
+          MessageBubble側で「生成中...」を表示するため、ここでは表示しない */}
+      {isAwaitingAssistant && !messages.some(m => m.status === 'partial' || m.status === 'draft') && (
         <div className="flex w-full justify-start mt-4">
           <div className="flex max-w-[85%] flex-col items-start">
             <div className="flex items-end gap-2">

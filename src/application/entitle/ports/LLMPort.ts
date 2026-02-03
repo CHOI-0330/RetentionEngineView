@@ -8,6 +8,7 @@
 import type {
   SearchSettings,
   LLMGenerateResponse,
+  SSEEvent,
 } from "../../../interfaceAdapters/gateways/api/types";
 
 /**
@@ -34,4 +35,17 @@ export interface LLMPort {
     runtimeId?: string;
     searchSettings?: SearchSettings;
   }): Promise<LLMGenerateResponse>;
+
+  /**
+   * ストリーミング版 LLM応答生成
+   */
+  generateResponseStream?(
+    input: {
+      question: string;
+      conversationId: string;
+      requireWebSearch?: boolean;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }

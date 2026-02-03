@@ -4,7 +4,7 @@
  * レガシースタイルのメッセージ入力フォーム
  */
 
-import { memo, useState } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import { Loader2, Globe } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -29,9 +29,19 @@ export const ChatComposerLegacy = memo(function ChatComposerLegacy({
   onRequireWebSearchChange,
 }: ChatComposerLegacyProps) {
   const [isComposing, setIsComposing] = useState(false);
+  const sendingRef = useRef(false);
+
+  // isSending が false になったら sendingRef をリセット（完了通知）
+  useEffect(() => {
+    if (!isSending && sendingRef.current) {
+      sendingRef.current = false;
+    }
+  }, [isSending]);
 
   const handleSend = () => {
+    if (sendingRef.current) return;
     if (canSend && !isSending && value.trim()) {
+      sendingRef.current = true;
       onSend();
     }
   };

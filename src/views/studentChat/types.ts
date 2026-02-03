@@ -13,6 +13,7 @@ export interface StudentChatViewStatus {
   isSending: boolean;
   isAwaitingAssistant: boolean;
   error: UseCaseFailure | null;
+  streamingStep: string | null;
 }
 
 /**

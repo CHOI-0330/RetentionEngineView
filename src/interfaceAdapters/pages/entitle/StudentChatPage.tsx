@@ -101,6 +101,7 @@ const StudentChatPage = ({ convId }: StudentChatPageProps) => {
           isSending: presenter.isSending,
           isAwaitingAssistant: presenter.isAwaitingAssistant,
           error: presenter.error,
+          streamingStep: presenter.streamingStep,
         }}
         actions={presenter.actions}
         requireWebSearch={presenter.requireWebSearch}
