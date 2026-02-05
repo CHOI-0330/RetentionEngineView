@@ -27,7 +27,7 @@ export interface FeedbackViewModel {
 
 export interface MessageViewModel {
   id: string;
-  role: "NEW_HIRE" | "ASSISTANT";
+  role: "NEW_HIRE" | "MENTOR" | "ASSISTANT";
   content: string;
   createdAt: Date;
   status?: "DRAFT" | "PARTIAL" | "DONE" | "CANCELLED";

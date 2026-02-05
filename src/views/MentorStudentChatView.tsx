@@ -28,7 +28,7 @@ import MarkdownRendererView from "../components/MarkdownRenderer";
 
 interface MentorChatMessage {
   id: string;
-  role: "NEW_HIRE" | "ASSISTANT";
+  role: "NEW_HIRE" | "MENTOR" | "ASSISTANT";
   content: string;
   createdAt: Date;
   status?: "DRAFT" | "PARTIAL" | "DONE" | "CANCELLED";

@@ -4,8 +4,15 @@
  * 新アーキテクチャ：レガシーUIスタイルを維持
  */
 
-import { memo, useRef, useEffect, useState } from "react";
+import { memo, useRef, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { AlertTriangle, Loader2, ChevronUp } from "lucide-react";
+
+// Dynamic Import: QuestionCardChatPanel (パネルは必要時のみロード)
+const QuestionCardChatPanel = lazy(() =>
+  import("../../components/QuestionCard/QuestionCardChatPanel").then((m) => ({
+    default: m.QuestionCardChatPanel,
+  }))
+);
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
 import {
@@ -38,12 +45,28 @@ export const StudentChatView = memo(function StudentChatView({
   onRequireWebSearchChange,
   feedback,
   accessToken,
+  onCreateQuestion,
 }: StudentChatViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [newConversationTitle, setNewConversationTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+
+  // 質問カード作成パネル状態
+  const [qcPanelOpen, setQcPanelOpen] = useState(false);
+  const [qcOriginalMessage, setQcOriginalMessage] = useState("");
+  const [qcSourceMsgId, setQcSourceMsgId] = useState<string | undefined>();
+
+  const handleCreateQuestion = useCallback(
+    (message: { content: string; msgId: string }) => {
+      setQcOriginalMessage(message.content);
+      setQcSourceMsgId(message.msgId);
+      setQcPanelOpen(true);
+      onCreateQuestion?.(message);
+    },
+    [onCreateQuestion],
+  );
 
   // 新しいメッセージが追加されたらスクロール（ストリーミング中も最新メッセージ内容でスクロール）
   const lastMessageContent = viewModel.messages[viewModel.messages.length - 1]?.content;
@@ -208,56 +231,81 @@ export const StudentChatView = memo(function StudentChatView({
         </div>
       )}
 
-      {/* メッセージエリア */}
-      <div className="flex-1 overflow-hidden">
-        <div className="flex h-full flex-col">
-          {/* ステータスバー */}
-          <div className="flex items-center justify-between border-b bg-muted/20 px-6 py-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              {status.isAwaitingAssistant && (
-                <span className="flex items-center gap-1.5 text-primary text-sm font-medium">
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                  {status.streamingStep ?? "AIが回答を準備しています..."}
-                </span>
-              )}
+      {/* メインエリア: 左右分割 */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* 左: チャット本体 */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* ステータスバー */}
+            <div className="flex items-center justify-between border-b bg-muted/20 px-6 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                {status.isAwaitingAssistant && (
+                  <span className="flex items-center gap-1.5 text-primary text-sm font-medium">
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    {status.streamingStep ?? "AIが回答を準備しています..."}
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-3 text-[11px] text-muted-foreground hover:bg-background"
+                onClick={() => void actions.reload()}
+                aria-label="リロード"
+              >
+                <ChevronUp className="h-3 w-3 mr-1" />
+                リロード
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-3 text-[11px] text-muted-foreground hover:bg-background"
-              onClick={() => void actions.reload()}
-              aria-label="リロード"
-            >
-              <ChevronUp className="h-3 w-3 mr-1" />
-              リロード
-            </Button>
+
+            {/* メッセージリスト */}
+            <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+              <div className="mx-auto max-w-3xl">
+                <MessageList
+                  messages={viewModel.messages}
+                  authorNames={viewModel.authorNames}
+                  isAwaitingAssistant={status.isAwaitingAssistant}
+                  feedback={feedback}
+                  onCreateQuestion={handleCreateQuestion}
+                />
+                <div ref={bottomRef} className="h-px" />
+              </div>
+            </div>
           </div>
 
-          {/* メッセージリスト */}
-          <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            <div className="mx-auto max-w-3xl">
-              <MessageList
-                messages={viewModel.messages}
-                authorNames={viewModel.authorNames}
-                isAwaitingAssistant={status.isAwaitingAssistant}
-                feedback={feedback}
-              />
-              <div ref={bottomRef} className="h-px" />
-            </div>
-          </div>
+          {/* 入力フォーム */}
+          <ChatComposerLegacy
+            value={newMessage}
+            onChange={actions.setNewMessage}
+            onSend={() => void actions.sendMessage()}
+            canSend={!status.isSending && !status.isAwaitingAssistant && newMessage.trim().length > 0}
+            isSending={status.isSending}
+            requireWebSearch={requireWebSearch}
+            onRequireWebSearchChange={onRequireWebSearchChange}
+          />
         </div>
-      </div>
 
-      {/* 入力フォーム */}
-      <ChatComposerLegacy
-        value={newMessage}
-        onChange={actions.setNewMessage}
-        onSend={() => void actions.sendMessage()}
-        canSend={!status.isSending && !status.isAwaitingAssistant && newMessage.trim().length > 0}
-        isSending={status.isSending}
-        requireWebSearch={requireWebSearch}
-        onRequireWebSearchChange={onRequireWebSearchChange}
-      />
+        {/* 右: 質問カード作成パネル */}
+        {qcPanelOpen && (
+          <div className="w-[400px] shrink-0 border-l bg-background">
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              }
+            >
+              <QuestionCardChatPanel
+                onClose={() => setQcPanelOpen(false)}
+                originalAiMessage={qcOriginalMessage}
+                accessToken={accessToken}
+                sourceConvId={viewModel.conversation?.convId}
+                sourceMsgId={qcSourceMsgId}
+              />
+            </Suspense>
+          </div>
+        )}
+      </div>
     </div>
   );
 });

@@ -2,6 +2,7 @@
 
 import { useSessionGuard } from "../../hooks";
 import { useKCListPresenter } from "../../presenters/useKCListPresenter";
+import { useQuestionCardListPresenter } from "../../presenters/useQuestionCardListPresenter";
 import KCLibraryView from "../../../views/KCLibraryView";
 import { Skeleton } from "../../../components/ui/skeleton";
 
@@ -10,6 +11,10 @@ const KCLibraryPage = () => {
   const { state: sessionState, session } = useSessionGuard({});
 
   const presenter = useKCListPresenter({
+    accessToken: session?.accessToken,
+  });
+
+  const qcPresenter = useQuestionCardListPresenter({
     accessToken: session?.accessToken,
   });
 
@@ -37,6 +42,8 @@ const KCLibraryPage = () => {
       viewModel={presenter.viewModel}
       actions={presenter.actions}
       accessToken={session?.accessToken}
+      qcViewModel={qcPresenter.viewModel}
+      qcActions={qcPresenter.actions}
     />
   );
 };

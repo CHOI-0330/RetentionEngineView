@@ -11,6 +11,7 @@ import {
   Globe,
   FileText,
   ExternalLink,
+  HelpCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
@@ -33,6 +34,7 @@ interface MessageBubbleProps {
   feedback?: FeedbackActions;
   authorNames?: Record<string, string>;
   canWriteFeedback?: boolean; // フィードバック入力可否（MEINTORのみtrue）
+  onCreateQuestion?: (message: MessageViewModel) => void;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -41,6 +43,7 @@ export const MessageBubble = memo(function MessageBubble({
   feedback,
   authorNames = {},
   canWriteFeedback = false,
+  onCreateQuestion,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isStreaming =
@@ -173,6 +176,16 @@ export const MessageBubble = memo(function MessageBubble({
                 </span>
               </button>
             )}
+          {/* 質問作成ボタン（AI応答のみ・ストリーミング完了後） */}
+          {!isUser && !isStreaming && message.content && onCreateQuestion && (
+            <button
+              onClick={() => onCreateQuestion(message)}
+              className="flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-purple-600 hover:bg-purple-100 transition-colors"
+            >
+              <HelpCircle className="h-3 w-3" />
+              <span className="font-medium">質問を作成</span>
+            </button>
+          )}
         </div>
 
         {/* ソース表示 */}

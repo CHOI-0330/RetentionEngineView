@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { Search, BookOpen, Loader2, RefreshCw, ThumbsUp, Eye, Lightbulb, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +18,15 @@ import type {
   KCListViewModel,
   KCListActions,
 } from "../interfaceAdapters/presenters/useKCListPresenter";
+import type {
+  QCListViewModel,
+  QCListActions,
+} from "../interfaceAdapters/presenters/useQuestionCardListPresenter";
 import type { KCListItem, KCStatus } from "../interfaceAdapters/gateways/api/KnowledgeGateway";
 import { KnowledgeGateway } from "../interfaceAdapters/gateways/api/KnowledgeGateway";
+
+// Dynamic Import: QuestionCardTab（タブ切替時のみロード）
+const QuestionCardTab = lazy(() => import("./questionCard/QuestionCardTab"));
 
 // ============================================
 // 型定義
@@ -28,6 +36,9 @@ interface KCLibraryViewProps {
   viewModel: KCListViewModel;
   actions: KCListActions;
   accessToken?: string;
+  /** 質問カードタブ用 */
+  qcViewModel?: QCListViewModel;
+  qcActions?: QCListActions;
 }
 
 // ============================================
@@ -99,35 +110,150 @@ export default function KCLibraryView({
   viewModel,
   actions,
   accessToken,
+  qcViewModel,
+  qcActions,
 }: KCLibraryViewProps) {
   const { items, total, isLoading, isLoadingMore, error, selectedStatus, hasMore } =
     viewModel;
   const [selectedItem, setSelectedItem] = useState<KCListItem | null>(null);
 
+  const hasQCTab = !!qcViewModel && !!qcActions;
+
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       {/* ヘッダー */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              ナレッジライブラリ
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              チームが蓄積したナレッジカードを閲覧できます
-              {total > 0 && `（${total}件）`}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={actions.refresh}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            更新
-          </Button>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          ナレッジライブラリ
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          チームが蓄積したナレッジ・質問カードを閲覧できます
+        </p>
+      </div>
+
+      {/* タブ切替 */}
+      {hasQCTab ? (
+        <Tabs defaultValue="knowledge">
+          <TabsList className="mb-6">
+            <TabsTrigger value="knowledge">
+              <BookOpen className="mr-1.5 h-4 w-4" />
+              ナレッジ
+              {total > 0 && (
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  {total}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="questions">
+              <Search className="mr-1.5 h-4 w-4" />
+              質問
+              {qcViewModel.total > 0 && (
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  {qcViewModel.total}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="knowledge">
+            <KCContent
+              items={items}
+              total={total}
+              isLoading={isLoading}
+              isLoadingMore={isLoadingMore}
+              error={error}
+              selectedStatus={selectedStatus}
+              hasMore={hasMore}
+              actions={actions}
+              selectedItem={selectedItem}
+              setSelectedItem={setSelectedItem}
+              accessToken={accessToken}
+            />
+          </TabsContent>
+
+          <TabsContent value="questions">
+            <Suspense
+              fallback={
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-40 w-full rounded-lg" />
+                  ))}
+                </div>
+              }
+            >
+              <QuestionCardTab
+                viewModel={qcViewModel}
+                actions={qcActions}
+              />
+            </Suspense>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        /* タブなし（後方互換） */
+        <KCContent
+          items={items}
+          total={total}
+          isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          error={error}
+          selectedStatus={selectedStatus}
+          hasMore={hasMore}
+          actions={actions}
+          selectedItem={selectedItem}
+          setSelectedItem={setSelectedItem}
+          accessToken={accessToken}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// ナレッジカードコンテンツ（タブ内用に抽出）
+// ============================================
+
+function KCContent({
+  items,
+  total,
+  isLoading,
+  isLoadingMore,
+  error,
+  selectedStatus,
+  hasMore,
+  actions,
+  selectedItem,
+  setSelectedItem,
+  accessToken,
+}: {
+  items: KCListItem[];
+  total: number;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  error: string | null;
+  selectedStatus: KCStatus | null;
+  hasMore: boolean;
+  actions: KCListActions;
+  selectedItem: KCListItem | null;
+  setSelectedItem: (item: KCListItem | null) => void;
+  accessToken?: string;
+}) {
+  return (
+    <>
+      {/* サブヘッダー */}
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          チームが蓄積したナレッジカード
+          {total > 0 && `（${total}件）`}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={actions.refresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          更新
+        </Button>
       </div>
 
       {/* フィルターバー */}
@@ -210,7 +336,7 @@ export default function KCLibraryView({
         accessToken={accessToken}
         onRefresh={actions.refresh}
       />
-    </div>
+    </>
   );
 }
 

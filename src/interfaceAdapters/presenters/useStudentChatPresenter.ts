@@ -261,8 +261,7 @@ export function useStudentChatPresenter(
     const placeholderAssistant: Message = {
       msgId: placeholderMsgId,
       convId: bootstrap.conversation.convId,
-      authorId: "assistant",
-      role: "MENTOR_AI",
+      role: "ASSISTANT",
       content: "",
       status: "PARTIAL",
       createdAt: new Date().toISOString(),
@@ -354,7 +353,7 @@ export function useStudentChatPresenter(
           setState((prev) => ({
             ...prev,
             streamingStep: null,
-            error: { kind: "UnexpectedError", message: errMsg },
+            error: { kind: "ExternalServiceError", message: errMsg },
           }));
           break;
         }
@@ -379,7 +378,7 @@ export function useStudentChatPresenter(
         const errMsg = err instanceof Error ? err.message : "ストリーミング中にエラーが発生しました";
         setState((prev) => ({
           ...prev,
-          error: { kind: "UnexpectedError", message: errMsg },
+          error: { kind: "ExternalServiceError", message: errMsg },
         }));
       }
     }

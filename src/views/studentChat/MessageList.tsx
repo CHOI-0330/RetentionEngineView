@@ -19,6 +19,7 @@ interface MessageListProps {
   canWriteFeedback?: boolean; // フィードバック入力可否
   isLoadingOlder?: boolean; // 過去メッセージ読み込み中
   hasOlderMessages?: boolean; // さらに過去のメッセージがあるか
+  onCreateQuestion?: (message: MessageViewModel) => void;
 }
 
 export const MessageList = memo(function MessageList({
@@ -29,6 +30,7 @@ export const MessageList = memo(function MessageList({
   canWriteFeedback = false,
   isLoadingOlder = false,
   hasOlderMessages = true,
+  onCreateQuestion,
 }: MessageListProps) {
   if (messages.length === 0 && !isAwaitingAssistant) {
     return (
@@ -72,6 +74,7 @@ export const MessageList = memo(function MessageList({
               feedback={feedback}
               authorNames={authorNames}
               canWriteFeedback={canWriteFeedback}
+              onCreateQuestion={onCreateQuestion}
             />
           </div>
         );

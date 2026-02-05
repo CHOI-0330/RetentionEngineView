@@ -65,4 +65,6 @@ export interface StudentChatViewProps {
   infiniteScroll?: InfiniteScrollState;
   /** 知識抽出機能用のアクセストークン */
   accessToken?: string;
+  /** 質問カード作成コールバック */
+  onCreateQuestion?: (message: { content: string; msgId: string; convId?: string }) => void;
 }
