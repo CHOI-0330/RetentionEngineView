@@ -12,6 +12,7 @@ import {
   FileText,
   ExternalLink,
   HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
@@ -28,6 +29,9 @@ import type { Feedback, WebSource, FileSearchSource } from "../../domain/core";
 import type { MessageViewModel } from "../../interfaceAdapters/services/StudentChatService";
 import type { FeedbackActions } from "./types";
 
+/** トリガー/ヒアリング状態 */
+export type TriggerStatus = "pending" | "hearing" | "ready";
+
 interface MessageBubbleProps {
   message: MessageViewModel;
   authorName?: string;
@@ -35,6 +39,12 @@ interface MessageBubbleProps {
   authorNames?: Record<string, string>;
   canWriteFeedback?: boolean; // フィードバック入力可否（MEINTORのみtrue）
   onCreateQuestion?: (message: MessageViewModel) => void;
+  /** トリガー検出アイコン表示（メンターAIチャットのみ） */
+  hasTrigger?: boolean;
+  /** トリガー/ヒアリング状態（pending=V1未保存, hearing=V2ヒアリング中, ready=V2完了待ち） */
+  triggerStatus?: TriggerStatus;
+  /** ✨クリック時のコールバック */
+  onTriggerClick?: () => void;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -44,6 +54,9 @@ export const MessageBubble = memo(function MessageBubble({
   authorNames = {},
   canWriteFeedback = false,
   onCreateQuestion,
+  hasTrigger = false,
+  triggerStatus,
+  onTriggerClick,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isStreaming =
@@ -157,6 +170,36 @@ export const MessageBubble = memo(function MessageBubble({
               minute: "2-digit",
             })}
           </span>
+          {/* トリガー検出✨（ユーザーメッセージのみ） */}
+          {isUser && hasTrigger && (
+            <button
+              type="button"
+              onClick={onTriggerClick}
+              className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 transition-colors ${
+                triggerStatus === "hearing"
+                  ? "bg-blue-50 text-blue-600 hover:bg-blue-100 animate-pulse"
+                  : triggerStatus === "ready"
+                    ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                    : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+              }`}
+              aria-label={
+                triggerStatus === "hearing"
+                  ? "ヒアリング中..."
+                  : triggerStatus === "ready"
+                    ? "暗黙知カード準備完了"
+                    : "暗黙知が検出されました"
+              }
+            >
+              <Sparkles className="h-3 w-3" />
+              <span className="text-[10px] font-medium">
+                {triggerStatus === "hearing"
+                  ? "聞取中"
+                  : triggerStatus === "ready"
+                    ? "完了"
+                    : "知識"}
+              </span>
+            </button>
+          )}
           {/* フィードバックボタン（AI応答のみ）
               - MENTOR: 常に表示（入力可能）
               - NEW_HIRE: フィードバックがある場合のみ表示（閲覧専用）

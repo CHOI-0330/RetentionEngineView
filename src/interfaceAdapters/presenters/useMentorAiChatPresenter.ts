@@ -25,6 +25,11 @@ import {
   type KnowledgeDetectionState,
   type KnowledgeDetectionActions,
 } from "../hooks/useKnowledgeDetection";
+import {
+  useTriggerDetection,
+  type TriggerDetectionState,
+  type TriggerDetectionActions,
+} from "../hooks/useTriggerDetection";
 
 // ============================================
 // 状態型定義
@@ -67,6 +72,8 @@ export interface MentorAiChatPresenterOutput {
   newMessage: string;
   // 暗黙知検出
   knowledgeDetection: KnowledgeDetectionState;
+  // トリガー検出（リアルタイム）
+  triggerDetection: TriggerDetectionState;
   // アクション
   actions: {
     setNewMessage: (value: string) => void;
@@ -77,6 +84,7 @@ export interface MentorAiChatPresenterOutput {
     clearError: () => void;
     reload: () => Promise<void>;
     knowledgeDetection: KnowledgeDetectionActions;
+    triggerDetection: TriggerDetectionActions;
   };
 }
 
@@ -113,8 +121,14 @@ export function useMentorAiChatPresenter(
   // 状態
   const [state, setState] = useState<PresenterState>(initialState);
 
-  // 暗黙知検出
+  // 暗黙知検出（ラウンドベース）
   const knowledgeDetection = useKnowledgeDetection({
+    accessToken,
+    conversationId: state.activeConversation?.convId,
+  });
+
+  // トリガー検出（リアルタイム・レスポンスごと）
+  const triggerDetection = useTriggerDetection({
     accessToken,
     conversationId: state.activeConversation?.convId,
   });
@@ -179,11 +193,13 @@ export function useMentorAiChatPresenter(
         activeConversation: conv,
         messages: [],
       }));
+      // 会話切替時にトリガー検出をクリア
+      triggerDetection.actions.clearTriggers();
       if (conv) {
         await loadMessages(conv.convId);
       }
     },
-    [state.conversations, loadMessages],
+    [state.conversations, loadMessages, triggerDetection.actions],
   );
 
   // 初回ロード
@@ -268,6 +284,24 @@ export function useMentorAiChatPresenter(
       return;
     }
 
+    // 2.5. トリガー検出結果を記録（ユーザーメッセージに紐づけ）
+    if (llmResult.value.triggerDetection?.detected) {
+      triggerDetection.actions.recordTrigger(
+        sendResult.value.msgId,
+        llmResult.value.triggerDetection,
+      );
+    }
+
+    // Story 2-10: セッション状態を記録（V2自動ヒアリング）
+    // 新規セッション開始時（ラウンド1）: ユーザーメッセージIDをtriggerMsgIdとして渡す
+    if (llmResult.value.triggerSession) {
+      const isNewSession = llmResult.value.triggerSession.hearingRound === 1;
+      triggerDetection.actions.recordSession(
+        llmResult.value.triggerSession,
+        isNewSession ? sendResult.value.msgId : undefined,
+      );
+    }
+
     // 3. アシスタントメッセージをDraft→Finalize
     const beginResult = await service.beginAssistantMessage(
       activeConversation.convId,
@@ -310,7 +344,7 @@ export function useMentorAiChatPresenter(
 
     // 暗黙知検出: ラウンドカウンタ更新（自動検出トリガー）
     knowledgeDetection.actions.onMessageSent();
-  }, [state, service, userId, knowledgeDetection.actions]);
+  }, [state, service, userId, knowledgeDetection.actions, triggerDetection.actions]);
 
   const createConversation = useCallback(
     async (title: string) => {
@@ -444,6 +478,7 @@ export function useMentorAiChatPresenter(
     isAwaitingAssistant: state.isAwaitingAssistant,
     newMessage: state.newMessage,
     knowledgeDetection: knowledgeDetection.state,
+    triggerDetection: triggerDetection.state,
     actions: {
       setNewMessage,
       sendMessage,
@@ -453,6 +488,7 @@ export function useMentorAiChatPresenter(
       clearError,
       reload,
       knowledgeDetection: knowledgeDetection.actions,
+      triggerDetection: triggerDetection.actions,
     },
   };
 }

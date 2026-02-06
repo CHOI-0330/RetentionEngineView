@@ -5,7 +5,7 @@
  */
 
 import { memo, useState } from "react";
-import { Loader2, Plus, Trash2, MessageSquare } from "lucide-react";
+import { Loader2, Plus, Trash2, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import {
@@ -25,6 +25,10 @@ interface ConversationSidebarProps {
   onCreate: (title: string) => Promise<void>;
   onDelete: (convId: string) => void;
   isLoading?: boolean;
+  /** アクティブ会話の未保存トリガー数 */
+  unsavedTriggerCount?: number;
+  /** ✨バッジクリック時（一括レビューモーダル表示） */
+  onTriggerBadgeClick?: () => void;
 }
 
 export const ConversationSidebar = memo(function ConversationSidebar({
@@ -33,6 +37,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onCreate,
   onDelete,
   isLoading = false,
+  unsavedTriggerCount = 0,
+  onTriggerBadgeClick,
 }: ConversationSidebarProps) {
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -151,6 +157,21 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 >
                   <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
                   <span className="flex-1 truncate">{conv.title}</span>
+                  {/* 未保存トリガー✨バッジ（アクティブ会話のみ） */}
+                  {conv.isActive && unsavedTriggerCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTriggerBadgeClick?.();
+                      }}
+                      className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-600 transition-colors hover:bg-amber-200"
+                      aria-label={`${unsavedTriggerCount}件の暗黙知を確認`}
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      <span className="text-[10px] font-bold">{unsavedTriggerCount}</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => {

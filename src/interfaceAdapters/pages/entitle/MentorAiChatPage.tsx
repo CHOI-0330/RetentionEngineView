@@ -11,7 +11,7 @@
 
 import { useSessionGuard } from "../../hooks";
 import { useMentorAiChatPresenter } from "../../presenters/useMentorAiChatPresenter";
-import { MentorAiChatView } from "../../../views/mentorAIChat";
+import { MentorAiChatView } from "../../../views/mentorAIChat/MentorAiChatView";
 import { Skeleton } from "../../../components/ui/skeleton";
 
 const MentorAiChatPage = () => {

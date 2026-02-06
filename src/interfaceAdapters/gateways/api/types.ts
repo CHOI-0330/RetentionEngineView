@@ -82,12 +82,56 @@ export enum ResponseType {
 }
 
 /**
+ * トリガー検出結果 (暗黙知の兆候)
+ */
+export interface TriggerDetectionResult {
+  detected: boolean;
+  triggerType: string | null;
+  confidence: number;
+  excerpt: string | null;
+  followUpQuestion?: string;
+}
+
+/**
+ * Story 2-10: 自動ヒアリングセッション応答
+ * KC候補構造（ヒアリング完了時に含まれる）
+ */
+export interface TriggerKCCandidate {
+  title: string;
+  situation: string;
+  knowhow: string;
+  precaution: string;
+  tags: string[];
+  importance?: string;
+}
+
+/**
+ * Story 2-10: トリガーセッション状態
+ * サーバー側のヒアリングセッション状態を反映
+ */
+export interface TriggerSessionResponse {
+  /** セッションID */
+  id: string;
+  /** 状態: hearing=ヒアリング中, ready=KC準備完了, created=保存済, dismissed=無視 */
+  status: "hearing" | "ready" | "created" | "dismissed";
+  /** 現在のヒアリングラウンド (1-3) */
+  hearingRound: number;
+  /** トリガーが発生したユーザーメッセージID（星表示用） */
+  triggerMsgId?: string;
+  /** KC候補（ready状態時のみ） */
+  kcCandidate?: TriggerKCCandidate;
+}
+
+/**
  * LLM 응답 DTO
  */
 export interface LLMGenerateResponse {
   type: ResponseType;
   answer: string;
   sources?: ResponseSources;
+  triggerDetection?: TriggerDetectionResult;
+  /** Story 2-10: 自動ヒアリングセッション状態 */
+  triggerSession?: TriggerSessionResponse;
 }
 
 // ============================================

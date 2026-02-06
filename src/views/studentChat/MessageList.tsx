@@ -20,6 +20,14 @@ interface MessageListProps {
   isLoadingOlder?: boolean; // 過去メッセージ読み込み中
   hasOlderMessages?: boolean; // さらに過去のメッセージがあるか
   onCreateQuestion?: (message: MessageViewModel) => void;
+  /** トリガー検出済みメッセージIDセット（メンターAIチャットのみ） */
+  triggerMsgIds?: Set<string>;
+  /** V2ヒアリング中のメッセージID */
+  hearingMsgId?: string;
+  /** V2ヒアリング状態 */
+  hearingStatus?: "hearing" | "ready";
+  /** ✨クリック時のコールバック */
+  onTriggerClick?: (msgId: string) => void;
 }
 
 export const MessageList = memo(function MessageList({
@@ -31,6 +39,10 @@ export const MessageList = memo(function MessageList({
   isLoadingOlder = false,
   hasOlderMessages = true,
   onCreateQuestion,
+  triggerMsgIds,
+  hearingMsgId,
+  hearingStatus,
+  onTriggerClick,
 }: MessageListProps) {
   if (messages.length === 0 && !isAwaitingAssistant) {
     return (
@@ -66,6 +78,13 @@ export const MessageList = memo(function MessageList({
       {messages.map((msg, index) => {
         const prev = index > 0 ? messages[index - 1] : null;
         const isTurnChange = !prev || prev.role !== msg.role;
+        const hasTrigger = triggerMsgIds?.has(msg.msgId) ?? false;
+        // V2ヒアリング状態を優先、そうでなければV1 pending
+        const triggerStatus = hasTrigger
+          ? msg.msgId === hearingMsgId && hearingStatus
+            ? hearingStatus
+            : "pending"
+          : undefined;
         return (
           <div key={msg.msgId} className={isTurnChange ? "mt-4" : ""}>
             <MessageBubble
@@ -75,6 +94,13 @@ export const MessageList = memo(function MessageList({
               authorNames={authorNames}
               canWriteFeedback={canWriteFeedback}
               onCreateQuestion={onCreateQuestion}
+              hasTrigger={hasTrigger}
+              triggerStatus={triggerStatus}
+              onTriggerClick={
+                onTriggerClick
+                  ? () => onTriggerClick(msg.msgId)
+                  : undefined
+              }
             />
           </div>
         );

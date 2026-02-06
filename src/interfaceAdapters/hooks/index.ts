@@ -16,6 +16,14 @@ export type {
   UseAvatarPreloaderResult,
 } from "./useAvatarPreloader";
 
+export { useTriggerDetection } from "./useTriggerDetection";
+export type {
+  TriggerItem,
+  TriggerDetectionState,
+  TriggerDetectionActions,
+  UseTriggerDetectionOutput,
+} from "./useTriggerDetection";
+
 // React Query Hooks (새로운 데이터 페칭 패턴)
 export {
   // Conversations
