@@ -7,7 +7,7 @@
 import type { Conversation, Message, MessageSources } from "../../domain/core";
 import type { UseCaseResult, UseCaseFailureKind } from "./models";
 import type { MentorAiChatPort } from "./ports/MentorAiChatPort";
-import type { LLMGenerateResponse } from "../../interfaceAdapters/gateways/api/types";
+import type { LLMGenerateResponse, SSEEvent } from "../../interfaceAdapters/gateways/api/types";
 
 // ============================================
 // 定数
@@ -189,5 +189,32 @@ export class MentorAiChatUseCase {
         error instanceof Error ? error.message : "AI応答の生成に失敗しました。",
       );
     }
+  }
+
+  /**
+   * メンター用LLM応答をストリーミングで生成
+   * SSEイベントをコールバックで受信
+   */
+  async generateResponseStream(
+    input: {
+      question: string;
+      conversationId: string;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const trimmed = input.question.trim();
+    if (!trimmed) {
+      throw new Error("質問を入力してください。");
+    }
+
+    return this.port.generateMentorResponseStream(
+      {
+        question: trimmed,
+        conversationId: input.conversationId,
+      },
+      onEvent,
+      signal,
+    );
   }
 }

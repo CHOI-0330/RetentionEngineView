@@ -6,7 +6,7 @@
  */
 
 import type { Conversation, Message, MessageSources } from "../../../domain/core";
-import type { LLMGenerateResponse } from "../../../interfaceAdapters/gateways/api/types";
+import type { LLMGenerateResponse, SSEEvent } from "../../../interfaceAdapters/gateways/api/types";
 
 /**
  * MentorAiChatPort
@@ -79,4 +79,17 @@ export interface MentorAiChatPort {
     question: string;
     conversationId: string;
   }): Promise<LLMGenerateResponse>;
+
+  /**
+   * メンター用LLM応答をストリーミングで生成
+   * SSEイベントをコールバックで受信
+   */
+  generateMentorResponseStream(
+    input: {
+      question: string;
+      conversationId: string;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }

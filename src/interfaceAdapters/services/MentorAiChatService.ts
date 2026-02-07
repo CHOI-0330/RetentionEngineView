@@ -9,7 +9,7 @@
 import type { Conversation, Message, MessageSources } from "../../domain/core";
 import type { UseCaseResult } from "../../application/entitle/models";
 import type { MentorAiChatUseCase } from "../../application/entitle/MentorAiChatUseCase";
-import type { LLMGenerateResponse } from "../gateways/api/types";
+import type { LLMGenerateResponse, SSEEvent } from "../gateways/api/types";
 
 // ============================================
 // ViewModel型定義
@@ -102,6 +102,21 @@ export class MentorAiChatService {
     conversationId: string,
   ): Promise<UseCaseResult<LLMGenerateResponse>> {
     return this.useCase.generateResponse(question, conversationId);
+  }
+
+  /**
+   * ストリーミング版 LLM応答を生成
+   * SSEイベントをコールバックで受信
+   */
+  async generateResponseStream(
+    input: {
+      question: string;
+      conversationId: string;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this.useCase.generateResponseStream(input, onEvent, signal);
   }
 
   // ============================================

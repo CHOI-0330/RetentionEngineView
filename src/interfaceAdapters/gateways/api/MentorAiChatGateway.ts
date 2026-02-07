@@ -7,7 +7,7 @@
 
 import type { Conversation, Message, MessageSources } from "../../../domain/core";
 import type { MentorAiChatPort } from "../../../application/entitle/ports/MentorAiChatPort";
-import type { LLMGenerateResponse } from "./types";
+import type { LLMGenerateResponse, SSEEvent } from "./types";
 import { apiFetch } from "../../../lib/api";
 import { createErrorFromStatus } from "../../errors";
 
@@ -165,5 +165,75 @@ export class MentorAiChatGateway implements MentorAiChatPort {
     }
 
     return result.data;
+  }
+
+  /**
+   * ストリーミング版 メンターLLM応答生成
+   * SSEイベントをコールバックで受信
+   */
+  async generateMentorResponseStream(
+    input: {
+      question: string;
+      conversationId: string;
+    },
+    onEvent: (event: SSEEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const response = await fetch("/api/llm/mentor/generate/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.accessToken
+          ? { Authorization: `Bearer ${this.accessToken}` }
+          : {}),
+      },
+      body: JSON.stringify(input),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw createErrorFromStatus(
+        response.status,
+        "ストリーミング接続に失敗しました"
+      );
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(line.slice(6)) as SSEEvent;
+              onEvent(event);
+            } catch {
+              // JSON parse error — skip this line
+            }
+          }
+        }
+      }
+
+      // 残りのバッファを処理
+      if (buffer.startsWith("data: ")) {
+        try {
+          const event = JSON.parse(buffer.slice(6)) as SSEEvent;
+          onEvent(event);
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 }

@@ -29,6 +29,24 @@ interface MentorAiChatViewProps {
 }
 
 // ============================================
+// ヘルパー関数
+// ============================================
+
+/**
+ * ストリーミングステップをユーザーフレンドリーなラベルに変換
+ */
+function getStepLabel(step: string): string {
+  const stepLabels: Record<string, string> = {
+    file_search: "ファイルを検索中...",
+    web_search: "Webを検索中...",
+    synthesis: "回答を生成中...",
+    thinking: "考え中...",
+    analyzing: "分析中...",
+  };
+  return stepLabels[step] ?? `${step}...`;
+}
+
+// ============================================
 // View コンポーネント
 // ============================================
 
@@ -44,6 +62,7 @@ export const MentorAiChatView = memo(function MentorAiChatView({
     isSending,
     isAwaitingAssistant,
     newMessage,
+    streamingStep,
     knowledgeDetection,
     triggerDetection,
     actions,
@@ -213,7 +232,9 @@ export const MentorAiChatView = memo(function MentorAiChatView({
                 {isAwaitingAssistant && (
                   <span className="flex items-center gap-1.5 text-primary text-sm font-medium">
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                    AIが回答を準備しています...
+                    {streamingStep
+                      ? getStepLabel(streamingStep)
+                      : "AIが回答を準備しています..."}
                   </span>
                 )}
               </div>

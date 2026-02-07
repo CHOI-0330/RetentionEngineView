@@ -7,15 +7,14 @@
  * - ViewModelをViewに提供
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 import type { Conversation, Message } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
 import { createMentorAiChatService } from "../../application/entitle/factories/MentorAiChatFactory";
-import type {
-  MentorAiChatService,
-} from "../services/MentorAiChatService";
+import type { MentorAiChatService } from "../services/MentorAiChatService";
+import type { SSEEvent } from "../gateways/api/types";
 import type {
   MentorAiConversationViewModel,
   MentorAiMessageViewModel,
@@ -44,6 +43,9 @@ interface PresenterState {
   isSending: boolean;
   isAwaitingAssistant: boolean;
   newMessage: string;
+  // ストリーミング状態
+  streamingContent: string;
+  streamingStep: string | null;
 }
 
 // ============================================
@@ -70,6 +72,8 @@ export interface MentorAiChatPresenterOutput {
   isSending: boolean;
   isAwaitingAssistant: boolean;
   newMessage: string;
+  // ストリーミング状態
+  streamingStep: string | null;
   // 暗黙知検出
   knowledgeDetection: KnowledgeDetectionState;
   // トリガー検出（リアルタイム）
@@ -101,6 +105,8 @@ const initialState: PresenterState = {
   isSending: false,
   isAwaitingAssistant: false,
   newMessage: "",
+  streamingContent: "",
+  streamingStep: null,
 };
 
 // ============================================
@@ -120,6 +126,12 @@ export function useMentorAiChatPresenter(
 
   // 状態
   const [state, setState] = useState<PresenterState>(initialState);
+
+  // ストリーミング用Ref
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const pendingContentRef = useRef<string>("");
+  const isBusyRef = useRef(false);
 
   // 暗黙知検出（ラウンドベース）
   const knowledgeDetection = useKnowledgeDetection({
@@ -232,15 +244,15 @@ export function useMentorAiChatPresenter(
   }, []);
 
   const sendMessage = useCallback(async () => {
+    // useRef による同期ガード（stale closure でもすり抜けない）
+    if (isBusyRef.current) return;
     if (!service || !userId) return;
 
-    const { activeConversation, newMessage, isSending, isAwaitingAssistant } =
-      state;
+    const { activeConversation, newMessage } = state;
 
-    // 重複防止
-    if (isSending || isAwaitingAssistant) return;
     if (!activeConversation || !newMessage.trim()) return;
 
+    isBusyRef.current = true;
     const questionText = newMessage.trim();
     setState((prev) => ({ ...prev, isSending: true, error: null }));
 
@@ -252,6 +264,7 @@ export function useMentorAiChatPresenter(
     );
 
     if (sendResult.kind === "failure") {
+      isBusyRef.current = false;
       setState((prev) => ({
         ...prev,
         isSending: false,
@@ -260,91 +273,207 @@ export function useMentorAiChatPresenter(
       return;
     }
 
-    // ユーザーメッセージをローカル状態に追加
+    // ユーザーメッセージをローカル状態に追加 + プレースホルダーアシスタントメッセージを追加
+    const placeholderMsgId = `streaming-${Date.now()}`;
+    const placeholderAssistant: Message = {
+      msgId: placeholderMsgId,
+      convId: activeConversation.convId,
+      role: "ASSISTANT",
+      content: "",
+      status: "PARTIAL",
+      createdAt: new Date().toISOString(),
+    };
+
     setState((prev) => ({
       ...prev,
       newMessage: "",
       isSending: false,
       isAwaitingAssistant: true,
-      messages: [...prev.messages, sendResult.value],
+      streamingContent: "",
+      streamingStep: null,
+      messages: [...prev.messages, sendResult.value, placeholderAssistant],
     }));
 
-    // 2. LLM応答を生成
-    const llmResult = await service.generateResponse(
-      questionText,
-      activeConversation.convId,
-    );
+    // 2. ストリーミングLLM応答
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    pendingContentRef.current = "";
 
-    if (llmResult.kind === "failure") {
+    let accumulatedContent = "";
+    let accumulatedSources: Message["sources"] | undefined;
+
+    // RAF でバッチ更新するヘルパー
+    const flushContent = () => {
+      const content = pendingContentRef.current;
+      setState((prev) => {
+        const msgs = [...prev.messages];
+        const lastIdx = msgs.length - 1;
+        if (lastIdx >= 0 && msgs[lastIdx].msgId === placeholderMsgId) {
+          msgs[lastIdx] = { ...msgs[lastIdx], content };
+        }
+        return {
+          ...prev,
+          streamingContent: content,
+          messages: msgs,
+        };
+      });
+      rafIdRef.current = null;
+    };
+
+    const scheduleFlush = () => {
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushContent);
+      }
+    };
+
+    const handleSSEEvent = (event: SSEEvent) => {
+      switch (event.type) {
+        case "chunk":
+          accumulatedContent += event.data;
+          pendingContentRef.current = accumulatedContent;
+          scheduleFlush();
+          break;
+
+        case "step":
+          setState((prev) => ({ ...prev, streamingStep: event.data }));
+          break;
+
+        case "sources":
+          if (event.metadata?.sources) {
+            accumulatedSources = event.metadata.sources;
+          }
+          break;
+
+        case "done":
+          // 最終フラッシュ
+          if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+          pendingContentRef.current = accumulatedContent;
+          flushContent();
+          break;
+
+        case "error": {
+          const errMsg = event.metadata?.error?.message ?? event.data ?? "ストリーミング中にエラーが発生しました";
+          setState((prev) => ({
+            ...prev,
+            streamingStep: null,
+            error: { kind: "ExternalServiceError", message: errMsg },
+          }));
+          break;
+        }
+      }
+    };
+
+    try {
+      await service.generateResponseStream(
+        {
+          question: questionText,
+          conversationId: activeConversation.convId,
+        },
+        handleSSEEvent,
+        abortController.signal,
+      );
+    } catch (err) {
+      // AbortErrorは無視（ユーザーキャンセル）
+      if (err instanceof Error && err.name === "AbortError") {
+        // 部分コンテンツは維持
+      } else {
+        const errMsg = err instanceof Error ? err.message : "ストリーミング中にエラーが発生しました";
+        setState((prev) => ({
+          ...prev,
+          error: { kind: "ExternalServiceError", message: errMsg },
+        }));
+      }
+    }
+
+    // RAFクリーンアップ
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    abortControllerRef.current = null;
+
+    // 3. アシスタントメッセージ保存（ストリーミング完了後）
+    const finalContent = accumulatedContent || pendingContentRef.current;
+    if (!finalContent) {
+      // ストリーミングでコンテンツが取得できなかった場合
+      isBusyRef.current = false;
       setState((prev) => ({
         ...prev,
         isAwaitingAssistant: false,
-        error: llmResult.error,
+        streamingStep: null,
+        streamingContent: "",
       }));
       return;
     }
 
-    // 2.5. トリガー検出結果を記録（ユーザーメッセージに紐づけ）
-    if (llmResult.value.triggerDetection?.detected) {
-      triggerDetection.actions.recordTrigger(
-        sendResult.value.msgId,
-        llmResult.value.triggerDetection,
-      );
-    }
-
-    // Story 2-10: セッション状態を記録（V2自動ヒアリング）
-    // 新規セッション開始時（ラウンド1）: ユーザーメッセージIDをtriggerMsgIdとして渡す
-    if (llmResult.value.triggerSession) {
-      const isNewSession = llmResult.value.triggerSession.hearingRound === 1;
-      triggerDetection.actions.recordSession(
-        llmResult.value.triggerSession,
-        isNewSession ? sendResult.value.msgId : undefined,
-      );
-    }
-
-    // 3. アシスタントメッセージをDraft→Finalize
     const beginResult = await service.beginAssistantMessage(
       activeConversation.convId,
     );
 
     if (beginResult.kind === "failure") {
-      setState((prev) => ({
-        ...prev,
-        isAwaitingAssistant: false,
-        error: beginResult.error,
-      }));
+      // 保存は失敗したがストリーミングコンテンツは表示を維持
+      isBusyRef.current = false;
+      setState((prev) => {
+        const msgs = [...prev.messages];
+        const lastIdx = msgs.length - 1;
+        if (lastIdx >= 0 && msgs[lastIdx].msgId === placeholderMsgId) {
+          msgs[lastIdx] = {
+            ...msgs[lastIdx],
+            content: finalContent,
+            status: "DONE",
+            sources: accumulatedSources,
+          };
+        }
+        return {
+          ...prev,
+          isAwaitingAssistant: false,
+          streamingStep: null,
+          streamingContent: "",
+          messages: msgs,
+        };
+      });
       return;
     }
 
     const finalizeResult = await service.finalizeAssistantMessage(
       beginResult.value.msgId,
-      llmResult.value.answer,
+      finalContent,
       activeConversation.convId,
-      llmResult.value.sources,
+      accumulatedSources,
     );
 
-    // アシスタントメッセージをローカル状態に追加
+    // プレースホルダーを実際のメッセージに置き換え
+    isBusyRef.current = false;
     setState((prev) => {
       const assistantMessage =
         finalizeResult.kind === "success"
-          ? { ...finalizeResult.value, sources: llmResult.value.sources }
+          ? { ...finalizeResult.value, sources: accumulatedSources }
           : {
               ...beginResult.value,
-              content: llmResult.value.answer,
+              content: finalContent,
               status: "DONE" as const,
-              sources: llmResult.value.sources,
+              sources: accumulatedSources,
             };
+
+      const msgs = prev.messages.map((m) =>
+        m.msgId === placeholderMsgId ? assistantMessage : m,
+      );
 
       return {
         ...prev,
         isAwaitingAssistant: false,
-        messages: [...prev.messages, assistantMessage],
+        streamingStep: null,
+        streamingContent: "",
+        messages: msgs,
       };
     });
 
     // 暗黙知検出: ラウンドカウンタ更新（自動検出トリガー）
     knowledgeDetection.actions.onMessageSent();
-  }, [state, service, userId, knowledgeDetection.actions, triggerDetection.actions]);
+  }, [state, service, userId, knowledgeDetection.actions]);
 
   const createConversation = useCallback(
     async (title: string) => {
@@ -477,6 +606,7 @@ export function useMentorAiChatPresenter(
     isSending: state.isSending,
     isAwaitingAssistant: state.isAwaitingAssistant,
     newMessage: state.newMessage,
+    streamingStep: state.streamingStep,
     knowledgeDetection: knowledgeDetection.state,
     triggerDetection: triggerDetection.state,
     actions: {
