@@ -101,12 +101,9 @@ export interface ACStreamEvent {
 
 export class AnswerCardGateway {
   private accessToken?: string;
-  private baseUrl: string;
 
   constructor(config: GatewayConfig = {}) {
     this.accessToken = config.accessToken;
-    this.baseUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5001";
   }
 
   setAccessToken(token: string | undefined): void {
@@ -189,7 +186,7 @@ export class AnswerCardGateway {
     request: GenerateAnswerRequest,
   ): Promise<GenerateAnswerResponse> {
     const result = await apiFetch<GenerateAnswerResponse>(
-      `${this.baseUrl}/answer-cards/generate`,
+      "/api/answer-cards/generate",
       {
         method: "POST",
         body: request,
@@ -211,7 +208,7 @@ export class AnswerCardGateway {
     request: SaveAnswerCardRequest,
   ): Promise<SaveAnswerCardResponse> {
     const result = await apiFetch<SaveAnswerCardResponse>(
-      `${this.baseUrl}/answer-cards`,
+      "/api/answer-cards",
       {
         method: "POST",
         body: request,
@@ -238,7 +235,7 @@ export class AnswerCardGateway {
     if (query.offset) params.set("offset", String(query.offset));
 
     const qs = params.toString();
-    const url = `${this.baseUrl}/answer-cards${qs ? `?${qs}` : ""}`;
+    const url = `/api/answer-cards${qs ? `?${qs}` : ""}`;
 
     const result = await apiFetch<ACListResponse>(url, {
       method: "GET",
@@ -256,7 +253,7 @@ export class AnswerCardGateway {
    * 質問カードに対する回答カード一覧取得（KC形式）
    */
   async getAnswersByQuestionCard(questionCardId: string): Promise<ACListResponse> {
-    const url = `${this.baseUrl}/answer-cards/question/${questionCardId}`;
+    const url = `/api/answer-cards/question/${questionCardId}`;
 
     const result = await apiFetch<ACListResponse>(url, {
       method: "GET",
@@ -275,7 +272,7 @@ export class AnswerCardGateway {
    */
   async getAnswerCard(id: string): Promise<ACListItem> {
     const result = await apiFetch<ACListItem>(
-      `${this.baseUrl}/answer-cards/${id}`,
+      `/api/answer-cards/${id}`,
       {
         method: "GET",
         accessToken: this.accessToken,
@@ -294,7 +291,7 @@ export class AnswerCardGateway {
    */
   async deleteAnswerCard(id: string): Promise<void> {
     const result = await apiFetch<void>(
-      `${this.baseUrl}/answer-cards/${id}`,
+      `/api/answer-cards/${id}`,
       {
         method: "DELETE",
         accessToken: this.accessToken,
