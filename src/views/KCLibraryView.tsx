@@ -39,6 +39,7 @@ interface KCLibraryViewProps {
   /** 質問カードタブ用 */
   qcViewModel?: QCListViewModel;
   qcActions?: QCListActions;
+  userRole?: string;
 }
 
 // ============================================
@@ -120,6 +121,7 @@ export default function KCLibraryView({
   accessToken,
   qcViewModel,
   qcActions,
+  userRole,
 }: KCLibraryViewProps) {
   const { items, total, isLoading, isLoadingMore, error, selectedStatus, hasMore } =
     viewModel;
@@ -192,6 +194,8 @@ export default function KCLibraryView({
               <QuestionCardTab
                 viewModel={qcViewModel}
                 actions={qcActions}
+                accessToken={accessToken}
+                userRole={userRole}
               />
             </Suspense>
           </TabsContent>

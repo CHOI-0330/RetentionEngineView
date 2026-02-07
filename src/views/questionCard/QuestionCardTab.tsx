@@ -29,6 +29,8 @@ import { QuestionCardDetailDialog } from "./QuestionCardDetailDialog";
 interface QuestionCardTabProps {
   viewModel: QCListViewModel;
   actions: QCListActions;
+  accessToken?: string;
+  userRole?: string;
 }
 
 // ============================================
@@ -61,6 +63,8 @@ const statusConfig = {
 export default function QuestionCardTab({
   viewModel,
   actions,
+  accessToken,
+  userRole,
 }: QuestionCardTabProps) {
   const {
     items,
@@ -171,6 +175,9 @@ export default function QuestionCardTab({
       <QuestionCardDetailDialog
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
+        accessToken={accessToken}
+        onRefresh={actions.refresh}
+        userRole={userRole}
       />
     </div>
   );

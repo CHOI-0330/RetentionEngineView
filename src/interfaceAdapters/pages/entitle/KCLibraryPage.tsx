@@ -44,6 +44,7 @@ const KCLibraryPage = () => {
       accessToken={session?.accessToken}
       qcViewModel={qcPresenter.viewModel}
       qcActions={qcPresenter.actions}
+      userRole={session?.role}
     />
   );
 };

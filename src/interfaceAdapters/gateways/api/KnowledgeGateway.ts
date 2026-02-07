@@ -121,11 +121,9 @@ export interface UpdateKnowledgeCardRequest {
 
 export class KnowledgeGateway {
   private accessToken?: string;
-  private baseUrl: string;
 
   constructor(config: GatewayConfig = {}) {
     this.accessToken = config.accessToken;
-    this.baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5001";
   }
 
   setAccessToken(token: string | undefined): void {
@@ -139,7 +137,7 @@ export class KnowledgeGateway {
     request: DetectTacitKnowledgeRequest
   ): Promise<DetectTacitKnowledgeResponse> {
     const result = await apiFetch<DetectTacitKnowledgeResponse>(
-      `${this.baseUrl}/knowledge/detect-tacit`,
+      "/api/knowledge/detect-tacit",
       {
         method: "POST",
         body: request,
@@ -161,7 +159,7 @@ export class KnowledgeGateway {
     request: SaveKnowledgeCardRequest
   ): Promise<SaveKnowledgeCardResponse> {
     const result = await apiFetch<SaveKnowledgeCardResponse>(
-      `${this.baseUrl}/knowledge/cards`,
+      "/api/knowledge/cards",
       {
         method: "POST",
         body: request,
@@ -191,7 +189,7 @@ export class KnowledgeGateway {
     if (query.offset) params.set("offset", String(query.offset));
 
     const qs = params.toString();
-    const url = `${this.baseUrl}/knowledge/cards${qs ? `?${qs}` : ""}`;
+    const url = `/api/knowledge/cards${qs ? `?${qs}` : ""}`;
 
     const result = await apiFetch<KCListResponse>(url, {
       method: "GET",
@@ -210,7 +208,7 @@ export class KnowledgeGateway {
    */
   async getKnowledgeCard(id: string): Promise<KCDetail> {
     const result = await apiFetch<KCDetail>(
-      `${this.baseUrl}/knowledge/cards/${id}`,
+      `/api/knowledge/cards/${id}`,
       {
         method: "GET",
         accessToken: this.accessToken,
@@ -232,7 +230,7 @@ export class KnowledgeGateway {
     data: UpdateKnowledgeCardRequest
   ): Promise<KCDetail> {
     const result = await apiFetch<KCDetail>(
-      `${this.baseUrl}/knowledge/cards/${id}`,
+      `/api/knowledge/cards/${id}`,
       {
         method: "PATCH",
         body: data,
@@ -252,7 +250,7 @@ export class KnowledgeGateway {
    */
   async markUseful(id: string): Promise<void> {
     const result = await apiFetch<{ success: boolean }>(
-      `${this.baseUrl}/knowledge/cards/${id}/useful`,
+      `/api/knowledge/cards/${id}/useful`,
       {
         method: "POST",
         accessToken: this.accessToken,

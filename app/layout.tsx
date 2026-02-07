@@ -50,12 +50,6 @@ export default function RootLayout({
                   >
                     Retention Engine
                   </Link>
-                  <Link
-                    href="/student/knowledge"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    ナレッジ
-                  </Link>
                 </div>
                 <div className="flex items-center gap-4">
                   <AppUserMenu />
