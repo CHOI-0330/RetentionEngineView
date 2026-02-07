@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, lazy, Suspense } from "react";
-import { Search, BookOpen, Loader2, RefreshCw, ThumbsUp, Eye, Lightbulb, AlertTriangle, MapPin } from "lucide-react";
+import { Search, BookOpen, Loader2, RefreshCw, ThumbsUp, Eye, Lightbulb, AlertTriangle, MapPin, Star, FileText } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -70,16 +70,18 @@ const statusLabels: Record<KCStatus, string> = {
   official: "公式",
 };
 
-// マークダウンコンテンツを状況/ノウハウ/注意点に分割
+// マークダウンコンテンツを状況/ノウハウ/注意点/重要性/具体例に分割
 interface ParsedContent {
   situation: string;
   knowhow: string;
   precaution: string;
+  importance: string;
+  example: string;
   raw: string;
 }
 
 function parseKCContent(content: string): ParsedContent {
-  const result: ParsedContent = { situation: "", knowhow: "", precaution: "", raw: content };
+  const result: ParsedContent = { situation: "", knowhow: "", precaution: "", importance: "", example: "", raw: content };
   const sections = content.split(/^##\s+/m).filter(Boolean);
   for (const section of sections) {
     const lines = section.split("\n");
@@ -91,6 +93,10 @@ function parseKCContent(content: string): ParsedContent {
       result.knowhow = body;
     } else if (heading.includes("注意点") || heading.includes("precaution") || heading.includes("注意")) {
       result.precaution = body;
+    } else if (heading.includes("重要性") || heading.includes("importance")) {
+      result.importance = body;
+    } else if (heading.includes("具体例") || heading.includes("example")) {
+      result.example = body;
     }
   }
   return result;
@@ -100,6 +106,8 @@ const SECTION_CONFIG = [
   { key: "situation" as const, label: "状況", icon: MapPin, color: "text-blue-600", bg: "bg-blue-50" },
   { key: "knowhow" as const, label: "ノウハウ", icon: Lightbulb, color: "text-amber-600", bg: "bg-amber-50" },
   { key: "precaution" as const, label: "注意点", icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
+  { key: "importance" as const, label: "重要性", icon: Star, color: "text-purple-600", bg: "bg-purple-50" },
+  { key: "example" as const, label: "具体例", icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50" },
 ] as const;
 
 // ============================================
@@ -400,7 +408,19 @@ function KCCard({
             <p className="text-xs text-muted-foreground line-clamp-1">{parsed.precaution}</p>
           </div>
         )}
-        {!parsed.situation && !parsed.knowhow && !parsed.precaution && (
+        {parsed.importance && (
+          <div className="flex items-start gap-1.5">
+            <Star className="h-3 w-3 text-purple-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-muted-foreground line-clamp-1">{parsed.importance}</p>
+          </div>
+        )}
+        {parsed.example && (
+          <div className="flex items-start gap-1.5">
+            <FileText className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-muted-foreground line-clamp-1">{parsed.example}</p>
+          </div>
+        )}
+        {!parsed.situation && !parsed.knowhow && !parsed.precaution && !parsed.importance && !parsed.example && (
           <p className="text-xs text-muted-foreground line-clamp-3">{item.content}</p>
         )}
       </div>
@@ -449,6 +469,9 @@ function KCDetailDialog({
 }) {
   const [isMarkingUseful, setIsMarkingUseful] = useState(false);
 
+  const parsed = useMemo(() => (item ? parseKCContent(item.content) : null), [item?.content]);
+  const hasSections = parsed && (parsed.situation || parsed.knowhow || parsed.precaution || parsed.importance || parsed.example);
+
   if (!item) return null;
 
   const handleMarkUseful = async () => {
@@ -490,10 +513,28 @@ function KCDetailDialog({
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {/* 全文（マークダウン） */}
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">
-            {item.content}
-          </div>
+          {/* セクション別表示 or 全文 */}
+          {hasSections ? (
+            <div className="space-y-3">
+              {SECTION_CONFIG.map(({ key, label, icon: Icon, color, bg }) => {
+                const value = parsed[key];
+                if (!value) return null;
+                return (
+                  <div key={key} className={`rounded-lg ${bg} p-3`}>
+                    <div className={`flex items-center gap-1.5 text-xs font-medium ${color} mb-1`}>
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{value}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-sm leading-relaxed whitespace-pre-wrap">
+              {item.content}
+            </div>
+          )}
 
           {/* タグ一覧 */}
           {item.tags.length > 0 && (

@@ -21,6 +21,8 @@ export interface KCCandidate {
   situation: string;
   knowhow: string;
   precaution: string;
+  importance?: string;
+  example?: string;
   tags: string[];
   confidence: number;
   sourceMessageRange?: { start: number; end: number };
@@ -107,6 +109,8 @@ export interface UpdateKnowledgeCardRequest {
   situation?: string;
   knowhow?: string;
   precaution?: string;
+  importance?: string;
+  example?: string;
   tags?: string[];
   status?: KCStatus;
 }

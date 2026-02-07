@@ -139,6 +139,18 @@ function KCCandidateCard({
             {candidate.precaution}
           </p>
         )}
+        {candidate.importance && (
+          <p>
+            <span className="font-medium text-foreground">重要性: </span>
+            {candidate.importance}
+          </p>
+        )}
+        {candidate.example && (
+          <p>
+            <span className="font-medium text-foreground">具体例: </span>
+            {candidate.example}
+          </p>
+        )}
       </div>
 
       {/* アクションボタン */}

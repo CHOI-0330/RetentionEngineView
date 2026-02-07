@@ -103,6 +103,7 @@ export interface TriggerKCCandidate {
   precaution: string;
   tags: string[];
   importance?: string;
+  example?: string;
 }
 
 /**

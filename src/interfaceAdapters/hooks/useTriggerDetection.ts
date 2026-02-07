@@ -285,6 +285,8 @@ export function useTriggerDetection({
           situation: kc.situation,
           knowhow: kc.knowhow,
           precaution: kc.precaution,
+          importance: kc.importance,
+          example: kc.example,
           tags: kc.tags,
           confidence: 0.8, // ヒアリング完了時のデフォルト信頼度
         };
@@ -317,6 +319,8 @@ export function useTriggerDetection({
       situation: kc.situation,
       knowhow: kc.knowhow,
       precaution: kc.precaution,
+      importance: kc.importance,
+      example: kc.example,
       tags: kc.tags,
       confidence: 0.8,
     };

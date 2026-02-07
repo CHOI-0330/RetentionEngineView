@@ -43,7 +43,7 @@ export function KCEditModal({ candidate, onClose, onSave }: KCEditModalProps) {
   if (!form) return null;
 
   const handleFieldChange = (
-    field: keyof Pick<KCCandidate, "title" | "situation" | "knowhow" | "precaution">,
+    field: keyof Pick<KCCandidate, "title" | "situation" | "knowhow" | "precaution" | "importance" | "example">,
     value: string,
   ) => {
     setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -136,6 +136,28 @@ export function KCEditModal({ candidate, onClose, onSave }: KCEditModalProps) {
               value={form.precaution}
               onChange={(e) => handleFieldChange("precaution", e.target.value)}
               placeholder="注意すべきこと（任意）"
+            />
+          </FieldRow>
+
+          {/* 重要性 */}
+          <FieldRow label="重要性">
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              value={form.importance ?? ""}
+              onChange={(e) => handleFieldChange("importance", e.target.value)}
+              placeholder="なぜ重要なのか（任意）"
+            />
+          </FieldRow>
+
+          {/* 具体例 */}
+          <FieldRow label="具体例">
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              value={form.example ?? ""}
+              onChange={(e) => handleFieldChange("example", e.target.value)}
+              placeholder="具体的な事例（任意）"
             />
           </FieldRow>
 
