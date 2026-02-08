@@ -142,7 +142,7 @@ export interface LLMGenerateResponse {
 /**
  * SSEイベントタイプ
  */
-export type SSEEventType = "step" | "chunk" | "sources" | "done" | "error";
+export type SSEEventType = "step" | "chunk" | "sources" | "done" | "error" | "trigger" | "session";
 
 /**
  * パイプラインステップ識別子
@@ -165,6 +165,8 @@ export interface SSEEventMetadata {
   step?: PipelineStep;
   sources?: ResponseSources;
   error?: SSEEventError;
+  triggerDetection?: TriggerDetectionResult;
+  triggerSession?: TriggerSessionResponse;
 }
 
 /**

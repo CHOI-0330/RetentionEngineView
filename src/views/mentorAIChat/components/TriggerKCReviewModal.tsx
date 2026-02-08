@@ -45,8 +45,20 @@ interface TriggerKCReviewModalProps {
   onDismiss: (triggerId: string) => void;
 }
 
-// トリガーからKCCandidateへの初期変換
+// トリガーからKCCandidateへの初期変換（V2対応）
 function triggerToCandidate(trigger: TriggerItem): KCCandidate {
+  // V2: initialKCがあればそのまま活用
+  if (trigger.initialKC) {
+    return {
+      title: trigger.initialKC.title || "暗黙知",
+      situation: trigger.initialKC.situation || "",
+      knowhow: trigger.initialKC.knowhow || "",
+      precaution: trigger.initialKC.precaution || "",
+      tags: trigger.initialKC.tags?.length ? trigger.initialKC.tags : (trigger.triggerType ? [trigger.triggerType] : []),
+      confidence: trigger.confidence,
+    };
+  }
+  // V1フォールバック: excerptから生成
   const excerpt = trigger.excerpt ?? "";
   return {
     title: excerpt.length > 40 ? excerpt.substring(0, 40) + "..." : excerpt || "暗黙知",

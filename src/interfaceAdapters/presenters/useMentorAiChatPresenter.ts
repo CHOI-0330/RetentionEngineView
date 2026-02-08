@@ -14,7 +14,11 @@ import type { Conversation, Message } from "../../domain/core";
 import type { UseCaseFailure } from "../../application/entitle/models";
 import { createMentorAiChatService } from "../../application/entitle/factories/MentorAiChatFactory";
 import type { MentorAiChatService } from "../services/MentorAiChatService";
-import type { SSEEvent } from "../gateways/api/types";
+import type {
+  SSEEvent,
+  TriggerDetectionResult,
+  TriggerSessionResponse,
+} from "../gateways/api/types";
 import type {
   MentorAiConversationViewModel,
   MentorAiMessageViewModel,
@@ -345,6 +349,10 @@ export function useMentorAiChatPresenter(
           break;
 
         case "done":
+          // マーカー除去済みのクリーンコンテンツがあれば置き換え
+          if (event.data) {
+            accumulatedContent = event.data;
+          }
           // 最終フラッシュ
           if (rafIdRef.current !== null) {
             cancelAnimationFrame(rafIdRef.current);
@@ -353,6 +361,35 @@ export function useMentorAiChatPresenter(
           pendingContentRef.current = accumulatedContent;
           flushContent();
           break;
+
+        case "trigger": {
+          try {
+            const raw = JSON.parse(event.data);
+            if (raw.detected) {
+              // V2データをそのまま渡す（recordTriggerがV2対応済み）
+              triggerDetection.actions.recordTrigger(
+                sendResult.value.msgId,
+                raw,
+              );
+            }
+          } catch {
+            // Ignore parse errors
+          }
+          break;
+        }
+
+        case "session": {
+          try {
+            const sessionResponse = JSON.parse(event.data) as TriggerSessionResponse;
+            triggerDetection.actions.recordSession(
+              sessionResponse,
+              sendResult.value.msgId,
+            );
+          } catch {
+            // Ignore parse errors
+          }
+          break;
+        }
 
         case "error": {
           const errMsg = event.metadata?.error?.message ?? event.data ?? "ストリーミング中にエラーが発生しました";
@@ -471,9 +508,9 @@ export function useMentorAiChatPresenter(
       };
     });
 
-    // 暗黙知検出: ラウンドカウンタ更新（自動検出トリガー）
-    knowledgeDetection.actions.onMessageSent();
-  }, [state, service, userId, knowledgeDetection.actions]);
+    // 暗黙知検出: ラウンドベース検出は無効化（V2リアルタイム検出に統合済み）
+    // knowledgeDetection.actions.onMessageSent();
+  }, [state, service, userId]);
 
   const createConversation = useCallback(
     async (title: string) => {

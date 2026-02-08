@@ -25,10 +25,14 @@ export interface TriggerItem {
   triggerType: string | null;
   /** 信頼度 */
   confidence: number;
-  /** 原文抜粋 */
+  /** 原文抜粋 (V1互換) */
   excerpt: string | null;
-  /** フォローアップ質問 */
+  /** フォローアップ質問 (V1互換) */
   followUpQuestion?: string;
+  /** V2: 初期KC候補（トリガー検出時のAI分析結果） */
+  initialKC?: TriggerKCCandidate;
+  /** V2: ヒアリング質問 */
+  hearingQuestion?: string;
   /** 状態 */
   status: "pending" | "saved" | "dismissed";
 }
@@ -145,10 +149,13 @@ export function useTriggerDetection({
   );
 
   /**
-   * LLM応答からトリガーを記録 (V1互換)
+   * LLM応答からトリガーを記録 (V2対応)
    */
   const recordTrigger = useCallback(
-    (userMsgId: string, result: TriggerDetectionResult) => {
+    (userMsgId: string, result: TriggerDetectionResult & {
+      initialKC?: TriggerKCCandidate;
+      hearingQuestion?: string;
+    }) => {
       if (!result.detected) return;
 
       const newTrigger: TriggerItem = {
@@ -156,8 +163,12 @@ export function useTriggerDetection({
         userMsgId,
         triggerType: result.triggerType,
         confidence: result.confidence,
-        excerpt: result.excerpt,
-        followUpQuestion: result.followUpQuestion,
+        // V2: initialKCからexcerptを生成（V1互換）
+        excerpt: result.initialKC?.knowhow ?? result.excerpt,
+        followUpQuestion: result.hearingQuestion ?? result.followUpQuestion,
+        // V2固有フィールド
+        initialKC: result.initialKC,
+        hearingQuestion: result.hearingQuestion,
         status: "pending",
       };
 

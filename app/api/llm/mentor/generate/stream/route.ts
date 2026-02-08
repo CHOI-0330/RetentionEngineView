@@ -105,11 +105,9 @@ export async function POST(request: NextRequest) {
       conversationId,
     };
 
-    // バックエンドのSSEエンドポイントにプロキシ
-    // NOTE: メンター用の専用エンドポイントが存在しないため、汎用のストリーミングエンドポイントを使用
-    // 会話IDに基づいてバックエンドがメンター/学生を区別する
+    // バックエンドのメンター専用SSEエンドポイントにプロキシ
     const backendResponse = await fetch(
-      `${BACKEND_BASE_URL}/llm/generate/stream`,
+      `${BACKEND_BASE_URL}/llm/mentor/generate/stream`,
       {
         method: "POST",
         headers: {
@@ -122,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     if (!backendResponse.ok) {
       const text = await backendResponse.text();
-      console.error("[llm-mentor-generate-stream][error]", backendResponse.status, text, "(via /llm/generate/stream)");
+      console.error("[llm-mentor-generate-stream][error]", backendResponse.status, text, "(via /llm/mentor/generate/stream)");
       return new Response(
         JSON.stringify({
           error: "バックエンドサービスに接続できません",
