@@ -134,10 +134,15 @@ export function useTriggerDetection({
     return () => clearTimeout(timeoutId);
   }, [savedMessage]);
 
-  // 未保存件数
+  // 未保存件数（ヒアリングセッション中のトリガーは除外）
   const unsavedCount = useMemo(
-    () => triggers.filter((t) => t.status === "pending").length,
-    [triggers],
+    () => triggers.filter((t) => {
+      if (t.status !== "pending") return false;
+      // アクティブなヒアリングセッションに紐づくトリガーは除外
+      if (hearingSession && hearingSession.triggerMsgId === t.userMsgId) return false;
+      return true;
+    }).length,
+    [triggers, hearingSession],
   );
 
   const hasTriggers = unsavedCount > 0;

@@ -54,6 +54,8 @@ function triggerToCandidate(trigger: TriggerItem): KCCandidate {
       situation: trigger.initialKC.situation || "",
       knowhow: trigger.initialKC.knowhow || "",
       precaution: trigger.initialKC.precaution || "",
+      importance: trigger.initialKC.importance || "",
+      example: trigger.initialKC.example || "",
       tags: trigger.initialKC.tags?.length ? trigger.initialKC.tags : (trigger.triggerType ? [trigger.triggerType] : []),
       confidence: trigger.confidence,
     };
@@ -65,6 +67,8 @@ function triggerToCandidate(trigger: TriggerItem): KCCandidate {
     situation: "",
     knowhow: excerpt,
     precaution: "",
+    importance: "",
+    example: "",
     tags: trigger.triggerType ? [trigger.triggerType] : [],
     confidence: trigger.confidence,
   };
@@ -164,7 +168,7 @@ function SingleReviewModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-500" />
@@ -204,6 +208,18 @@ function SingleReviewModal({
             />
           </div>
           <div className="space-y-1.5">
+            <label className="text-sm font-medium">状況</label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              value={form.situation}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, situation: e.target.value }))
+              }
+              placeholder="この知識が役立つ場面・条件"
+            />
+          </div>
+          <div className="space-y-1.5">
             <label className="text-sm font-medium">ノウハウ</label>
             <textarea
               className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
@@ -213,6 +229,40 @@ function SingleReviewModal({
                 setForm((prev) => ({ ...prev, knowhow: e.target.value }))
               }
               placeholder="具体的なノウハウ"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">注意点</label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              value={form.precaution}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, precaution: e.target.value }))
+              }
+              placeholder="やってはいけないこと、注意すべき点"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">重要性 (任意)</label>
+            <Input
+              value={form.importance ?? ""}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, importance: e.target.value }))
+              }
+              placeholder="なぜこの知識が新人に重要か"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">具体例 (任意)</label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              value={form.example ?? ""}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, example: e.target.value }))
+              }
+              placeholder="具体的な事例やエピソード"
             />
           </div>
         </div>
